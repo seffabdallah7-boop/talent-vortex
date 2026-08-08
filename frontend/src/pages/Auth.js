@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, formatApiError } from "@/context/AuthContext";
+import { useDarkMode } from "@/context/DarkModeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Briefcase, Loader2 } from "lucide-react";
+import { Briefcase, Loader2, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Auth() {
   const { login, register } = useAuth();
+  const { dark, toggle } = useDarkMode();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("login");
@@ -40,7 +42,15 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-screen grid lg:grid-cols-2 relative">
+      <button
+        onClick={toggle}
+        data-testid="auth-dark-toggle"
+        aria-label="Basculer le thème"
+        className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full border border-border bg-card flex items-center justify-center hover:bg-secondary transition-colors"
+      >
+        {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
       <div className="hidden lg:block relative grain">
         <img
           src="https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjB3b3JrZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODYyMTY1Nzh8MA&ixlib=rb-4.1.0&q=85"

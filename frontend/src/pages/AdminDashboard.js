@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useDarkMode } from "@/context/DarkModeContext";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
-  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2,
+  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,6 +62,7 @@ function hexToHsl(hex) {
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
+  const { dark, toggle } = useDarkMode();
   const navigate = useNavigate();
   const [section, setSection] = useState("overview");
 
@@ -85,8 +87,18 @@ export default function AdminDashboard() {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-border">
-          <p className="text-xs text-muted-foreground px-3 mb-2 truncate">{user?.email}</p>
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <button
+              onClick={toggle}
+              data-testid="admin-dark-toggle"
+              aria-label="Basculer le thème"
+              className="h-8 w-8 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+          </div>
           <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="admin-logout-btn">
             <LogOut className="h-4 w-4 mr-2" /> Déconnexion
           </Button>
