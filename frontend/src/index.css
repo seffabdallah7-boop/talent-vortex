@@ -40,22 +40,22 @@ body {
     }
 
     html.dark {
-        --background: 240 10% 6%;
-        --foreground: 0 0% 96%;
-        --card: 240 9% 10%;
-        --card-foreground: 0 0% 96%;
-        --popover: 240 9% 10%;
-        --popover-foreground: 0 0% 96%;
-        --secondary: 240 6% 15%;
-        --secondary-foreground: 0 0% 96%;
-        --muted: 240 5% 16%;
-        --muted-foreground: 240 5% 66%;
-        --accent: 240 6% 16%;
-        --accent-foreground: 0 0% 96%;
+        --background: 240 8% 13%;
+        --foreground: 0 0% 94%;
+        --card: 240 7% 17%;
+        --card-foreground: 0 0% 94%;
+        --popover: 240 7% 17%;
+        --popover-foreground: 0 0% 94%;
+        --secondary: 240 6% 23%;
+        --secondary-foreground: 0 0% 94%;
+        --muted: 240 5% 25%;
+        --muted-foreground: 240 5% 70%;
+        --accent: 240 6% 25%;
+        --accent-foreground: 0 0% 94%;
         --destructive: 0 72% 51%;
         --destructive-foreground: 0 0% 100%;
-        --border: 240 6% 20%;
-        --input: 240 6% 22%;
+        --border: 240 6% 30%;
+        --input: 240 6% 32%;
     }
 
     html { color-scheme: light; }
@@ -105,7 +105,7 @@ body {
 .dark .status-rejected { color: hsl(0 84% 70%); }
 
 .dark .glass {
-    background: hsl(240 10% 8% / 0.72);
+    background: hsl(240 8% 16% / 0.78);
     border: 1px solid hsl(0 0% 100% / 0.08);
 }
 
