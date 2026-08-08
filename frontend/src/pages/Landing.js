@@ -193,9 +193,9 @@ export default function Landing() {
               <div className="h-9 w-9 bg-primary flex items-center justify-center">
                 <Briefcase className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="font-display text-xl font-semibold">RecrutAI</span>
+              <span className="font-display text-xl font-semibold">Talent Vortex</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2026 RecrutAI — Le recrutement qui vous ressemble.</p>
+            <p className="text-sm text-muted-foreground">© 2026 Talent Vortex — Le recrutement qui vous ressemble.</p>
           </div>
           <a href="#offres" className="group font-display text-2xl md:text-3xl font-semibold flex items-center gap-2 hover:text-primary transition-colors">
             Voir les offres <MoveUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />

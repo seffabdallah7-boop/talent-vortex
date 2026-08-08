@@ -49,7 +49,7 @@ export default function Navbar() {
           <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
             <Briefcase className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-display text-xl font-semibold">RecrutAI</span>
+          <span className="font-display text-xl font-semibold">Talent Vortex</span>
         </Link>
         <nav className="flex items-center gap-3">
           <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">

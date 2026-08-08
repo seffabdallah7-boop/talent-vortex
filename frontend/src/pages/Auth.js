@@ -155,7 +155,7 @@ export default function Auth() {
         <div className="absolute inset-0 bg-primary/70 mix-blend-multiply" />
         <div className="relative h-full flex flex-col justify-end p-12 text-white">
           <h2 className="font-display text-4xl font-semibold leading-tight">Votre carrière commence ici.</h2>
-          <p className="text-white/80 mt-4 max-w-sm">Rejoignez RecrutAI et postulez aux meilleures offres avec votre CV et votre voix.</p>
+          <p className="text-white/80 mt-4 max-w-sm">Rejoignez Talent Vortex et postulez aux meilleures offres avec votre CV et votre voix.</p>
         </div>
       </div>
 
@@ -165,7 +165,7 @@ export default function Auth() {
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Briefcase className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="font-display text-xl font-semibold">RecrutAI</span>
+            <span className="font-display text-xl font-semibold">Talent Vortex</span>
           </div>
 
           <Tabs value={tab} onValueChange={(v) => { setTab(v); setStep("credentials"); refreshCaptcha(); }}>

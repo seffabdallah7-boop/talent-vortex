@@ -182,7 +182,7 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 # ---------------------------------------------------------------------------
 EMAIL_BASE_URL = "https://integrations.emergentagent.com"
 EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY")
-EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "RecrutAI")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Talent Vortex")
 ADMIN_ACCESS_CODE = os.environ.get("ADMIN_ACCESS_CODE", "")
 
 
@@ -251,7 +251,7 @@ def otp_email_html(code: str, name: str) -> str:
     return (
         f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
         f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
-        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
         f'<tr><td style="padding-top:12px;color:#333">Bonjour {name or ""}, voici votre code de connexion :</td></tr>'
         f'<tr><td align="center" style="padding:24px 0"><span style="font-size:34px;letter-spacing:8px;font-weight:bold;color:#0b3fb5">{code}</span></td></tr>'
         f'<tr><td style="color:#666;font-size:13px">Ce code expire dans 10 minutes. Si vous n\'etes pas a l\'origine de cette connexion, ignorez cet email.</td></tr>'
@@ -263,7 +263,7 @@ def status_email_html(appdoc: dict, label: str) -> str:
     return (
         f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
         f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
-        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
         f'<tr><td style="padding-top:12px;color:#333">Bonjour {appdoc.get("candidate_name","")},</td></tr>'
         f'<tr><td style="padding-top:8px;color:#333">Le statut de votre candidature au poste <b>{appdoc.get("job_title","")}</b> est desormais : <b>{label}</b>.</td></tr>'
         f'<tr><td style="padding-top:16px;color:#666;font-size:13px">Connectez-vous a votre espace candidat pour plus de details.</td></tr>'
@@ -275,7 +275,7 @@ def reset_email_html(code: str, name: str) -> str:
     return (
         f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
         f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
-        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
         f'<tr><td style="padding-top:12px;color:#333">Bonjour {name or ""}, voici votre code de reinitialisation :</td></tr>'
         f'<tr><td align="center" style="padding:24px 0"><span style="font-size:34px;letter-spacing:8px;font-weight:bold;color:#0b3fb5">{code}</span></td></tr>'
         f'<tr><td style="color:#666;font-size:13px">Ce code expire dans 1 heure. Si vous n\'etes pas a l\'origine de cette demande, ignorez cet email.</td></tr>'
@@ -386,7 +386,7 @@ async def login(body: LoginInput):
         upsert=True,
     )
     logger.info(f"OTP {email} = {otp}")
-    await send_email(email, "Votre code de connexion RecrutAI", otp_email_html(otp, user.get("name", "")))
+    await send_email(email, "Votre code de connexion Talent Vortex", otp_email_html(otp, user.get("name", "")))
     return {"otp_required": True, "email": email}
 
 
@@ -453,7 +453,7 @@ async def forgot_password(body: ForgotInput):
             upsert=True,
         )
         logger.info(f"RESET {email} = {code}")
-        await send_email(email, "Reinitialisation de votre mot de passe RecrutAI", reset_email_html(code, user.get("name", "")))
+        await send_email(email, "Reinitialisation de votre mot de passe Talent Vortex", reset_email_html(code, user.get("name", "")))
     return {"ok": True}
 
 
@@ -852,7 +852,7 @@ async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_
 # AI assistant (Claude Sonnet 4.6)
 # ---------------------------------------------------------------------------
 AI_SYSTEM = (
-    "Tu es l'assistant virtuel de RecrutAI, une plateforme de recrutement en ligne. "
+    "Tu es l'assistant virtuel de Talent Vortex, une plateforme de recrutement en ligne. "
     "Tu reponds en francais, de maniere concise, chaleureuse et professionnelle. "
     "Tu aides les candidats a comprendre comment postuler (envoi d'un CV et d'un message vocal), "
     "consulter le statut de leurs candidatures (en attente, acceptee, refusee), "
@@ -1074,7 +1074,7 @@ async def read_all_notifications(user: dict = Depends(get_current_user)):
 
 @api.get("/")
 async def root():
-    return {"message": "RecrutAI API"}
+    return {"message": "Talent Vortex API"}
 
 
 # ---------------------------------------------------------------------------

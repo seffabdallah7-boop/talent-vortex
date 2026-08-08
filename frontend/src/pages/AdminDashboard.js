@@ -77,7 +77,7 @@ export default function AdminDashboard() {
           <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
             <Briefcase className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-display text-lg font-semibold">RecrutAI</span>
+          <span className="font-display text-lg font-semibold">Talent Vortex</span>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map((n) => (
