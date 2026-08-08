@@ -457,6 +457,7 @@ function Messages() {
   const [active, setActive] = useState(null);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
+  const [call, setCall] = useState(null);
 
   useEffect(() => {
     const load = () => api.get("/chat/conversations").then(({ data }) => setConvs(data)).catch(() => {});
@@ -482,6 +483,7 @@ function Messages() {
 
   return (
     <div>
+      {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
       <div className="grid md:grid-cols-3 gap-4 h-[560px]">
         <div className="rounded-2xl border border-border bg-card overflow-y-auto">
@@ -500,7 +502,13 @@ function Messages() {
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Sélectionnez une conversation</div>
           ) : (
             <>
-              <div className="p-4 border-b border-border font-medium">{active.candidate_name || "Candidat"}</div>
+              <div className="p-4 border-b border-border font-medium flex items-center justify-between">
+                <span>{active.candidate_name || "Candidat"}</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: true })} data-testid="admin-audio-call-btn"><Phone className="h-4 w-4" /></Button>
+                </div>
+              </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {msgs.map((m) => (
                   <div key={m.id} className={`flex ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
@@ -669,6 +677,7 @@ function Interviews() {
 
   return (
     <div>
+      {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title={`Entretien`} onClose={() => setCall(null)} />}
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-3xl font-semibold">Agenda des entretiens</h1>
@@ -698,6 +707,7 @@ function Interviews() {
                       <p className="font-medium">{i.title}</p>
                       <p className="text-xs text-muted-foreground">{[i.candidate_name, i.location].filter(Boolean).join(" • ")}</p>
                     </div>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} data-testid={`join-interview-${i.id}`}><Video className="h-4 w-4 mr-1" /> Rejoindre</Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(i)} data-testid={`edit-interview-${i.id}`}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => setDel(i)} data-testid={`delete-interview-${i.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>

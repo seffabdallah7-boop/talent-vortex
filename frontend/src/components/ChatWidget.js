@@ -23,6 +23,7 @@ export default function ChatWidget() {
   const [supMsgs, setSupMsgs] = useState([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [call, setCall] = useState(null);
   const scrollRef = useRef(null);
   const sessionId = user?.user_id || anonId();
 
@@ -77,6 +78,7 @@ export default function ChatWidget() {
 
   return (
     <>
+      {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
       <motion.button
         data-testid="chat-toggle-btn"
         whileHover={{ scale: 1.05 }}
@@ -141,6 +143,12 @@ export default function ChatWidget() {
               )}
             </div>
 
+            {tab === "support" && isCandidate && (
+              <div className="px-3 pt-2 flex gap-2">
+                <Button size="sm" variant="outline" className="rounded-full flex-1" onClick={() => setCall({ room: `recrutai-chat-${user.user_id}`, audioOnly: false })} data-testid="chat-video-call-btn"><Video className="h-4 w-4 mr-1" /> Vidéo</Button>
+                <Button size="sm" variant="outline" className="rounded-full flex-1" onClick={() => setCall({ room: `recrutai-chat-${user.user_id}`, audioOnly: true })} data-testid="chat-audio-call-btn"><Phone className="h-4 w-4 mr-1" /> Audio</Button>
+              </div>
+            )}
             {(tab === "ai" || isCandidate) && (
               <div className="p-3 border-t border-border flex gap-2 bg-background">
                 <Input

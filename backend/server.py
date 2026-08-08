@@ -682,6 +682,12 @@ async def update_status(app_id: str, body: StatusInput, admin: dict = Depends(re
         await send_email(appdoc["candidate_email"],
                          f"Mise a jour de votre candidature — {appdoc.get('job_title','')}",
                          status_email_html(appdoc, labels[body.status]))
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()), "user_id": appdoc["candidate_id"], "type": "status",
+        "title": f"Candidature {labels[body.status].lower()}",
+        "body": f"{appdoc.get('job_title','')} : votre candidature est {labels[body.status].lower()}.",
+        "read": False, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
     return await db.applications.find_one({"id": app_id}, {"_id": 0})
 
 
@@ -1051,6 +1057,19 @@ async def export_contracts(admin: dict = Depends(require_admin)):
                     c.get("amount", ""), c.get("start_date", ""), c.get("end_date", ""), c.get("status", "")])
     return Response(content=buf.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": "attachment; filename=contrats.csv"})
+
+
+@api.get("/notifications")
+async def list_notifications(user: dict = Depends(get_current_user)):
+    items = await db.notifications.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    unread = await db.notifications.count_documents({"user_id": user["user_id"], "read": False})
+    return {"items": items, "unread": unread}
+
+
+@api.post("/notifications/read-all")
+async def read_all_notifications(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["user_id"], "read": False}, {"$set": {"read": True}})
+    return {"ok": True}
 
 
 @api.get("/")

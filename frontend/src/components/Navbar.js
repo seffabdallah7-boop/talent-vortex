@@ -1,8 +1,41 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useDarkMode } from "@/context/DarkModeContext";
+import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Briefcase, LogOut, LayoutDashboard, Sun, Moon } from "lucide-react";
+import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell } from "lucide-react";
+
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState({ items: [], unread: 0 });
+  const load = () => api.get("/notifications").then(({ data }) => setData(data)).catch(() => {});
+  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
+  const toggle = async () => {
+    const n = !open; setOpen(n);
+    if (n && data.unread > 0) { await api.post("/notifications/read-all").catch(() => {}); load(); }
+  };
+  return (
+    <div className="relative">
+      <button onClick={toggle} data-testid="notif-bell" aria-label="Notifications" className="relative h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
+        <Bell className="h-4 w-4" />
+        {data.unread > 0 && <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center" data-testid="notif-count">{data.unread}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto rounded-xl border border-border bg-card shadow-xl z-50 p-2" data-testid="notif-panel">
+          {data.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground p-3 text-center">Aucune notification</p>
+          ) : data.items.map((n) => (
+            <div key={n.id} className="p-3 rounded-lg hover:bg-secondary">
+              <p className="text-sm font-medium">{n.title}</p>
+              <p className="text-xs text-muted-foreground">{n.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -30,6 +63,7 @@ export default function Navbar() {
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+          {user && user.role === "candidate" && <NotificationBell />}
           {user ? (
             <>
               <Button
