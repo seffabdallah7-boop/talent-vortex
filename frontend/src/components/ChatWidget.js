@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Headset, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Bot, Headset, Loader2, Video, Phone } from "lucide-react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import VideoCall from "@/components/VideoCall";
 
 function anonId() {
   let id = localStorage.getItem("ai_session");

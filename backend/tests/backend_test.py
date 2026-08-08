@@ -95,7 +95,8 @@ def full_login(email: str, password: str, admin_code: str | None = None) -> str:
 # ----------------------------- fixtures -----------------------------
 @pytest.fixture(scope="session")
 def admin_token():
-    return full_login(ADMIN_EMAIL, ADMIN_PASSWORD, admin_code=ADMIN_CODE)
+    # NEW: admin_code no longer required, just email+password+captcha+OTP
+    return full_login(ADMIN_EMAIL, ADMIN_PASSWORD)
 
 
 @pytest.fixture(scope="session")
@@ -146,22 +147,17 @@ class TestAdminLogin:
         assert r.status_code == 200
         assert r.json().get("role") == "admin"
 
-    def test_admin_wrong_admin_code_blocks(self):
+    def test_admin_no_code_field_needed(self):
+        # NEW: admin logs in with just email+password+captcha+OTP; admin_code is no longer required.
+        # Sending 'admin_code' (even wrong) should be ignored -> login should still succeed.
         cid, ans = get_captcha()
         r = requests.post(f"{API}/auth/login", json={
             "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD,
             "captcha_id": cid, "captcha_answer": ans,
-            "admin_code": "WRONG-CODE",
+            "admin_code": "SHOULD-BE-IGNORED",
         }, timeout=30)
-        assert r.status_code == 403, r.text
-
-    def test_admin_missing_admin_code_blocks(self):
-        cid, ans = get_captcha()
-        r = requests.post(f"{API}/auth/login", json={
-            "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD,
-            "captcha_id": cid, "captcha_answer": ans,
-        }, timeout=30)
-        assert r.status_code == 403, r.text
+        assert r.status_code == 200, r.text
+        assert r.json().get("otp_required") is True
 
 
 # ----------------------------- Registration + strong password -----------------------------
@@ -371,3 +367,30 @@ class TestApplicationReview:
                           headers=admin_headers, timeout=30)
         assert r3.status_code == 200
         assert r3.json()["status"] == "rejected"
+
+
+# ----------------------------- Notifications (candidate side) -----------------------------
+class TestNotifications:
+    def test_candidate_notifications_created_on_status_change(self, admin_headers, candidate_token):
+        # Trigger a status update so the candidate gets an in-app notification
+        apps = requests.get(f"{API}/applications", headers=admin_headers, timeout=30).json()
+        if not apps:
+            pytest.skip("No applications available")
+        # find one belonging to candidate1@test.com if possible
+        target = next((a for a in apps if a.get("candidate_email") == CANDIDATE_EMAIL), apps[0])
+        app_id = target["id"]
+        requests.put(f"{API}/applications/{app_id}/status", json={"status": "accepted"},
+                     headers=admin_headers, timeout=30)
+        # Only assert notifications for the owner candidate
+        if target.get("candidate_email") != CANDIDATE_EMAIL:
+            pytest.skip("Application not owned by test candidate; notif belongs to another user")
+        r = requests.get(f"{API}/notifications",
+                         headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "items" in d and "unread" in d
+        assert isinstance(d["items"], list)
+        # mark all read
+        r2 = requests.post(f"{API}/notifications/read-all",
+                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r2.status_code == 200

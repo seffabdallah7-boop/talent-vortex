@@ -19,9 +19,10 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
-  CalendarDays, ScrollText, Download, Star,
+  CalendarDays, ScrollText, Download, Star, Video, Phone,
 } from "lucide-react";
 import { toast } from "sonner";
+import VideoCall from "@/components/VideoCall";
 
 const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
@@ -657,6 +658,7 @@ function Interviews() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_ITW);
   const [del, setDel] = useState(null);
+  const [call, setCall] = useState(null);
   const load = useCallback(() => api.get(`/interviews`).then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
   const openNew = () => { setEditing(null); setForm(EMPTY_ITW); setOpen(true); };
