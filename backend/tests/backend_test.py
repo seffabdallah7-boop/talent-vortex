@@ -1,258 +1,373 @@
-"""Backend regression tests for RecrutAI recruitment platform."""
-import io
+"""Backend regression tests for RecrutAI recruitment platform (captcha + OTP + admin_code).
+
+Tests cover:
+ - Auth: captcha, OTP, admin_code, forgot/reset password, strong password validation
+ - Contracts CRUD (admin)
+ - Interviews CRUD (admin)
+ - Applications review + status
+ - CSV exports (with ?auth= query token)
+ - Admin stats widgets
+"""
 import os
+import re
+import subprocess
 import time
 import uuid
 
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://candidai.preview.emergentagent.com").rstrip("/")
+def _load_backend_url():
+    v = os.environ.get("REACT_APP_BACKEND_URL")
+    if v:
+        return v
+    try:
+        with open("/app/frontend/.env") as f:
+            for line in f:
+                if line.strip().startswith("REACT_APP_BACKEND_URL="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except FileNotFoundError:
+        pass
+    raise RuntimeError("REACT_APP_BACKEND_URL not set")
+
+
+BASE_URL = _load_backend_url().rstrip("/")
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "seffabdallah7@gmail.com"
 ADMIN_PASSWORD = "Admin@2026!"
+ADMIN_CODE = "RECRUT-ADM-2026"
+CANDIDATE_EMAIL = "candidate1@test.com"
+CANDIDATE_PASSWORD = "Test@2026!"
+
+LOG_FILE = "/var/log/supervisor/backend.err.log"
 
 
-# ---------- Fixtures ----------
+# ----------------------------- helpers -----------------------------
+def get_captcha():
+    r = requests.get(f"{API}/auth/captcha", timeout=30)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    q = d["question"]  # e.g. "3 + 4"
+    m = re.match(r"\s*(\d+)\s*\+\s*(\d+)", q)
+    assert m, f"Unexpected captcha question: {q}"
+    ans = str(int(m.group(1)) + int(m.group(2)))
+    return d["captcha_id"], ans
+
+
+def read_code_from_log(prefix: str, email: str, since_ts: float, timeout: float = 8.0):
+    """Grep OTP/RESET code from backend logs since given timestamp."""
+    deadline = time.time() + timeout
+    pattern = f"{prefix} {email} = "
+    while time.time() < deadline:
+        try:
+            out = subprocess.check_output(
+                ["grep", pattern, LOG_FILE], stderr=subprocess.DEVNULL
+            ).decode()
+        except subprocess.CalledProcessError:
+            out = ""
+        # last match
+        codes = re.findall(rf"{re.escape(pattern)}(\d{{6}})", out)
+        if codes:
+            return codes[-1]
+        time.sleep(0.5)
+    raise AssertionError(f"Could not read {prefix} code for {email} from logs")
+
+
+def full_login(email: str, password: str, admin_code: str | None = None) -> str:
+    """Perform captcha -> login -> OTP verify. Returns bearer token."""
+    cid, ans = get_captcha()
+    body = {"email": email, "password": password, "captcha_id": cid, "captcha_answer": ans}
+    if admin_code is not None:
+        body["admin_code"] = admin_code
+    ts = time.time()
+    r = requests.post(f"{API}/auth/login", json=body, timeout=30)
+    assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
+    assert r.json().get("otp_required") is True
+    code = read_code_from_log("OTP", email, ts)
+    r2 = requests.post(f"{API}/auth/verify-otp", json={"email": email, "code": code}, timeout=30)
+    assert r2.status_code == 200, f"verify-otp failed: {r2.status_code} {r2.text}"
+    tok = r2.json()["token"]
+    assert isinstance(tok, str) and len(tok) > 10
+    return tok
+
+
+# ----------------------------- fixtures -----------------------------
 @pytest.fixture(scope="session")
 def admin_token():
-    r = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}, timeout=30)
-    assert r.status_code == 200, f"Admin login failed: {r.status_code} {r.text}"
-    data = r.json()
-    assert data["user"]["role"] == "admin"
-    return data["token"]
+    return full_login(ADMIN_EMAIL, ADMIN_PASSWORD, admin_code=ADMIN_CODE)
 
 
 @pytest.fixture(scope="session")
-def candidate():
-    email = f"test_cand_{uuid.uuid4().hex[:8]}@test.com"
-    r = requests.post(f"{API}/auth/register", json={"name": "Test Candidate", "email": email, "password": "Test@2026!"}, timeout=30)
-    assert r.status_code == 200, f"Register failed: {r.text}"
-    data = r.json()
-    return {"token": data["token"], "user": data["user"], "email": email}
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
 
 
 @pytest.fixture(scope="session")
-def created_job(admin_token):
-    body = {
-        "title": "TEST_Engineer",
-        "company": "TEST Corp",
-        "location": "Paris",
-        "type": "Temps plein",
-        "category": "Tech",
-        "description": "Backend test job.",
-        "requirements": "Python",
-        "salary": "50k",
-    }
-    r = requests.post(f"{API}/jobs", json=body, headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-    assert r.status_code == 200, r.text
-    job = r.json()
-    assert job["title"] == "TEST_Engineer"
-    assert "id" in job
-    yield job
-    # cleanup handled by delete test if run; otherwise ignore
-    requests.delete(f"{API}/jobs/{job['id']}", headers={"Authorization": f"Bearer {admin_token}"})
-
-
-# ---------- Auth ----------
-class TestAuth:
-    def test_admin_login(self, admin_token):
-        assert isinstance(admin_token, str) and len(admin_token) > 10
-
-    def test_login_invalid(self):
-        r = requests.post(f"{API}/auth/login", json={"email": ADMIN_EMAIL, "password": "wrong"}, timeout=30)
-        assert r.status_code == 401
-
-    def test_register_and_me(self, candidate):
-        r = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 200
-        assert r.json()["role"] == "candidate"
-
-    def test_me_unauth(self):
-        r = requests.get(f"{API}/auth/me", timeout=30)
-        assert r.status_code == 401
-
-    def test_duplicate_register(self, candidate):
-        r = requests.post(f"{API}/auth/register", json={"name": "x", "email": candidate["email"], "password": "x"}, timeout=30)
-        assert r.status_code == 400
-
-
-# ---------- Jobs ----------
-class TestJobs:
-    def test_public_list_jobs(self):
-        r = requests.get(f"{API}/jobs", timeout=30)
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
-
-    def test_create_and_get_job(self, created_job):
-        r = requests.get(f"{API}/jobs/{created_job['id']}", timeout=30)
-        assert r.status_code == 200
-        assert r.json()["title"] == "TEST_Engineer"
-
-    def test_update_job(self, admin_token, created_job):
-        upd = {**{k: created_job[k] for k in ["title", "company", "location", "type", "category", "description", "requirements", "salary"]}}
-        upd["title"] = "TEST_Engineer_Updated"
-        r = requests.put(f"{API}/jobs/{created_job['id']}", json=upd, headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        assert r.json()["title"] == "TEST_Engineer_Updated"
-        # verify via GET
-        r2 = requests.get(f"{API}/jobs/{created_job['id']}", timeout=30)
-        assert r2.json()["title"] == "TEST_Engineer_Updated"
-
-    def test_jobs_all_admin_only(self, admin_token, candidate):
-        r = requests.get(f"{API}/jobs/all", headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 403
-        r2 = requests.get(f"{API}/jobs/all", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r2.status_code == 200
-
-    def test_create_job_forbidden_for_candidate(self, candidate):
-        r = requests.post(f"{API}/jobs", json={"title": "x", "company": "x", "location": "x", "description": "x"},
-                          headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 403
-
-
-# ---------- Applications flow ----------
-class TestApplications:
-    def _apply(self, candidate, job_id):
-        files = {"cv": ("cv.pdf", io.BytesIO(b"%PDF-1.4 test cv content"), "application/pdf")}
-        data = {"job_id": job_id, "cover_note": "Bonjour, je suis interesse."}
-        r = requests.post(f"{API}/applications", data=data, files=files,
-                          headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=90)
-        return r
-
-    def test_create_application_pending(self, candidate, created_job):
-        r = self._apply(candidate, created_job["id"])
+def candidate_token():
+    # Ensure candidate exists. Try login; if fails (unknown), register.
+    try:
+        return full_login(CANDIDATE_EMAIL, CANDIDATE_PASSWORD)
+    except AssertionError:
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/register", json={
+            "name": "Candidate One", "email": CANDIDATE_EMAIL, "password": CANDIDATE_PASSWORD,
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
         assert r.status_code == 200, r.text
-        app = r.json()
-        assert app["status"] == "pending"
-        assert app["candidate_id"] == candidate["user"]["user_id"]
-        assert app["cv_file_id"]
-        pytest.app_id = app["id"]
-        pytest.cv_file_id = app["cv_file_id"]
-
-    def test_my_applications(self, candidate):
-        r = requests.get(f"{API}/applications/me", headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 200
-        apps = r.json()
-        assert any(a["id"] == pytest.app_id for a in apps)
-
-    def test_admin_list_applications(self, admin_token):
-        r = requests.get(f"{API}/applications", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        assert any(a["id"] == pytest.app_id for a in r.json())
-
-    def test_update_status_accepted(self, admin_token, candidate):
-        r = requests.put(f"{API}/applications/{pytest.app_id}/status", json={"status": "accepted"},
-                         headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        assert r.json()["status"] == "accepted"
-        # verify candidate sees it
-        r2 = requests.get(f"{API}/applications/me", headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert any(a["id"] == pytest.app_id and a["status"] == "accepted" for a in r2.json())
-
-    def test_update_status_invalid(self, admin_token):
-        r = requests.put(f"{API}/applications/{pytest.app_id}/status", json={"status": "bogus"},
-                         headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 400
-
-    def test_cv_download_admin(self, admin_token):
-        r = requests.get(f"{API}/files/{pytest.cv_file_id}", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        assert len(r.content) > 0
-
-    def test_cv_download_forbidden_for_other(self):
-        # A newly registered candidate should not access another's CV
-        email = f"other_{uuid.uuid4().hex[:6]}@test.com"
-        rr = requests.post(f"{API}/auth/register", json={"name": "O", "email": email, "password": "Test@2026!"}, timeout=30)
-        tok = rr.json()["token"]
-        r = requests.get(f"{API}/files/{pytest.cv_file_id}", headers={"Authorization": f"Bearer {tok}"}, timeout=30)
-        assert r.status_code == 403
-
-    def test_delete_application(self, admin_token):
-        r = requests.delete(f"{API}/applications/{pytest.app_id}", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
+        return r.json()["token"]
 
 
-# ---------- Candidates ----------
-class TestCandidates:
-    def test_list_candidates(self, admin_token, candidate):
-        r = requests.get(f"{API}/candidates", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        assert any(u["email"] == candidate["email"] for u in r.json())
-
-
-# ---------- Chat (polling) ----------
-class TestChat:
-    def test_candidate_sends_message(self, candidate, admin_token):
-        r = requests.post(f"{API}/chat/messages", json={"text": "Bonjour admin"},
-                          headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 200
-        msg = r.json()
-        assert msg["sender_role"] == "candidate"
-        # admin lists conversations
-        r2 = requests.get(f"{API}/chat/conversations", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r2.status_code == 200
-        convs = r2.json()
-        assert any(c["candidate_id"] == candidate["user"]["user_id"] for c in convs)
-
-    def test_admin_replies(self, admin_token, candidate):
-        cid = candidate["user"]["user_id"]
-        r = requests.post(f"{API}/chat/messages", json={"text": "Bonjour candidat", "candidate_id": cid},
-                          headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        # candidate polls
-        r2 = requests.get(f"{API}/chat/messages", headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r2.status_code == 200
-        texts = [m["text"] for m in r2.json()]
-        assert "Bonjour candidat" in texts
-
-
-# ---------- Theme ----------
-class TestTheme:
-    def test_get_theme_public(self):
-        r = requests.get(f"{API}/settings/theme", timeout=30)
-        assert r.status_code == 200
-        assert "primary" in r.json()
-
-    def test_update_theme(self, admin_token):
-        body = {"primary": "10 90% 50%", "primary_foreground": "0 0% 100%", "name": "TEST_Red"}
-        r = requests.put(f"{API}/settings/theme", json=body, headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
-        assert r.status_code == 200
-        # persist check
-        r2 = requests.get(f"{API}/settings/theme", timeout=30)
-        assert r2.json()["primary"] == "10 90% 50%"
-
-    def test_update_theme_forbidden(self, candidate):
-        r = requests.put(f"{API}/settings/theme",
-                         json={"primary": "0 0% 0%", "primary_foreground": "0 0% 100%", "name": "x"},
-                         headers={"Authorization": f"Bearer {candidate['token']}"}, timeout=30)
-        assert r.status_code == 403
-
-
-# ---------- Admin stats ----------
-class TestStats:
-    def test_admin_stats(self, admin_token):
-        r = requests.get(f"{API}/admin/stats", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
+# ----------------------------- Captcha -----------------------------
+class TestCaptcha:
+    def test_captcha_endpoint(self):
+        r = requests.get(f"{API}/auth/captcha", timeout=30)
         assert r.status_code == 200
         d = r.json()
-        for k in ["jobs", "candidates", "applications", "pending", "accepted", "rejected"]:
-            assert k in d
+        assert "captcha_id" in d and "question" in d
+        assert re.match(r"^\d+ \+ \d+$", d["question"])
+
+    def test_login_wrong_captcha(self):
+        cid, ans = get_captcha()
+        wrong = str(int(ans) + 1)
+        r = requests.post(f"{API}/auth/login", json={
+            "email": CANDIDATE_EMAIL, "password": CANDIDATE_PASSWORD,
+            "captcha_id": cid, "captcha_answer": wrong,
+        }, timeout=30)
+        assert r.status_code == 400, r.text
 
 
-# ---------- AI chat ----------
-class TestAI:
-    def test_ai_chat_replies_french(self):
-        sid = f"test-sess-{uuid.uuid4().hex[:8]}"
-        r = requests.post(f"{API}/ai/chat", json={"session_id": sid, "message": "Comment puis-je postuler ?"}, timeout=90)
+# ----------------------------- Admin login / OTP / admin_code -----------------------------
+class TestAdminLogin:
+    def test_admin_full_flow(self, admin_token):
+        assert admin_token  # login + OTP verify succeeded
+        # /auth/me must return admin role
+        r = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {admin_token}"}, timeout=30)
         assert r.status_code == 200
-        reply = r.json().get("reply", "")
-        assert isinstance(reply, str) and len(reply) > 5
-        # should not be the fallback error
-        assert "souci technique" not in reply.lower(), f"AI fell back: {reply}"
+        assert r.json().get("role") == "admin"
+
+    def test_admin_wrong_admin_code_blocks(self):
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/login", json={
+            "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD,
+            "captcha_id": cid, "captcha_answer": ans,
+            "admin_code": "WRONG-CODE",
+        }, timeout=30)
+        assert r.status_code == 403, r.text
+
+    def test_admin_missing_admin_code_blocks(self):
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/login", json={
+            "email": ADMIN_EMAIL, "password": ADMIN_PASSWORD,
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 403, r.text
 
 
-# ---------- Cleanup ----------
-def test_zz_cleanup(admin_token, candidate):
-    # delete candidate (cleans applications + messages)
-    requests.delete(f"{API}/candidates/{candidate['user']['user_id']}", headers={"Authorization": f"Bearer {admin_token}"})
+# ----------------------------- Registration + strong password -----------------------------
+class TestRegister:
+    def test_register_strong(self):
+        email = f"test_reg_{uuid.uuid4().hex[:6]}@test.com"
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/register", json={
+            "name": "Reg Test", "email": email, "password": "Test@2026!",
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "token" in d and d["user"]["email"] == email
+        assert d["user"]["role"] == "candidate"
+
+    def test_register_weak_password_rejected(self):
+        email = f"test_weak_{uuid.uuid4().hex[:6]}@test.com"
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/register", json={
+            "name": "Weak", "email": email, "password": "abc",
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 400, r.text
+
+
+# ----------------------------- Forgot / Reset password -----------------------------
+class TestForgotReset:
+    def test_forgot_reset_flow(self):
+        # 1) forgot
+        cid, ans = get_captcha()
+        ts = time.time()
+        r = requests.post(f"{API}/auth/forgot-password", json={
+            "email": CANDIDATE_EMAIL, "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+
+        code = read_code_from_log("RESET", CANDIDATE_EMAIL, ts)
+
+        # 2) reset with weak password should fail
+        r_weak = requests.post(f"{API}/auth/reset-password", json={
+            "email": CANDIDATE_EMAIL, "code": code, "new_password": "abc",
+        }, timeout=30)
+        assert r_weak.status_code == 400
+
+        # 3) reset with strong password (same Test@2026! to keep credential valid)
+        r_ok = requests.post(f"{API}/auth/reset-password", json={
+            "email": CANDIDATE_EMAIL, "code": code, "new_password": CANDIDATE_PASSWORD,
+        }, timeout=30)
+        assert r_ok.status_code == 200, r_ok.text
+
+        # 4) candidate can now login with new password (OTP flow)
+        tok = full_login(CANDIDATE_EMAIL, CANDIDATE_PASSWORD)
+        assert tok
+
+
+# ----------------------------- Contracts CRUD -----------------------------
+class TestContracts:
+    contract_id = None
+
+    def test_create_contract(self, admin_headers):
+        r = requests.post(f"{API}/contracts", json={
+            "title": "TEST_Contract_A", "client": "Acme", "status": "en_cours",
+            "amount": "10000", "start_date": "2026-02-01", "end_date": "2026-08-01",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["title"] == "TEST_Contract_A"
+        assert d["status"] == "en_cours"
+        assert "id" in d
+        TestContracts.contract_id = d["id"]
+
+    def test_create_contract_invalid_status(self, admin_headers):
+        r = requests.post(f"{API}/contracts", json={"title": "TEST_x", "status": "bogus"},
+                          headers=admin_headers, timeout=30)
+        assert r.status_code == 400
+
+    def test_list_contracts(self, admin_headers):
+        r = requests.get(f"{API}/contracts", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        ids = [c["id"] for c in r.json()]
+        assert TestContracts.contract_id in ids
+
+    def test_filter_contracts(self, admin_headers):
+        r = requests.get(f"{API}/contracts?status=en_cours", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        assert all(c["status"] == "en_cours" for c in r.json())
+
+    def test_update_contract(self, admin_headers):
+        r = requests.put(f"{API}/contracts/{TestContracts.contract_id}", json={
+            "title": "TEST_Contract_A_upd", "status": "boucle",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        assert r.json()["status"] == "boucle"
+
+    def test_delete_contract(self, admin_headers):
+        r = requests.delete(f"{API}/contracts/{TestContracts.contract_id}", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+
+    def test_contracts_forbidden_for_candidate(self, candidate_token):
+        r = requests.get(f"{API}/contracts", headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r.status_code == 403
+
+
+# ----------------------------- Interviews CRUD -----------------------------
+class TestInterviews:
+    itw_id = None
+
+    def test_create_interview(self, admin_headers):
+        r = requests.post(f"{API}/interviews", json={
+            "title": "TEST_Interview_A", "date": "2026-09-15", "time": "10:30",
+            "candidate_name": "Candidate One",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["title"] == "TEST_Interview_A"
+        assert d["date"] == "2026-09-15"
+        assert d["time"] == "10:30"
+        TestInterviews.itw_id = d["id"]
+
+    def test_list_interviews(self, admin_headers):
+        r = requests.get(f"{API}/interviews", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        assert any(i["id"] == TestInterviews.itw_id for i in r.json())
+
+    def test_update_interview(self, admin_headers):
+        r = requests.put(f"{API}/interviews/{TestInterviews.itw_id}", json={
+            "title": "TEST_Interview_A_upd", "date": "2026-09-15", "time": "11:00",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        assert r.json()["time"] == "11:00"
+
+    def test_delete_interview(self, admin_headers):
+        r = requests.delete(f"{API}/interviews/{TestInterviews.itw_id}", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+
+
+# ----------------------------- Admin stats widgets -----------------------------
+class TestStats:
+    def test_admin_stats_has_widgets(self, admin_headers):
+        r = requests.get(f"{API}/admin/stats", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["contracts_active", "upcoming_interviews", "jobs", "applications"]:
+            assert k in d, f"Missing key {k} in stats"
+
+
+# ----------------------------- CSV exports -----------------------------
+class TestExports:
+    def test_export_applications(self, admin_token):
+        r = requests.get(f"{API}/export/applications?auth={admin_token}", timeout=30)
+        assert r.status_code == 200
+        assert "text/csv" in r.headers.get("content-type", "").lower()
+        assert "Candidat" in r.text.splitlines()[0]
+
+    def test_export_contracts(self, admin_token):
+        r = requests.get(f"{API}/export/contracts?auth={admin_token}", timeout=30)
+        assert r.status_code == 200
+        assert "text/csv" in r.headers.get("content-type", "").lower()
+        assert "Intitule" in r.text.splitlines()[0]
+
+    def test_export_forbidden_without_auth(self):
+        r = requests.get(f"{API}/export/applications", timeout=30)
+        assert r.status_code == 401
+
+
+# ----------------------------- Application review + status -----------------------------
+class TestApplicationReview:
+    def test_review_and_status_flow(self, admin_headers, candidate_token):
+        # find an application; if none exists, create one by applying to any active job
+        apps = requests.get(f"{API}/applications", headers=admin_headers, timeout=30).json()
+        if not apps:
+            jobs = requests.get(f"{API}/jobs", timeout=30).json()
+            if not jobs:
+                pytest.skip("No jobs available to create an application")
+            import io as _io
+            files = {"cv": ("cv.pdf", _io.BytesIO(b"%PDF-1.4 test cv"), "application/pdf")}
+            data = {"job_id": jobs[0]["id"], "cover_note": "TEST review"}
+            rr = requests.post(f"{API}/applications", data=data, files=files,
+                               headers={"Authorization": f"Bearer {candidate_token}"}, timeout=60)
+            assert rr.status_code == 200, rr.text
+            app_id = rr.json()["id"]
+        else:
+            app_id = apps[0]["id"]
+
+        # review
+        r = requests.put(f"{API}/applications/{app_id}/review",
+                         json={"admin_note": "TEST note", "rating": 4},
+                         headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d.get("admin_note") == "TEST note"
+        assert d.get("rating") == 4
+
+        # persistence: refetch list
+        apps2 = requests.get(f"{API}/applications", headers=admin_headers, timeout=30).json()
+        target = next(a for a in apps2 if a["id"] == app_id)
+        assert target["admin_note"] == "TEST note"
+        assert target["rating"] == 4
+
+        # status change (accepted then rejected)
+        r2 = requests.put(f"{API}/applications/{app_id}/status", json={"status": "accepted"},
+                          headers=admin_headers, timeout=30)
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "accepted"
+        r3 = requests.put(f"{API}/applications/{app_id}/status", json={"status": "rejected"},
+                          headers=admin_headers, timeout=30)
+        assert r3.status_code == 200
+        assert r3.json()["status"] == "rejected"

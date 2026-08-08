@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { fileUrl, formatApiError } from "@/lib/api";
+import api, { fileUrl, formatApiError, API } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useDarkMode } from "@/context/DarkModeContext";
@@ -19,6 +19,7 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
+  CalendarDays, ScrollText, Download, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +27,8 @@ const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
   { key: "jobs", label: "Offres d'emploi", Icon: Briefcase },
   { key: "applications", label: "Candidatures", Icon: FileText },
+  { key: "contracts", label: "Contrats", Icon: ScrollText },
+  { key: "interviews", label: "Agenda entretiens", Icon: CalendarDays },
   { key: "candidates", label: "Utilisateurs", Icon: Users },
   { key: "messages", label: "Messages", Icon: MessageSquare },
   { key: "theme", label: "Apparence", Icon: Palette },
@@ -115,6 +118,8 @@ export default function AdminDashboard() {
           {section === "overview" && <Overview />}
           {section === "jobs" && <Jobs />}
           {section === "applications" && <Applications />}
+          {section === "contracts" && <Contracts />}
+          {section === "interviews" && <Interviews />}
           {section === "candidates" && <Candidates />}
           {section === "messages" && <Messages />}
           {section === "theme" && <ThemeSection />}
@@ -133,6 +138,8 @@ function Overview() {
     { label: "Candidats", value: stats.candidates, Icon: Users },
     { label: "Candidatures", value: stats.applications, Icon: FileText },
     { label: "En attente", value: stats.pending, Icon: CheckCircle2 },
+    { label: "Contrats actifs", value: stats.contracts_active, Icon: ScrollText },
+    { label: "Entretiens à venir", value: stats.upcoming_interviews, Icon: CalendarDays },
   ];
   return (
     <div>
@@ -258,6 +265,8 @@ function Applications() {
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState(null);
   const [del, setDel] = useState(null);
+  const [note, setNote] = useState("");
+  const [rating, setRating] = useState(0);
 
   const load = useCallback(() => api.get(`/applications?status=${filter}`).then(({ data }) => setApps(data)).catch(() => {}), [filter]);
   useEffect(() => { load(); }, [load]);
@@ -269,20 +278,32 @@ function Applications() {
     load();
   };
   const remove = async () => { await api.delete(`/applications/${del.id}`); toast.success("Candidature supprimée"); setDel(null); setDetail(null); load(); };
+  const saveReview = async () => {
+    try {
+      const { data } = await api.put(`/applications/${detail.id}/review`, { admin_note: note, rating: rating || null });
+      toast.success("Évaluation enregistrée");
+      setDetail(data); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="font-display text-3xl font-semibold">Candidatures</h1>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-44 rounded-full" data-testid="status-filter"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toutes</SelectItem>
-            <SelectItem value="pending">En attente</SelectItem>
-            <SelectItem value="accepted">Acceptées</SelectItem>
-            <SelectItem value="rejected">Refusées</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="rounded-full" data-testid="export-applications-btn">
+            <a href={`${API}/export/applications?auth=${encodeURIComponent(localStorage.getItem("token") || "")}`}><Download className="h-4 w-4 mr-2" /> Export CSV</a>
+          </Button>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-44 rounded-full" data-testid="status-filter"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes</SelectItem>
+              <SelectItem value="pending">En attente</SelectItem>
+              <SelectItem value="accepted">Acceptées</SelectItem>
+              <SelectItem value="rejected">Refusées</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {apps.length === 0 ? (
@@ -321,6 +342,18 @@ function Applications() {
                 <div className="flex flex-wrap gap-2">
                   {detail.cv_file_id && <Button asChild variant="outline" size="sm" className="rounded-full" data-testid="admin-view-cv"><a href={fileUrl(detail.cv_file_id)} target="_blank" rel="noreferrer"><FileText className="h-4 w-4 mr-2" /> Voir le CV</a></Button>}
                   {detail.voice_file_id && <Button asChild variant="outline" size="sm" className="rounded-full" data-testid="admin-play-voice"><a href={fileUrl(detail.voice_file_id)} target="_blank" rel="noreferrer"><Volume2 className="h-4 w-4 mr-2" /> Écouter le vocal</a></Button>}
+                </div>
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Évaluation interne (admin)</p>
+                  <div className="flex items-center gap-1 mb-3">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button key={n} type="button" onClick={() => setRating(n)} data-testid={`rating-${n}`}>
+                        <Star className={`h-6 w-6 ${n <= rating ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                      </button>
+                    ))}
+                  </div>
+                  <Textarea data-testid="admin-note-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note interne sur le candidat..." />
+                  <Button size="sm" className="rounded-full mt-2" onClick={saveReview} data-testid="save-review-btn">Enregistrer l'évaluation</Button>
                 </div>
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Décision</p>
@@ -483,6 +516,224 @@ function Messages() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const C_STATUS = {
+  en_cours: { l: "En cours", c: "status-pending" },
+  boucle: { l: "Bouclé", c: "status-accepted" },
+  resilie: { l: "Résilié", c: "status-rejected" },
+};
+const EMPTY_CONTRACT = { title: "", client: "", candidate_name: "", job_title: "", amount: "", start_date: "", end_date: "", status: "en_cours", notes: "" };
+
+function Contracts() {
+  const [list, setList] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY_CONTRACT);
+  const [del, setDel] = useState(null);
+  const load = useCallback(() => api.get(`/contracts?status=${filter}`).then(({ data }) => setList(data)).catch(() => {}), [filter]);
+  useEffect(() => { load(); }, [load]);
+  const openNew = () => { setEditing(null); setForm(EMPTY_CONTRACT); setOpen(true); };
+  const openEdit = (c) => { setEditing(c); setForm({ ...EMPTY_CONTRACT, ...c }); setOpen(true); };
+  const save = async () => {
+    try {
+      if (editing) await api.put(`/contracts/${editing.id}`, form);
+      else await api.post(`/contracts`, form);
+      toast.success(editing ? "Contrat mis à jour" : "Contrat créé");
+      setOpen(false); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const remove = async () => { await api.delete(`/contracts/${del.id}`); toast.success("Contrat supprimé"); setDel(null); load(); };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <h1 className="font-display text-3xl font-semibold">Contrats</h1>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="rounded-full" data-testid="export-contracts-btn">
+            <a href={`${API}/export/contracts?auth=${encodeURIComponent(localStorage.getItem("token") || "")}`}><Download className="h-4 w-4 mr-2" /> Export CSV</a>
+          </Button>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-40 rounded-full" data-testid="contract-filter"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous</SelectItem>
+              <SelectItem value="en_cours">En cours</SelectItem>
+              <SelectItem value="boucle">Bouclés</SelectItem>
+              <SelectItem value="resilie">Résiliés</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={openNew} className="rounded-full" data-testid="new-contract-btn"><Plus className="h-4 w-4 mr-2" /> Nouveau</Button>
+        </div>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun contrat.</div>
+      ) : (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader><TableRow><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {list.map((c) => (
+                <TableRow key={c.id} data-testid={`contract-row-${c.id}`}>
+                  <TableCell className="font-medium">{c.title}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.client}</TableCell>
+                  <TableCell className="text-muted-foreground">{c.candidate_name}</TableCell>
+                  <TableCell>{c.amount}</TableCell>
+                  <TableCell><span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(C_STATUS[c.status] || C_STATUS.en_cours).c}`}>{(C_STATUS[c.status] || C_STATUS.en_cours).l}</span></TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(c)} data-testid={`edit-contract-${c.id}`}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setDel(c)} data-testid={`delete-contract-${c.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editing ? "Modifier le contrat" : "Nouveau contrat"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Intitulé</Label><Input data-testid="contract-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Client / Chef de projet</Label><Input value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} className="mt-1" /></div>
+              <div><Label>Candidat</Label><Input value={form.candidate_name} onChange={(e) => setForm({ ...form, candidate_name: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Offre liée</Label><Input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} className="mt-1" /></div>
+              <div><Label>Montant</Label><Input value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Début</Label><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="mt-1" /></div>
+              <div><Label>Fin</Label><Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div>
+              <Label>Statut</Label>
+              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <SelectTrigger className="mt-1" data-testid="contract-status-select"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en_cours">En cours</SelectItem>
+                  <SelectItem value="boucle">Bouclé</SelectItem>
+                  <SelectItem value="resilie">Résilié</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} className="rounded-full">Annuler</Button>
+            <Button onClick={save} disabled={!form.title} className="rounded-full" data-testid="save-contract-btn">Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Supprimer ce contrat ?</AlertDialogTitle><AlertDialogDescription>Action irréversible.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-contract">Supprimer</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+const EMPTY_ITW = { title: "", candidate_name: "", date: "", time: "", location: "", notes: "", status: "scheduled" };
+
+function Interviews() {
+  const [list, setList] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(EMPTY_ITW);
+  const [del, setDel] = useState(null);
+  const load = useCallback(() => api.get(`/interviews`).then(({ data }) => setList(data)).catch(() => {}), []);
+  useEffect(() => { load(); }, [load]);
+  const openNew = () => { setEditing(null); setForm(EMPTY_ITW); setOpen(true); };
+  const openEdit = (i) => { setEditing(i); setForm({ ...EMPTY_ITW, ...i }); setOpen(true); };
+  const save = async () => {
+    try {
+      if (editing) await api.put(`/interviews/${editing.id}`, form);
+      else await api.post(`/interviews`, form);
+      toast.success(editing ? "Entretien mis à jour" : "Entretien planifié");
+      setOpen(false); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+  const remove = async () => { await api.delete(`/interviews/${del.id}`); toast.success("Entretien supprimé"); setDel(null); load(); };
+
+  const groups = list.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {});
+  const dates = Object.keys(groups).sort();
+  const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <div>
+          <h1 className="font-display text-3xl font-semibold">Agenda des entretiens</h1>
+          <p className="text-muted-foreground text-sm">{list.length} entretien{list.length > 1 ? "s" : ""} planifié{list.length > 1 ? "s" : ""}</p>
+        </div>
+        <Button onClick={openNew} className="rounded-full" data-testid="new-interview-btn"><Plus className="h-4 w-4 mr-2" /> Planifier</Button>
+      </div>
+
+      {dates.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">
+          <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+          Aucun entretien planifié.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {dates.map((d) => (
+            <div key={d} className="rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/40">
+                <span className="font-display font-semibold capitalize">{fmtDate(d)}</span>
+                <span className="rounded-full bg-primary/15 text-primary px-2.5 py-0.5 text-xs font-semibold">{groups[d].length} entretien{groups[d].length > 1 ? "s" : ""}</span>
+              </div>
+              <div className="divide-y divide-border">
+                {groups[d].sort((a, b) => a.time.localeCompare(b.time)).map((i) => (
+                  <div key={i.id} className="flex items-center gap-4 px-5 py-3" data-testid={`interview-row-${i.id}`}>
+                    <span className="font-mono font-semibold text-primary w-14">{i.time}</span>
+                    <div className="flex-1">
+                      <p className="font-medium">{i.title}</p>
+                      <p className="text-xs text-muted-foreground">{[i.candidate_name, i.location].filter(Boolean).join(" • ")}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(i)} data-testid={`edit-interview-${i.id}`}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setDel(i)} data-testid={`delete-interview-${i.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? "Modifier l'entretien" : "Nouvel entretien"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Intitulé</Label><Input data-testid="interview-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" placeholder="Ex : Entretien technique" /></div>
+            <div><Label>Candidat</Label><Input value={form.candidate_name} onChange={(e) => setForm({ ...form, candidate_name: e.target.value })} className="mt-1" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Date</Label><Input type="date" data-testid="interview-date-input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="mt-1" /></div>
+              <div><Label>Heure</Label><Input type="time" data-testid="interview-time-input" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div><Label>Lieu / Lien visio</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="mt-1" /></div>
+            <div><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} className="rounded-full">Annuler</Button>
+            <Button onClick={save} disabled={!form.title || !form.date || !form.time} className="rounded-full" data-testid="save-interview-btn">Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Supprimer cet entretien ?</AlertDialogTitle><AlertDialogDescription>Action irréversible.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-interview">Supprimer</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

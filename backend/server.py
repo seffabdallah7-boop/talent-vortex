@@ -14,6 +14,12 @@ from typing import List, Optional
 import jwt
 import bcrypt
 import requests
+import httpx
+import secrets
+import random
+import re
+import io
+import csv
 from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form,
     Header, Query, Response,
@@ -172,17 +178,133 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Email, security & OTP helpers
+# ---------------------------------------------------------------------------
+EMAIL_BASE_URL = "https://integrations.emergentagent.com"
+EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "RecrutAI")
+ADMIN_ACCESS_CODE = os.environ.get("ADMIN_ACCESS_CODE", "")
+
+
+async def send_email(to: str, subject: str, html: str):
+    if not EMAIL_KEY:
+        logger.warning("EMERGENT_EMAIL_KEY absent — email non envoye")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(
+                f"{EMAIL_BASE_URL}/api/v1/email/send",
+                headers={"X-Email-Key": EMAIL_KEY},
+                json={"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME},
+            )
+        r.raise_for_status()
+    except Exception as e:
+        logger.error(f"Email send error: {e}")
+
+
+def validate_password(pw: str):
+    if len(pw) < 8 or not re.search(r"[A-Za-z]", pw) or not re.search(r"\d", pw):
+        raise HTTPException(status_code=400, detail="Mot de passe trop faible : au moins 8 caracteres, une lettre et un chiffre.")
+
+
+async def ensure_not_locked(email: str):
+    rec = await db.login_attempts.find_one({"identifier": email})
+    if rec and rec.get("locked_until"):
+        lu = datetime.fromisoformat(rec["locked_until"])
+        if lu.tzinfo is None:
+            lu = lu.replace(tzinfo=timezone.utc)
+        if lu > datetime.now(timezone.utc):
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Compte bloque 15 minutes.")
+
+
+async def register_failed(email: str):
+    rec = await db.login_attempts.find_one({"identifier": email})
+    count = (rec.get("count", 0) if rec else 0) + 1
+    upd = {"identifier": email, "count": count}
+    if count >= 5:
+        upd["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+        upd["count"] = 0
+    await db.login_attempts.update_one({"identifier": email}, {"$set": upd}, upsert=True)
+
+
+async def clear_attempts(email: str):
+    await db.login_attempts.delete_one({"identifier": email})
+
+
+async def verify_captcha(captcha_id: str, answer: str):
+    if not captcha_id:
+        raise HTTPException(status_code=400, detail="Verification anti-robot requise")
+    rec = await db.captchas.find_one({"cid": captcha_id})
+    if not rec:
+        raise HTTPException(status_code=400, detail="Captcha invalide ou expire")
+    exp = datetime.fromisoformat(rec["expires_at"])
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    expired = exp < datetime.now(timezone.utc)
+    ok = (not expired) and verify_password(str(answer).strip(), rec["answer_hash"])
+    await db.captchas.delete_one({"cid": captcha_id})
+    if not ok:
+        raise HTTPException(status_code=400, detail="Verification anti-robot echouee")
+
+
+def otp_email_html(code: str, name: str) -> str:
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Bonjour {name or ""}, voici votre code de connexion :</td></tr>'
+        f'<tr><td align="center" style="padding:24px 0"><span style="font-size:34px;letter-spacing:8px;font-weight:bold;color:#0b3fb5">{code}</span></td></tr>'
+        f'<tr><td style="color:#666;font-size:13px">Ce code expire dans 10 minutes. Si vous n\'etes pas a l\'origine de cette connexion, ignorez cet email.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+def status_email_html(appdoc: dict, label: str) -> str:
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Bonjour {appdoc.get("candidate_name","")},</td></tr>'
+        f'<tr><td style="padding-top:8px;color:#333">Le statut de votre candidature au poste <b>{appdoc.get("job_title","")}</b> est desormais : <b>{label}</b>.</td></tr>'
+        f'<tr><td style="padding-top:16px;color:#666;font-size:13px">Connectez-vous a votre espace candidat pour plus de details.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+def reset_email_html(code: str, name: str) -> str:
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">RecrutAI</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Bonjour {name or ""}, voici votre code de reinitialisation :</td></tr>'
+        f'<tr><td align="center" style="padding:24px 0"><span style="font-size:34px;letter-spacing:8px;font-weight:bold;color:#0b3fb5">{code}</span></td></tr>'
+        f'<tr><td style="color:#666;font-size:13px">Ce code expire dans 1 heure. Si vous n\'etes pas a l\'origine de cette demande, ignorez cet email.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+# ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
 class RegisterInput(BaseModel):
     name: str
     email: EmailStr
     password: str
+    captcha_id: str
+    captcha_answer: str
 
 
 class LoginInput(BaseModel):
     email: EmailStr
     password: str
+    admin_code: Optional[str] = None
+    captcha_id: str
+    captcha_answer: str
+
+
+class OtpInput(BaseModel):
+    email: EmailStr
+    code: str
 
 
 class GoogleSessionInput(BaseModel):
@@ -225,9 +347,11 @@ class ThemeInput(BaseModel):
 # ---------------------------------------------------------------------------
 @api.post("/auth/register")
 async def register(body: RegisterInput):
+    await verify_captcha(body.captcha_id, body.captcha_answer)
     email = body.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Cet email est deja utilise")
+    validate_password(body.password)
     user_id = f"user_{uuid.uuid4().hex[:12]}"
     doc = {
         "user_id": user_id,
@@ -246,12 +370,114 @@ async def register(body: RegisterInput):
 
 @api.post("/auth/login")
 async def login(body: LoginInput):
+    await verify_captcha(body.captcha_id, body.captcha_answer)
     email = body.email.lower().strip()
+    await ensure_not_locked(email)
     user = await db.users.find_one({"email": email})
     if not user or not user.get("password_hash") or not verify_password(body.password, user["password_hash"]):
+        await register_failed(email)
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+    await clear_attempts(email)
+    if user.get("role") == "admin" and ADMIN_ACCESS_CODE:
+        if (body.admin_code or "").strip() != ADMIN_ACCESS_CODE:
+            raise HTTPException(status_code=403, detail="Code administrateur invalide")
+    otp = f"{random.randint(0, 999999):06d}"
+    await db.otp_codes.update_one(
+        {"email": email},
+        {"$set": {"email": email, "code_hash": hash_password(otp),
+                  "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(), "attempts": 0}},
+        upsert=True,
+    )
+    logger.info(f"OTP {email} = {otp}")
+    await send_email(email, "Votre code de connexion RecrutAI", otp_email_html(otp, user.get("name", "")))
+    return {"otp_required": True, "email": email}
+
+
+@api.post("/auth/verify-otp")
+async def verify_otp(body: OtpInput):
+    email = body.email.lower().strip()
+    rec = await db.otp_codes.find_one({"email": email})
+    if not rec:
+        raise HTTPException(status_code=400, detail="Aucun code en attente. Reconnectez-vous.")
+    exp = datetime.fromisoformat(rec["expires_at"])
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        await db.otp_codes.delete_one({"email": email})
+        raise HTTPException(status_code=400, detail="Code expire. Reconnectez-vous.")
+    if rec.get("attempts", 0) >= 5:
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Reconnectez-vous.")
+    if not verify_password(body.code, rec["code_hash"]):
+        await db.otp_codes.update_one({"email": email}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="Code incorrect")
+    await db.otp_codes.delete_one({"email": email})
+    user = await db.users.find_one({"email": email})
     token = create_jwt(user["user_id"], email)
     return {"token": token, "user": public_user(user)}
+
+
+@api.get("/auth/captcha")
+async def get_captcha():
+    a = random.randint(1, 9)
+    b = random.randint(1, 9)
+    cid = secrets.token_urlsafe(12)
+    await db.captchas.update_one(
+        {"cid": cid},
+        {"$set": {"cid": cid, "answer_hash": hash_password(str(a + b)),
+                  "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()}},
+        upsert=True,
+    )
+    return {"captcha_id": cid, "question": f"{a} + {b}"}
+
+
+class ForgotInput(BaseModel):
+    email: EmailStr
+    captcha_id: str
+    captcha_answer: str
+
+
+class ResetInput(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+
+
+@api.post("/auth/forgot-password")
+async def forgot_password(body: ForgotInput):
+    await verify_captcha(body.captcha_id, body.captcha_answer)
+    email = body.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if user and user.get("password_hash"):
+        code = f"{random.randint(0, 999999):06d}"
+        await db.password_reset_tokens.update_one(
+            {"email": email},
+            {"$set": {"email": email, "code_hash": hash_password(code),
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(), "used": False}},
+            upsert=True,
+        )
+        logger.info(f"RESET {email} = {code}")
+        await send_email(email, "Reinitialisation de votre mot de passe RecrutAI", reset_email_html(code, user.get("name", "")))
+    return {"ok": True}
+
+
+@api.post("/auth/reset-password")
+async def reset_password(body: ResetInput):
+    email = body.email.lower().strip()
+    rec = await db.password_reset_tokens.find_one({"email": email})
+    if not rec or rec.get("used"):
+        raise HTTPException(status_code=400, detail="Aucune demande de reinitialisation valide.")
+    exp = datetime.fromisoformat(rec["expires_at"])
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Code expire. Refaites une demande.")
+    if not verify_password(body.code, rec["code_hash"]):
+        raise HTTPException(status_code=400, detail="Code incorrect")
+    validate_password(body.new_password)
+    await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(body.new_password)}})
+    await db.password_reset_tokens.update_one({"email": email}, {"$set": {"used": True}})
+    await clear_attempts(email)
+    return {"ok": True}
 
 
 @api.post("/auth/google/session")
@@ -447,10 +673,32 @@ async def all_applications(status: Optional[str] = Query(None), admin: dict = De
 async def update_status(app_id: str, body: StatusInput, admin: dict = Depends(require_admin)):
     if body.status not in ("pending", "accepted", "rejected"):
         raise HTTPException(status_code=400, detail="Statut invalide")
-    res = await db.applications.update_one(
+    appdoc = await db.applications.find_one({"id": app_id}, {"_id": 0})
+    if not appdoc:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    await db.applications.update_one(
         {"id": app_id},
         {"$set": {"status": body.status, "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
+    labels = {"accepted": "Acceptee", "rejected": "Refusee", "pending": "En attente"}
+    if appdoc.get("candidate_email"):
+        await send_email(appdoc["candidate_email"],
+                         f"Mise a jour de votre candidature — {appdoc.get('job_title','')}",
+                         status_email_html(appdoc, labels[body.status]))
+    return await db.applications.find_one({"id": app_id}, {"_id": 0})
+
+
+class ReviewInput(BaseModel):
+    admin_note: Optional[str] = ""
+    rating: Optional[int] = None
+
+
+@api.put("/applications/{app_id}/review")
+async def review_application(app_id: str, body: ReviewInput, admin: dict = Depends(require_admin)):
+    upd = {"admin_note": body.admin_note or ""}
+    if body.rating is not None:
+        upd["rating"] = body.rating
+    res = await db.applications.update_one({"id": app_id}, {"$set": upd})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
     return await db.applications.find_one({"id": app_id}, {"_id": 0})
@@ -680,6 +928,7 @@ async def set_theme(body: ThemeInput, admin: dict = Depends(require_admin)):
 # ---------------------------------------------------------------------------
 @api.get("/admin/stats")
 async def admin_stats(admin: dict = Depends(require_admin)):
+    today = datetime.now(timezone.utc).date().isoformat()
     return {
         "jobs": await db.jobs.count_documents({}),
         "active_jobs": await db.jobs.count_documents({"is_active": True}),
@@ -688,7 +937,123 @@ async def admin_stats(admin: dict = Depends(require_admin)):
         "pending": await db.applications.count_documents({"status": "pending"}),
         "accepted": await db.applications.count_documents({"status": "accepted"}),
         "rejected": await db.applications.count_documents({"status": "rejected"}),
+        "contracts_active": await db.contracts.count_documents({"status": "en_cours"}),
+        "contracts_closed": await db.contracts.count_documents({"status": "boucle"}),
+        "contracts_terminated": await db.contracts.count_documents({"status": "resilie"}),
+        "upcoming_interviews": await db.interviews.count_documents({"date": {"$gte": today}}),
     }
+
+
+class ContractInput(BaseModel):
+    title: str
+    client: Optional[str] = ""
+    candidate_id: Optional[str] = None
+    candidate_name: Optional[str] = ""
+    job_title: Optional[str] = ""
+    amount: Optional[str] = ""
+    start_date: Optional[str] = ""
+    end_date: Optional[str] = ""
+    status: str = "en_cours"
+    notes: Optional[str] = ""
+
+
+@api.get("/contracts")
+async def list_contracts(status: Optional[str] = Query(None), admin: dict = Depends(require_admin)):
+    q = {}
+    if status and status != "all":
+        q["status"] = status
+    return await db.contracts.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+@api.post("/contracts")
+async def create_contract(body: ContractInput, admin: dict = Depends(require_admin)):
+    if body.status not in ("en_cours", "boucle", "resilie"):
+        raise HTTPException(status_code=400, detail="Statut de contrat invalide")
+    doc = body.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.contracts.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/contracts/{contract_id}")
+async def update_contract(contract_id: str, body: ContractInput, admin: dict = Depends(require_admin)):
+    res = await db.contracts.update_one({"id": contract_id}, {"$set": body.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Contrat introuvable")
+    return await db.contracts.find_one({"id": contract_id}, {"_id": 0})
+
+
+@api.delete("/contracts/{contract_id}")
+async def delete_contract(contract_id: str, admin: dict = Depends(require_admin)):
+    await db.contracts.delete_one({"id": contract_id})
+    return {"ok": True}
+
+
+class InterviewInput(BaseModel):
+    title: str
+    candidate_id: Optional[str] = None
+    candidate_name: Optional[str] = ""
+    application_id: Optional[str] = None
+    date: str
+    time: str
+    location: Optional[str] = ""
+    notes: Optional[str] = ""
+    status: str = "scheduled"
+
+
+@api.get("/interviews")
+async def list_interviews(admin: dict = Depends(require_admin)):
+    return await db.interviews.find({}, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(2000)
+
+
+@api.post("/interviews")
+async def create_interview(body: InterviewInput, admin: dict = Depends(require_admin)):
+    doc = body.model_dump()
+    doc.update({"id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.interviews.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/interviews/{interview_id}")
+async def update_interview(interview_id: str, body: InterviewInput, admin: dict = Depends(require_admin)):
+    res = await db.interviews.update_one({"id": interview_id}, {"$set": body.model_dump()})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Entretien introuvable")
+    return await db.interviews.find_one({"id": interview_id}, {"_id": 0})
+
+
+@api.delete("/interviews/{interview_id}")
+async def delete_interview(interview_id: str, admin: dict = Depends(require_admin)):
+    await db.interviews.delete_one({"id": interview_id})
+    return {"ok": True}
+
+
+@api.get("/export/applications")
+async def export_applications(admin: dict = Depends(require_admin)):
+    apps = await db.applications.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Candidat", "Email", "Offre", "Statut", "Note admin", "Evaluation", "Date"])
+    for a in apps:
+        w.writerow([a.get("candidate_name", ""), a.get("candidate_email", ""), a.get("job_title", ""),
+                    a.get("status", ""), a.get("admin_note", ""), a.get("rating", ""), a.get("created_at", "")])
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=candidatures.csv"})
+
+
+@api.get("/export/contracts")
+async def export_contracts(admin: dict = Depends(require_admin)):
+    rows = await db.contracts.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Intitule", "Client", "Candidat", "Offre", "Montant", "Debut", "Fin", "Statut"])
+    for c in rows:
+        w.writerow([c.get("title", ""), c.get("client", ""), c.get("candidate_name", ""), c.get("job_title", ""),
+                    c.get("amount", ""), c.get("start_date", ""), c.get("end_date", ""), c.get("status", "")])
+    return Response(content=buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=contrats.csv"})
 
 
 @api.get("/")
@@ -704,6 +1069,11 @@ async def startup():
     try:
         await db.users.create_index("email", unique=True)
         await db.users.create_index("user_id")
+        await db.login_attempts.create_index("identifier")
+        await db.otp_codes.create_index("email", unique=True)
+        await db.interviews.create_index("date")
+        await db.password_reset_tokens.create_index("email")
+        await db.captchas.create_index("cid", unique=True)
     except Exception as e:
         logger.warning(f"Index warning: {e}")
     try:
