@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { DarkModeProvider } from "@/context/DarkModeContext";
 import { Toaster } from "@/components/ui/sonner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Landing from "@/pages/Landing";
@@ -28,12 +29,14 @@ function AppInner() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ThemeProvider>
-          <AppInner />
-          <Toaster position="top-right" richColors />
-        </ThemeProvider>
-      </AuthProvider>
+      <DarkModeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <AppInner />
+            <Toaster position="top-right" richColors />
+          </ThemeProvider>
+        </AuthProvider>
+      </DarkModeProvider>
     </BrowserRouter>
   );
 }

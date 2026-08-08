@@ -6,9 +6,12 @@ import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MapPin, Briefcase, Search, ArrowRight, FileAudio, ShieldCheck, Bot } from "lucide-react";
+import { MapPin, Briefcase, Search, ArrowRight, FileAudio, ShieldCheck, Bot, MoveUpRight, Star } from "lucide-react";
 
 const HERO = "https://images.unsplash.com/photo-1716703373229-b0e43de7dd5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBzcGFjZSUyMGludGVyaW9yfGVufDB8fHx8MTc4NjIxNjU3OHww&ixlib=rb-4.1.0&q=85";
+const AV1 = "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjB3b3JrZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODYyMTY1Nzh8MA&ixlib=rb-4.1.0&q=85";
+const AV2 = "https://images.pexels.com/photos/8101982/pexels-photo-8101982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
+const CATS = ["Tech", "Ressources Humaines", "Design", "Data", "Marketing", "Finance"];
 
 export default function Landing() {
   const [jobs, setJobs] = useState([]);
@@ -26,126 +29,178 @@ export default function Landing() {
   );
 
   return (
-    <div className="App">
+    <div className="App bg-background text-foreground">
       <Navbar />
 
-      <section className="relative overflow-hidden grain">
-        <div className="absolute inset-0">
-          <img src={HERO} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/55" />
-        </div>
-        <div className="relative max-w-7xl mx-auto px-5 py-24 md:py-32">
-          <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="label-caps text-white/70 mb-4">
-            Recrutement nouvelle génération
-          </motion.p>
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold text-white max-w-3xl leading-[1.05]"
-          >
-            Trouvez votre prochain emploi. Postulez avec votre voix.
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12 }}
-            className="text-lg text-white/80 max-w-xl mt-6"
-          >
-            Déposez votre CV, enregistrez un message vocal de motivation et suivez le statut de vos candidatures en temps réel.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.18 }}
-            className="mt-8 flex flex-col sm:flex-row gap-3 max-w-lg"
-          >
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                data-testid="job-search-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Poste, entreprise, ville..."
-                className="pl-12 h-13 rounded-full bg-white border-0 h-12"
-              />
+      <section className="relative overflow-hidden border-b border-border">
+        <div className="absolute inset-0 dot-grid opacity-70" />
+        <div className="relative max-w-7xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="lg:col-span-7">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 mb-7">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <span className="label-caps text-muted-foreground">Recrutement nouvelle génération</span>
+            </motion.div>
+            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold leading-[0.95]">
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="block">Votre voix</motion.span>
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="block text-stroke">au cœur du</motion.span>
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }} className="block">recrutement.</motion.span>
+            </h1>
+            <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }} className="text-base md:text-lg text-muted-foreground max-w-lg mt-7">
+              Déposez votre CV, enregistrez un message vocal jusqu'à 10 minutes et suivez le statut de chaque candidature — en toute transparence.
+            </motion.p>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.33 }} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-lg">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  data-testid="job-search-input"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Poste, entreprise, ville..."
+                  className="pl-12 h-12 rounded-none border-2 border-foreground/15 focus-visible:border-primary bg-card"
+                />
+              </div>
+              <Button asChild className="rounded-none h-12 px-8" data-testid="hero-cta">
+                <a href="#offres">Voir les offres <ArrowRight className="h-4 w-4 ml-2" /></a>
+              </Button>
+            </motion.div>
+            <div className="mt-8 flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex -space-x-2">
+                {[AV1, AV2].map((s, i) => (
+                  <img key={i} src={s} className="h-8 w-8 rounded-full border-2 border-background object-cover" alt="" />
+                ))}
+                <span className="h-8 w-8 rounded-full border-2 border-background bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">+9</span>
+              </div>
+              <span>Des candidats recrutés chaque semaine</span>
             </div>
-            <Button asChild className="rounded-full h-12 px-8" data-testid="hero-cta">
-              <a href="#offres">Voir les offres <ArrowRight className="h-4 w-4 ml-2" /></a>
-            </Button>
+          </div>
+
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-5 relative">
+            <div className="absolute -right-3 -bottom-3 w-full h-full bg-primary hidden sm:block" />
+            <div className="relative border-2 border-foreground/15 bg-card overflow-hidden">
+              <img src={HERO} alt="" className="w-full h-64 md:h-72 object-cover" />
+              <div className="p-5">
+                <p className="label-caps text-muted-foreground mb-3">Statut de candidature</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Développeur Full-Stack</span>
+                    <span className="status-accepted rounded-full px-2.5 py-0.5 text-xs font-semibold">Acceptée</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Designer UI/UX</span>
+                    <span className="status-pending rounded-full px-2.5 py-0.5 text-xs font-semibold">En attente</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-5 py-16 grid md:grid-cols-3 gap-5">
-        {[
-          { Icon: FileAudio, t: "CV + Message vocal", d: "Joignez votre CV et un message vocal jusqu'à 10 minutes pour vous démarquer." },
-          { Icon: ShieldCheck, t: "Suivi transparent", d: "Visualisez à tout moment le statut : en attente, acceptée ou refusée." },
-          { Icon: Bot, t: "Assistant IA 24/7", d: "Un assistant intelligent répond à toutes vos questions instantanément." },
-        ].map((f, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.08 }}
-            className="rounded-2xl border border-border bg-card p-8 hover:-translate-y-1 hover:shadow-lg transition-transform"
-          >
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-              <f.Icon className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="font-display text-xl font-semibold mb-2">{f.t}</h3>
-            <p className="text-muted-foreground leading-relaxed">{f.d}</p>
-          </motion.div>
-        ))}
+      <div className="border-b border-border overflow-hidden py-4 bg-card">
+        <div className="flex whitespace-nowrap animate-marquee">
+          {[...CATS, ...CATS].map((c, i) => (
+            <span key={i} className="mx-6 font-display text-2xl font-semibold text-muted-foreground/50 flex items-center gap-6">
+              {c}<Star className="h-4 w-4 text-primary" />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <section className="max-w-7xl mx-auto px-5 py-20">
+        <div className="flex items-end justify-between mb-12 flex-wrap gap-4">
+          <h2 className="font-display text-3xl lg:text-5xl font-semibold max-w-md leading-tight">Postuler n'a jamais été aussi humain.</h2>
+          <p className="text-muted-foreground max-w-sm">Trois étapes, quelques minutes. Votre personnalité fait la différence.</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-px bg-border border border-border">
+          {[
+            { n: "01", Icon: FileAudio, t: "CV + Message vocal", d: "Joignez votre CV et enregistrez jusqu'à 10 minutes de motivation vocale." },
+            { n: "02", Icon: Bot, t: "Assistant IA 24/7", d: "Un assistant intelligent répond à toutes vos questions, à tout moment." },
+            { n: "03", Icon: ShieldCheck, t: "Suivi transparent", d: "En attente, acceptée ou refusée : suivez chaque statut en temps réel." },
+          ].map((f, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.08 }}
+              className="group bg-background p-8 hover:bg-card transition-colors"
+            >
+              <div className="flex items-center justify-between mb-8">
+                <span className="font-display text-4xl font-semibold text-primary">{f.n}</span>
+                <f.Icon className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <h3 className="font-display text-xl font-semibold mb-2">{f.t}</h3>
+              <p className="text-muted-foreground leading-relaxed">{f.d}</p>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       <section id="offres" className="max-w-7xl mx-auto px-5 pb-24">
-        <div className="flex items-end justify-between mb-8">
+        <div className="flex items-end justify-between mb-10 border-t-2 border-foreground/15 pt-8">
           <div>
             <p className="label-caps text-primary mb-2">Offres d'emploi</p>
-            <h2 className="font-display text-3xl lg:text-4xl font-semibold">{filtered.length} poste{filtered.length > 1 ? "s" : ""} disponible{filtered.length > 1 ? "s" : ""}</h2>
+            <h2 className="font-display text-3xl lg:text-5xl font-semibold">{filtered.length} poste{filtered.length > 1 ? "s" : ""} disponible{filtered.length > 1 ? "s" : ""}</h2>
           </div>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-jobs">
+          <div className="border-2 border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-jobs">
             Aucune offre pour le moment. Revenez bientôt !
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((job, i) => (
-              <motion.div
-                key={job.id}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: (i % 3) * 0.06 }}
-              >
-                <Link
-                  to={`/jobs/${job.id}`}
-                  data-testid={`job-card-${job.id}`}
-                  className="group block h-full rounded-2xl border border-border bg-card p-6 hover:-translate-y-1 hover:shadow-lg transition-transform"
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((job, i) => {
+              const featured = i === 0;
+              return (
+                <motion.div
+                  key={job.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: (i % 3) * 0.06 }}
+                  className={featured ? "lg:col-span-2" : ""}
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-xs font-semibold rounded-full bg-secondary px-3 py-1">{job.category}</span>
-                    <span className="text-xs text-muted-foreground">{job.type}</span>
-                  </div>
-                  <h3 className="font-display text-xl font-semibold mb-1 group-hover:text-primary transition-colors">{job.title}</h3>
-                  <p className="text-sm font-medium text-muted-foreground mb-4">{job.company}</p>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> {job.location}</span>
-                    {job.salary && <span className="flex items-center gap-1"><Briefcase className="h-4 w-4" /> {job.salary}</span>}
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                  <Link
+                    to={`/jobs/${job.id}`}
+                    data-testid={`job-card-${job.id}`}
+                    className={`group relative flex h-full flex-col border-2 border-foreground/15 bg-card p-6 transition-colors hover:border-primary ${featured ? "lg:p-8" : ""}`}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xs font-semibold border border-foreground/15 px-3 py-1">{job.category}</span>
+                      <span className="text-xs text-muted-foreground">{job.type}</span>
+                      <MoveUpRight className="ml-auto h-5 w-5 text-muted-foreground transition-transform group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </div>
+                    <h3 className={`font-display font-semibold mb-1 group-hover:text-primary transition-colors ${featured ? "text-2xl lg:text-3xl" : "text-xl"}`}>{job.title}</h3>
+                    <p className="text-sm font-medium text-muted-foreground mb-4">{job.company}</p>
+                    {featured && <p className="text-muted-foreground mb-6 line-clamp-2 max-w-lg">{job.description}</p>}
+                    <div className="mt-auto flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> {job.location}</span>
+                      {job.salary && <span className="flex items-center gap-1"><Briefcase className="h-4 w-4" /> {job.salary}</span>}
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </section>
 
-      <footer className="border-t border-border py-10 text-center text-sm text-muted-foreground">
-        © 2026 RecrutAI — Plateforme de recrutement en ligne.
+      <footer className="border-t-2 border-foreground/15">
+        <div className="max-w-7xl mx-auto px-5 py-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="h-9 w-9 bg-primary flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="font-display text-xl font-semibold">RecrutAI</span>
+            </div>
+            <p className="text-sm text-muted-foreground">© 2026 RecrutAI — Le recrutement qui vous ressemble.</p>
+          </div>
+          <a href="#offres" className="group font-display text-2xl md:text-3xl font-semibold flex items-center gap-2 hover:text-primary transition-colors">
+            Voir les offres <MoveUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+          </a>
+        </div>
       </footer>
 
       <ChatWidget />

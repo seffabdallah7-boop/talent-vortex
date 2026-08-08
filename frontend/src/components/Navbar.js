@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useDarkMode } from "@/context/DarkModeContext";
 import { Button } from "@/components/ui/button";
-import { Briefcase, LogOut, LayoutDashboard } from "lucide-react";
+import { Briefcase, LogOut, LayoutDashboard, Sun, Moon } from "lucide-react";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { dark, toggle } = useDarkMode();
   const navigate = useNavigate();
 
   return (
@@ -20,6 +22,14 @@ export default function Navbar() {
           <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
             Offres
           </Link>
+          <button
+            onClick={toggle}
+            data-testid="dark-toggle-btn"
+            aria-label="Basculer le thème"
+            className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
+          >
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {user ? (
             <>
               <Button
