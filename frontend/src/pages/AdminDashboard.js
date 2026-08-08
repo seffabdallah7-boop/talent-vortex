@@ -650,7 +650,7 @@ function Contracts() {
   );
 }
 
-const EMPTY_ITW = { title: "", candidate_name: "", date: "", time: "", location: "", notes: "", status: "scheduled" };
+const EMPTY_ITW = { title: "", candidate_id: "", candidate_name: "", date: "", time: "", location: "", notes: "", status: "scheduled" };
 
 function Interviews() {
   const [list, setList] = useState([]);
@@ -659,8 +659,10 @@ function Interviews() {
   const [form, setForm] = useState(EMPTY_ITW);
   const [del, setDel] = useState(null);
   const [call, setCall] = useState(null);
+  const [candidates, setCandidates] = useState([]);
   const load = useCallback(() => api.get(`/interviews`).then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.get(`/candidates`).then(({ data }) => setCandidates(data)).catch(() => {}); }, []);
   const openNew = () => { setEditing(null); setForm(EMPTY_ITW); setOpen(true); };
   const openEdit = (i) => { setEditing(i); setForm({ ...EMPTY_ITW, ...i }); setOpen(true); };
   const save = async () => {
@@ -725,7 +727,14 @@ function Interviews() {
           <DialogHeader><DialogTitle>{editing ? "Modifier l'entretien" : "Nouvel entretien"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Intitulé</Label><Input data-testid="interview-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" placeholder="Ex : Entretien technique" /></div>
-            <div><Label>Candidat</Label><Input value={form.candidate_name} onChange={(e) => setForm({ ...form, candidate_name: e.target.value })} className="mt-1" /></div>
+            <div><Label>Candidat</Label>
+              <Select value={form.candidate_id || ""} onValueChange={(v) => { const c = candidates.find((x) => x.user_id === v); setForm({ ...form, candidate_id: v, candidate_name: c?.name || "" }); }}>
+                <SelectTrigger className="mt-1" data-testid="interview-candidate-select"><SelectValue placeholder="Sélectionner un candidat" /></SelectTrigger>
+                <SelectContent>
+                  {candidates.map((c) => (<SelectItem key={c.user_id} value={c.user_id}>{c.name} — {c.email}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Date</Label><Input type="date" data-testid="interview-date-input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="mt-1" /></div>
               <div><Label>Heure</Label><Input type="time" data-testid="interview-time-input" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="mt-1" /></div>

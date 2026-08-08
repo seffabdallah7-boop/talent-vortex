@@ -1,0 +1,8 @@
+crons:
+  - name: interview-reminder
+    description: "Envoie chaque jour à 8h UTC un email de rappel aux candidats ayant un entretien le lendemain"
+    cron: "0 8 * * *"
+    endpoint: "{{BASE_URL}}/api/cron/interview-reminders"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

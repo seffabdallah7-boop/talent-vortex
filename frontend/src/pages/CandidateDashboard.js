@@ -5,9 +5,10 @@ import api, { fileUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
+import VideoCall from "@/components/VideoCall";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { FileText, Volume2, Plus, Briefcase, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Volume2, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video } from "lucide-react";
 
 const STEPS = [
   { key: "pending", label: "Reçue / En attente", Icon: Clock },
@@ -17,14 +18,20 @@ const STEPS = [
 export default function CandidateDashboard() {
   const { user } = useAuth();
   const [apps, setApps] = useState([]);
+  const [interviews, setInterviews] = useState([]);
+  const [call, setCall] = useState(null);
 
   useEffect(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});
+    api.get("/interviews/me").then(({ data }) => setInterviews(data)).catch(() => {});
   }, []);
+
+  const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); } catch { return d; } };
 
   return (
     <div className="App">
       <Navbar />
+      {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title="Entretien" onClose={() => setCall(null)} />}
       <div className="max-w-6xl mx-auto px-5 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -35,6 +42,30 @@ export default function CandidateDashboard() {
             <Link to="/"><Plus className="h-4 w-4 mr-2" /> Nouvelle candidature</Link>
           </Button>
         </div>
+
+        {interviews.length > 0 && (
+          <div className="mb-10" data-testid="candidate-interviews">
+            <h2 className="font-display text-xl font-semibold mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Mes entretiens</h2>
+            <div className="space-y-3">
+              {interviews.map((i) => (
+                <div key={i.id} className="rounded-2xl border border-border bg-card p-5 flex flex-wrap items-center justify-between gap-4" data-testid={`candidate-interview-${i.id}`}>
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex flex-col items-center justify-center leading-none">
+                      <span className="font-mono text-sm font-bold">{i.time}</span>
+                    </div>
+                    <div>
+                      <p className="font-medium">{i.title}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{fmtDate(i.date)}{i.location ? ` • ${i.location}` : ""}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" className="rounded-full" onClick={() => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} data-testid={`candidate-join-interview-${i.id}`}>
+                    <Video className="h-4 w-4 mr-1.5" /> Rejoindre
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {apps.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border p-16 text-center" data-testid="no-applications">

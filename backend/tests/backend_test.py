@@ -369,6 +369,115 @@ class TestApplicationReview:
         assert r3.json()["status"] == "rejected"
 
 
+# ----------------------------- New features (iteration 5) -----------------------------
+class TestNewFeatures:
+    """New: admin notifications on new application/message, interview with candidate_id,
+    GET /interviews/me, cron endpoint auth."""
+
+    def test_admin_notif_on_new_application(self, admin_headers, candidate_token):
+        # snapshot admin notifications count
+        before = requests.get(f"{API}/notifications", headers=admin_headers, timeout=30).json()
+        before_unread = before.get("unread", 0)
+
+        # candidate applies to first active job (or skip)
+        jobs = requests.get(f"{API}/jobs", timeout=30).json()
+        if not jobs:
+            pytest.skip("No jobs available")
+        import io as _io
+        files = {"cv": ("cv.pdf", _io.BytesIO(b"%PDF-1.4 TEST notif"), "application/pdf")}
+        data = {"job_id": jobs[0]["id"], "cover_note": "TEST admin notif"}
+        r = requests.post(f"{API}/applications", data=data, files=files,
+                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=60)
+        assert r.status_code == 200, r.text
+
+        after = requests.get(f"{API}/notifications", headers=admin_headers, timeout=30).json()
+        assert after["unread"] >= before_unread + 1, f"Admin should get a new unread notif ({before_unread}->{after['unread']})"
+        # find application-type notif
+        assert any(n.get("type") == "application" for n in after["items"]), "no 'application' type notif"
+
+    def test_admin_notif_on_candidate_message(self, admin_headers, candidate_token):
+        # candidate posts a message; admin should be notified
+        before = requests.get(f"{API}/notifications", headers=admin_headers, timeout=30).json()
+        before_unread = before.get("unread", 0)
+
+        r = requests.post(f"{API}/chat/messages", json={"text": "TEST_msg from candidate"},
+                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r.status_code == 200, r.text
+        after = requests.get(f"{API}/notifications", headers=admin_headers, timeout=30).json()
+        assert after["unread"] >= before_unread + 1
+        assert any(n.get("type") == "message" for n in after["items"])
+
+    def test_interview_with_candidate_id_and_me_endpoint(self, admin_headers, candidate_token):
+        # discover candidate user_id
+        me = requests.get(f"{API}/auth/me",
+                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30).json()
+        cand_id = me["user_id"]
+        # snapshot candidate notifications
+        cn_before = requests.get(f"{API}/notifications",
+                                 headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30).json()
+        # admin plans interview with candidate_id
+        r = requests.post(f"{API}/interviews", json={
+            "title": "TEST_ITW_notif", "date": "2026-11-20", "time": "14:00",
+            "candidate_id": cand_id, "candidate_name": me.get("name", ""),
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        itw = r.json()
+        assert itw["candidate_id"] == cand_id
+        itw_id = itw["id"]
+
+        # GET /interviews/me returns it
+        r_me = requests.get(f"{API}/interviews/me",
+                            headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r_me.status_code == 200
+        assert any(i["id"] == itw_id for i in r_me.json()), "candidate /interviews/me missing new interview"
+
+        # candidate got an 'interview' notification
+        cn_after = requests.get(f"{API}/notifications",
+                                headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30).json()
+        assert cn_after["unread"] >= cn_before.get("unread", 0) + 1
+        assert any(n.get("type") == "interview" for n in cn_after["items"])
+
+        # verify via admin GET /interviews that candidate_id is present
+        all_itws = requests.get(f"{API}/interviews", headers=admin_headers, timeout=30).json()
+        target = next(i for i in all_itws if i["id"] == itw_id)
+        assert target.get("candidate_id") == cand_id
+
+        # cleanup
+        requests.delete(f"{API}/interviews/{itw_id}", headers=admin_headers, timeout=30)
+
+    def test_interviews_me_only_returns_own(self, admin_headers, candidate_token):
+        # create an interview with an unrelated candidate_id
+        other_id = "user_" + uuid.uuid4().hex[:12]
+        r = requests.post(f"{API}/interviews", json={
+            "title": "TEST_ITW_other", "date": "2026-12-01", "time": "09:00",
+            "candidate_id": other_id, "candidate_name": "Someone Else",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        other_itw_id = r.json()["id"]
+
+        r_me = requests.get(f"{API}/interviews/me",
+                            headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r_me.status_code == 200
+        assert not any(i["id"] == other_itw_id for i in r_me.json())
+
+        requests.delete(f"{API}/interviews/{other_itw_id}", headers=admin_headers, timeout=30)
+
+    def test_cron_interview_reminders_auth(self):
+        secret = os.environ.get("WEBHOOK_CRON_SECRET") or "tv_cron_7f3a9c2e5b8d1046af62e9c4d7b0153e"
+        # No auth -> 401
+        r = requests.post(f"{API}/cron/interview-reminders", timeout=30)
+        assert r.status_code == 401, r.text
+        # Wrong token -> 401
+        r2 = requests.post(f"{API}/cron/interview-reminders",
+                           headers={"Authorization": "Bearer wrong"}, timeout=30)
+        assert r2.status_code == 401
+        # Correct -> 200
+        r3 = requests.post(f"{API}/cron/interview-reminders",
+                           headers={"Authorization": f"Bearer {secret}"}, timeout=30)
+        assert r3.status_code == 200, r3.text
+        assert r3.json().get("ok") is True
+
+
 # ----------------------------- Notifications (candidate side) -----------------------------
 class TestNotifications:
     def test_candidate_notifications_created_on_status_change(self, admin_headers, candidate_token):

@@ -63,7 +63,7 @@ export default function Navbar() {
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          {user && user.role === "candidate" && <NotificationBell />}
+          {user && <NotificationBell />}
           {user ? (
             <>
               <Button

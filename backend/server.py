@@ -22,7 +22,7 @@ import io
 import csv
 from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form,
-    Header, Query, Response,
+    Header, Query, Response, BackgroundTasks,
 )
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -281,6 +281,49 @@ def reset_email_html(code: str, name: str) -> str:
         f'<tr><td style="color:#666;font-size:13px">Ce code expire dans 1 heure. Si vous n\'etes pas a l\'origine de cette demande, ignorez cet email.</td></tr>'
         f'</table></td></tr></table>'
     )
+
+
+def admin_new_app_email_html(appdoc: dict) -> str:
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Nouvelle candidature reçue.</td></tr>'
+        f'<tr><td style="padding-top:8px;color:#333"><b>{appdoc.get("candidate_name","")}</b> a postulé au poste <b>{appdoc.get("job_title","")}</b>.</td></tr>'
+        f'<tr><td style="padding-top:16px;color:#666;font-size:13px">Connectez-vous à l\'espace administration pour consulter le CV et le message vocal.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+def interview_email_html(itw: dict, reminder: bool = False) -> str:
+    intro = "Rappel : votre entretien a lieu demain." if reminder else "Un entretien a été planifié pour vous."
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Bonjour {itw.get("candidate_name","")}, {intro}</td></tr>'
+        f'<tr><td style="padding-top:8px;color:#333"><b>{itw.get("title","")}</b><br/>Le <b>{itw.get("date","")}</b> à <b>{itw.get("time","")}</b>{(" — " + itw.get("location","")) if itw.get("location") else ""}</td></tr>'
+        f'<tr><td style="padding-top:16px;color:#666;font-size:13px">Connectez-vous à votre espace candidat pour rejoindre l\'entretien en visioconférence.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+async def notify_user(user_id: str, ntype: str, title: str, body: str, extra: dict = None):
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user_id, "type": ntype,
+        "title": title, "body": body, "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if extra:
+        doc.update(extra)
+    await db.notifications.insert_one(doc)
+
+
+async def notify_admins(ntype: str, title: str, body: str, extra: dict = None):
+    admins = await db.users.find({"role": "admin"}, {"_id": 0}).to_list(100)
+    for a in admins:
+        await notify_user(a["user_id"], ntype, title, body, extra)
+    return admins
 
 
 # ---------------------------------------------------------------------------
@@ -648,6 +691,14 @@ async def create_application(
     }
     await db.applications.insert_one(app_doc)
     app_doc.pop("_id", None)
+    admins = await notify_admins(
+        "application", "Nouvelle candidature",
+        f"{app_doc['candidate_name']} a postulé à « {app_doc['job_title']} ».",
+    )
+    for adm in admins:
+        if adm.get("email"):
+            await send_email(adm["email"], f"Nouvelle candidature — {app_doc['job_title']}",
+                             admin_new_app_email_html(app_doc))
     return app_doc
 
 
@@ -845,6 +896,12 @@ async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_
     }
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
+    if sender_role == "candidate":
+        await notify_admins("message", "Nouveau message",
+                            f"{candidate_name or 'Un candidat'} vous a envoyé un message.")
+    else:
+        await notify_user(conv, "message", "Nouveau message",
+                          "L'équipe de recrutement vous a répondu.")
     return doc
 
 
@@ -1010,12 +1067,26 @@ async def list_interviews(admin: dict = Depends(require_admin)):
     return await db.interviews.find({}, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(2000)
 
 
+@api.get("/interviews/me")
+async def my_interviews(user: dict = Depends(get_current_user)):
+    items = await db.interviews.find({"candidate_id": user["user_id"]}, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(500)
+    return items
+
+
 @api.post("/interviews")
 async def create_interview(body: InterviewInput, admin: dict = Depends(require_admin)):
     doc = body.model_dump()
     doc.update({"id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()})
     await db.interviews.insert_one(doc)
     doc.pop("_id", None)
+    if doc.get("candidate_id"):
+        await notify_user(doc["candidate_id"], "interview", "Entretien planifié",
+                          f"{doc.get('title','Entretien')} le {doc.get('date','')} à {doc.get('time','')}.",
+                          {"interview_id": doc["id"]})
+        cand = await db.users.find_one({"user_id": doc["candidate_id"]}, {"_id": 0})
+        if cand and cand.get("email"):
+            await send_email(cand["email"], f"Entretien planifié — {doc.get('title','')}",
+                             interview_email_html(doc))
     return doc
 
 
@@ -1075,6 +1146,37 @@ async def read_all_notifications(user: dict = Depends(get_current_user)):
 @api.get("/")
 async def root():
     return {"message": "Talent Vortex API"}
+
+
+# ---------------------------------------------------------------------------
+# Cron: interview reminders (day before)
+# ---------------------------------------------------------------------------
+WEBHOOK_CRON_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
+
+
+async def send_interview_reminders():
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+    itws = await db.interviews.find({"date": tomorrow, "status": {"$ne": "cancelled"}}, {"_id": 0}).to_list(1000)
+    for itw in itws:
+        if not itw.get("candidate_id"):
+            continue
+        cand = await db.users.find_one({"user_id": itw["candidate_id"]}, {"_id": 0})
+        if cand and cand.get("email"):
+            await send_email(cand["email"], f"Rappel : entretien demain — {itw.get('title','')}",
+                             interview_email_html(itw, reminder=True))
+        await notify_user(itw["candidate_id"], "interview", "Rappel d'entretien",
+                          f"{itw.get('title','Entretien')} demain à {itw.get('time','')}.",
+                          {"interview_id": itw["id"]})
+
+
+@api.post("/cron/interview-reminders")
+async def cron_interview_reminders(background: BackgroundTasks, authorization: Optional[str] = Header(None)):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not WEBHOOK_CRON_SECRET or not secrets.compare_digest(token, WEBHOOK_CRON_SECRET):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    background.add_task(send_interview_reminders)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
