@@ -1,0 +1,135 @@
+{
+  "theme": "hybrid_fullstack",
+  "typography": {
+    "headings": {
+      "font_family": "Clash Display, sans-serif",
+      "style": "tracking-tight, high impact, expressive",
+      "h1_max": "text-5xl lg:text-6xl",
+      "h2": "text-3xl lg:text-4xl",
+      "rules": "Never use Inter, Roboto, or generic sans for headings."
+    },
+    "body": {
+      "font_family": "IBM Plex Sans, sans-serif",
+      "style": "leading-relaxed, highly legible for dashboards and CV reading"
+    },
+    "labels": {
+      "style": "uppercase, tracking-[0.2em], text-xs font-semibold"
+    },
+    "forbidden_fonts": [
+      "Space Grotesk (Banned for dashboards)"
+    ]
+  },
+  "colors": {
+    "strategy": "CSS Variable Driven (Admin Themeable) - Default Base: Swiss High-Contrast",
+    "css_variables": {
+      "--background": "0 0% 98%",
+      "--foreground": "240 10% 10%",
+      "--primary": "220 100% 33%", 
+      "--primary-foreground": "0 0% 100%",
+      "--muted": "240 5% 90%",
+      "--border": "240 5% 85%",
+      "--status-pending": "38 92% 50%",
+      "--status-accepted": "142 71% 45%",
+      "--status-rejected": "0 84% 60%"
+    },
+    "rules": [
+      "No generic full-screen gradients. Use flat or highly structural grayscale backgrounds.",
+      "Primary color MUST be injected via CSS variables so the Admin can customize it dynamically.",
+      "Use status color-coding consistently across candidate and admin views.",
+      "Do NOT use teal green/blue (#1B93A4) or #7351B7 anywhere."
+    ]
+  },
+  "visual_enhancers": {
+    "surface_styles": [
+      "Glassmorphism (Crystal Variant): For sticky headers, AI chat overlays. bg-white/70, backdrop-blur-xl, 1px border-white/20. NEVER use fully transparent backgrounds.",
+      "Neumorphism (Tactile): For dashboard action cards. Flat background, sharp 1px border-black/5, layered shadow.",
+      "Grid Borders: For admin dashboard data tables. border-collapse, subtle borders."
+    ],
+    "textures": "Subtle noise overlays on the landing page hero section to kill digital flatness."
+  },
+  "component_name": {
+    "strategy": "Shadcn UI + Custom Layouts (.js implementation)",
+    "forms": "Use Shadcn Form, Input, Textarea. Do not use native HTML inputs.",
+    "select": "Shadcn Select for job categories and status filters.",
+    "tables": "Shadcn Table for candidate management in Admin dashboard.",
+    "dialogs": "Shadcn Dialog for viewing CVs and application details.",
+    "voice_recorder": "Custom UI using standard audio web APIs, styled with a distinct pulse animation when active.",
+    "tabs": "Shadcn Tabs (override h-9 to h-auto) for switching between Admin Chat and AI Settings."
+  },
+  "grids": {
+    "landing_page": "Tetris Bento Grid (grid-cols-1 md:grid-cols-12, wide gaps, asymmetrical).",
+    "dashboard": "High Density Grid (grid-cols-1 lg:grid-cols-4, tight gaps, strict hierarchy).",
+    "rules": "Grid items MUST be direct children of grid containers. Add p-6 or p-8 inside cards to avoid text collision."
+  },
+  "layouts": {
+    "public_facing": "Large expressive headers, asymmetrical feature grids, immersive sticky navigation.",
+    "candidate_portal": "Top navigation, modular cards showing job applications and status timeline.",
+    "admin_dashboard": "Left-sidebar navigation (collapsible). Top-left KPI snapshot. Actionable tasks widget. Main center is the candidate pipeline table."
+  },
+  "motion": {
+    "interactions": "Hover states (translate-y-1, shadow-lg, text color change) on all cards.",
+    "transitions": "Use specific properties: transition-transform, opacity (NOT transition-all).",
+    "voice_recording": "Pulsing red dot or audio waveform animation when recording is active.",
+    "chat": "Smooth entrance animations for new messages (framer-motion slide up)."
+  },
+  "accessibility": {
+    "contrast": "APCA standard minimums. Dynamic text color inversion if admin chooses a light primary color.",
+    "focus": "focus:ring-2 focus:ring-primary focus:ring-offset-2 on all inputs and buttons.",
+    "motion": "Respect prefers-reduced-motion."
+  },
+  "media": {
+    "handling": "Images max-h-[80vh] on mobile. Overlay hero images with bg-black/40 max."
+  },
+  "3d_libraries": {
+    "usage": "Use Framer Motion for UI transitions. No heavy 3D required unless adding a subtle particle background on the landing page (TSParticles)."
+  },
+  "image_urls": {
+    "landing_hero": {
+      "url": "https://images.unsplash.com/photo-1716703373229-b0e43de7dd5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBzcGFjZSUyMGludGVyaW9yfGVufDB8fHx8MTc4NjIxNjU3OHww&ixlib=rb-4.1.0&q=85",
+      "description": "Modern office space for landing page background (apply bg-black/40 overlay)",
+      "category": "background"
+    },
+    "candidate_avatar_1": {
+      "url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjB3b3JrZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODYyMTY1Nzh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Professional man standing",
+      "category": "avatar"
+    },
+    "candidate_avatar_2": {
+      "url": "https://images.pexels.com/photos/8101982/pexels-photo-8101982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Smiling woman in professional office",
+      "category": "avatar"
+    },
+    "company_logo": {
+      "url": "https://images.unsplash.com/photo-1746047420047-03fc7a9b9226?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwc3RhcnR1cCUyMGxvZ298ZW58MHx8fHwxNzg2MjE2NTc4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Minimalist startup logo stand-in for platform brand or hiring company",
+      "category": "logo"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure complete separation of Candidate and Admin routes (e.g., /dashboard for candidates, /admin for admins).",
+    "Implement a dynamic CSS variable mechanism allowing the admin to override --primary and --primary-foreground.",
+    "For the voice recording feature, build a custom UI block inside the application form with a clear timer (max 10:00) and 'Start/Stop/Playback' controls.",
+    "Build a persistent Chat Widget on candidate side that toggles between AI Assistant and Admin Live Chat.",
+    "You are working with .js files, NOT .tsx. Adapt all Shadcn and React component definitions to standard JavaScript (JSX) without TypeScript types.",
+    "Use Phosphor Icons (@phosphor-icons/react) for professional dashboard iconography.",
+    "Use sonner for all toast notifications (status updates, theme changes, application submitted)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Avoid the 'AI slop' aesthetic. Do not make generic centered layouts or simplistic gradients.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky navs and chat windows. Never use pure transparent backgrounds if content scrolls underneath.",
+    "You MUST NOT apply universal transitions (e.g., transition: all). Target specific properties like transition-transform or opacity.",
+    "You MUST NOT center align the app container (no .App { text-align: center; }).",
+    "Always use modern button styles (pill-shaped or sharp) with interaction animations.",
+    "NEVER use AI assistant Emoji characters (like 🤖🧠💭💡) for icons. Use real SVG icons.",
+    "Prioritize using pre-existing components from src/components/ui.",
+    "Apply optical alignment over strict geometric alignment where appropriate."
+  ],
+  "general_ui_ux_design_guidelines": [
+    "Every interactive element MUST include a data-testid attribute (e.g., data-testid='submit-application-btn') to facilitate robust automated testing.",
+    "Status badges MUST be visibly distinct: Pending (Yellow/Orange), Accepted (Green), Rejected (Red).",
+    "Empty states in the admin dashboard (no applicants yet) should have actionable CTAs ('Post a new job').",
+    "Provide clear feedback (sonner toasts) for destructive actions (e.g., deleting a candidate or rejecting an application).",
+    "Ensure the voice recording UI clearly indicates recording state (pulsing UI) and length to prevent user anxiety."
+  ]
+}
