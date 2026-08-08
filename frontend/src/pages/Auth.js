@@ -10,6 +10,19 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Briefcase, Loader2, Sun, Moon, RefreshCw, ShieldCheck, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
+function CaptchaField({ question, value, onChange, onRefresh }) {
+  return (
+    <div>
+      <Label className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Vérification anti-robot</Label>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="px-3 h-11 flex items-center rounded-md bg-secondary font-mono font-semibold select-none" data-testid="captcha-question">{question} =</span>
+        <Input data-testid="captcha-input" value={value} onChange={(e) => onChange(e.target.value)} required inputMode="numeric" placeholder="?" className="w-24" />
+        <button type="button" onClick={onRefresh} data-testid="captcha-refresh" className="h-11 w-11 shrink-0 rounded-md border border-border flex items-center justify-center hover:bg-secondary"><RefreshCw className="h-4 w-4" /></button>
+      </div>
+    </div>
+  );
+}
+
 export default function Auth() {
   const { setSession } = useAuth();
   const { dark, toggle } = useDarkMode();
@@ -42,7 +55,7 @@ export default function Auth() {
     try {
       if (tab === "login") {
         const { data } = await api.post("/auth/login", {
-          email: form.email, password: form.password, admin_code: form.admin_code,
+          email: form.email, password: form.password,
           captcha_id: captcha.captcha_id, captcha_answer: captchaAns,
         });
         if (data.otp_required) {
@@ -113,15 +126,8 @@ export default function Auth() {
     }
   };
 
-  const CaptchaField = () => (
-    <div>
-      <Label className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Vérification anti-robot</Label>
-      <div className="flex items-center gap-2 mt-1.5">
-        <span className="px-3 h-11 flex items-center rounded-md bg-secondary font-mono font-semibold select-none" data-testid="captcha-question">{captcha.question} =</span>
-        <Input data-testid="captcha-input" value={captchaAns} onChange={(e) => setCaptchaAns(e.target.value)} required inputMode="numeric" placeholder="?" className="w-24" />
-        <button type="button" onClick={refreshCaptcha} data-testid="captcha-refresh" className="h-11 w-11 shrink-0 rounded-md border border-border flex items-center justify-center hover:bg-secondary"><RefreshCw className="h-4 w-4" /></button>
-      </div>
-    </div>
+  const CaptchaFieldEl = (
+    <CaptchaField question={captcha.question} value={captchaAns} onChange={setCaptchaAns} onRefresh={refreshCaptcha} />
   );
 
   const googleLogin = () => {
@@ -185,13 +191,7 @@ export default function Auth() {
                   <Input id="password" type="password" data-testid="auth-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required className="mt-1.5" />
                   {tab === "register" && <p className="text-xs text-muted-foreground mt-1">Min. 8 caractères, une lettre et un chiffre.</p>}
                 </div>
-                <TabsContent value="login" className="mt-0 space-y-4 p-0">
-                  <div>
-                    <Label htmlFor="admin_code">Code administrateur <span className="text-muted-foreground">(admins uniquement)</span></Label>
-                    <Input id="admin_code" data-testid="admin-code-input" value={form.admin_code} onChange={(e) => setForm({ ...form, admin_code: e.target.value })} placeholder="Laisser vide si candidat" className="mt-1.5" />
-                  </div>
-                </TabsContent>
-                <CaptchaField />
+                {CaptchaFieldEl}
                 <Button type="submit" disabled={loading} className="w-full rounded-full h-11" data-testid="auth-submit-btn">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : tab === "login" ? "Se connecter" : "Créer mon compte"}
                 </Button>
@@ -224,7 +224,7 @@ export default function Auth() {
                   <Label htmlFor="fe">Email</Label>
                   <Input id="fe" type="email" data-testid="forgot-email" value={reset.email} onChange={(e) => setReset({ ...reset, email: e.target.value })} required className="mt-1.5" />
                 </div>
-                <CaptchaField />
+                {CaptchaFieldEl}
                 <Button type="submit" disabled={loading} className="w-full rounded-full h-11" data-testid="forgot-submit-btn">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer le code"}
                 </Button>

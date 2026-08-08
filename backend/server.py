@@ -378,9 +378,6 @@ async def login(body: LoginInput):
         await register_failed(email)
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     await clear_attempts(email)
-    if user.get("role") == "admin" and ADMIN_ACCESS_CODE:
-        if (body.admin_code or "").strip() != ADMIN_ACCESS_CODE:
-            raise HTTPException(status_code=403, detail="Code administrateur invalide")
     otp = f"{random.randint(0, 999999):06d}"
     await db.otp_codes.update_one(
         {"email": email},
@@ -697,7 +694,7 @@ class ReviewInput(BaseModel):
 async def review_application(app_id: str, body: ReviewInput, admin: dict = Depends(require_admin)):
     upd = {"admin_note": body.admin_note or ""}
     if body.rating is not None:
-        upd["rating"] = body.rating
+        upd["rating"] = max(1, min(5, int(body.rating)))
     res = await db.applications.update_one({"id": app_id}, {"$set": upd})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Candidature introuvable")
