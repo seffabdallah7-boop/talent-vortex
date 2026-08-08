@@ -487,6 +487,40 @@ async def list_candidates(admin: dict = Depends(require_admin)):
     return users
 
 
+@api.get("/users")
+async def list_users(admin: dict = Depends(require_admin)):
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+    for u in users:
+        u["application_count"] = await db.applications.count_documents({"candidate_id": u["user_id"]})
+    return users
+
+
+class RoleInput(BaseModel):
+    role: str
+
+
+@api.put("/users/{user_id}/role")
+async def set_user_role(user_id: str, body: RoleInput, admin: dict = Depends(require_admin)):
+    if body.role not in ("admin", "candidate"):
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    if user_id == admin["user_id"] and body.role != "admin":
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas retirer votre propre rôle admin")
+    res = await db.users.update_one({"user_id": user_id}, {"$set": {"role": body.role}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+
+
+@api.delete("/users/{user_id}")
+async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    if user_id == admin["user_id"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
+    await db.users.delete_one({"user_id": user_id})
+    await db.applications.delete_many({"candidate_id": user_id})
+    await db.messages.delete_many({"conversation_id": user_id})
+    return {"ok": True}
+
+
 @api.delete("/candidates/{user_id}")
 async def delete_candidate(user_id: str, admin: dict = Depends(require_admin)):
     await db.users.delete_one({"user_id": user_id, "role": "candidate"})

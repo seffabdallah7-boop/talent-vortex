@@ -26,7 +26,7 @@ const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
   { key: "jobs", label: "Offres d'emploi", Icon: Briefcase },
   { key: "applications", label: "Candidatures", Icon: FileText },
-  { key: "candidates", label: "Candidats", Icon: Users },
+  { key: "candidates", label: "Utilisateurs", Icon: Users },
   { key: "messages", label: "Messages", Icon: MessageSquare },
   { key: "theme", label: "Apparence", Icon: Palette },
 ];
@@ -348,37 +348,70 @@ function Applications() {
 }
 
 function Candidates() {
+  const { user: me } = useAuth();
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
-  const load = useCallback(() => api.get("/candidates").then(({ data }) => setList(data)).catch(() => {}), []);
+  const load = useCallback(() => api.get("/users").then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
-  const remove = async () => { await api.delete(`/candidates/${del.user_id}`); toast.success("Candidat supprimé"); setDel(null); load(); };
+  const remove = async () => {
+    try {
+      await api.delete(`/users/${del.user_id}`);
+      toast.success("Utilisateur supprimé");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    setDel(null); load();
+  };
+  const changeRole = async (u, role) => {
+    try {
+      await api.put(`/users/${u.user_id}/role`, { role });
+      toast.success(role === "admin" ? `${u.name} est maintenant administrateur` : `${u.name} est de nouveau candidat`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold mb-6">Candidats inscrits</h1>
+      <h1 className="font-display text-3xl font-semibold mb-2">Utilisateurs & rôles</h1>
+      <p className="text-muted-foreground mb-6">Gérez les comptes : promouvoir en administrateur, rétrograder en candidat, ou supprimer.</p>
       {list.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun candidat inscrit.</div>
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun utilisateur.</div>
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Candidatures</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Rôle</TableHead><TableHead>Candidatures</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {list.map((u) => (
-                <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
-                  <TableCell className="font-medium">{u.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                  <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{u.application_count}</span></TableCell>
-                  <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setDel(u)} data-testid={`delete-candidate-${u.user_id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                </TableRow>
-              ))}
+              {list.map((u) => {
+                const isSelf = me && u.user_id === me.user_id;
+                return (
+                  <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
+                    <TableCell className="font-medium">{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                    <TableCell>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.role === "admin" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                        {u.role === "admin" ? "Administrateur" : "Candidat"}
+                      </span>
+                    </TableCell>
+                    <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{u.application_count}</span></TableCell>
+                    <TableCell className="text-right">
+                      {!isSelf && u.role === "candidate" && (
+                        <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => changeRole(u, "admin")} data-testid={`promote-${u.user_id}`}>Promouvoir admin</Button>
+                      )}
+                      {!isSelf && u.role === "admin" && (
+                        <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => changeRole(u, "candidate")} data-testid={`demote-${u.user_id}`}>Rétrograder</Button>
+                      )}
+                      {!isSelf && (
+                        <Button variant="ghost" size="icon" onClick={() => setDel(u)} data-testid={`delete-candidate-${u.user_id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
       <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Supprimer {del?.name} ?</AlertDialogTitle><AlertDialogDescription>Le candidat et toutes ses candidatures seront supprimés définitivement.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Supprimer {del?.name} ?</AlertDialogTitle><AlertDialogDescription>L'utilisateur et toutes ses candidatures seront supprimés définitivement.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-candidate">Supprimer</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
