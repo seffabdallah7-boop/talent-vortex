@@ -442,8 +442,10 @@ function Candidates() {
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
   const [q, setQ] = useState("");
+  const [nats, setNats] = useState([]);
   const load = useCallback(() => api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`).then(({ data }) => setList(data)).catch(() => {}), [q]);
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
+  useEffect(() => { api.get("/admin/nationalities").then(({ data }) => setNats(data)).catch(() => {}); }, []);
   const remove = async () => {
     try {
       await api.delete(`/users/${del.user_id}`);
@@ -470,6 +472,19 @@ function Candidates() {
           <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un candidat (poste, domaine, nationalité...)" className="rounded-full" />
         </div>
       </div>
+      {nats.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card p-4 mb-6" data-testid="nationalities-panel">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Répartition par nationalité</p>
+          <div className="flex flex-wrap gap-2">
+            {nats.map((n) => (
+              <span key={n.nationality} data-testid={`nat-${n.nationality}`} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-sm">
+                {n.nationality}
+                <span className="rounded-full bg-primary/15 text-primary px-1.5 text-xs font-bold">{n.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun utilisateur.</div>
       ) : (

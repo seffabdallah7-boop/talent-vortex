@@ -46,3 +46,6 @@
 ### Score d'adéquation + optimisations (fait)
 - Badge "★ Match {percent}%" sur les cartes d'offres pour le candidat connecté (calculé côté serveur : match_percent dérivé du match_score, 55 + score*12, plafonné à 96%). Traduit FR/EN.
 - Optimisation N+1 : /jobs/all, /candidates, /users utilisent désormais une seule agrégation MongoDB (comptages groupés). Contrôle de déploiement : aucun blocage.
+
+### Classification des nationalités (fait)
+- GET /api/admin/nationalities (agrégation des candidats par nationalité). Panneau "Répartition par nationalité" (chips + compteurs) au-dessus de la liste des utilisateurs dans l'admin.

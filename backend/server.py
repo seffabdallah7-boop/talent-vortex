@@ -1001,6 +1001,16 @@ async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(requi
     return users
 
 
+@api.get("/admin/nationalities")
+async def nationalities(admin: dict = Depends(require_admin)):
+    agg = await db.users.aggregate([
+        {"$match": {"role": "candidate"}},
+        {"$group": {"_id": {"$ifNull": ["$nationality", ""]}, "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]).to_list(300)
+    return [{"nationality": (a["_id"] or "Non renseignée"), "count": a["count"]} for a in agg]
+
+
 class RoleInput(BaseModel):
     role: str
 

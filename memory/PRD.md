@@ -44,7 +44,7 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - ✅ Moteur de recherche de candidats (GET /api/users?q=) par nom/email/poste/domaines/outils/nationalité + colonnes Nationalité & Poste.
 - ✅ IA Rédaction d'offre : POST /api/jobs/ai-draft (brief → formulaire pré-rempli, admin valide).
 - Statut d'appréciation du candidat (rating/admin_note — déjà présent, à mettre en avant).
-- Classification/statistiques des nationalités (vue dédiée).
+- ✅ Classification/statistiques des nationalités (GET /admin/nationalities + panneau admin).
 - ✅ Agenda hebdomadaire (vue calendrier semaine, bascule Semaine/Liste) + rappel 5 min avant l'entretien (client, bannière + toast).
 - ✅ Chat : accusés de lecture (vus) + heures, statut en ligne + dernière connexion (présence via ping/last_seen).
 
