@@ -38,14 +38,14 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 ### ✅ Phase Candidat (fait, 2026-06)
 - Sidebar (postulations/entretiens/contrats/profil) + badges, profil enrichi + IA priorisation offres, anti-doublon, recherche, lecteur vocal avec vitesse.
 
-### 🟡 Phase Admin (à faire)
-- Regrouper les candidatures par offre (clic sur offre → ses candidatures) + badge nb nouvelles candidatures sur la carte offre.
-- Masquer/afficher une offre (toggle is_active) côté admin.
-- Moteur de recherche de candidats (par expérience/profil).
-- Statut d'appréciation du candidat (déjà: rating/admin_note — à exposer proprement).
-- Classification des nationalités des candidats.
+### 🟡 Phase Admin (en cours)
+- ✅ Regrouper les candidatures par offre (clic sur le compteur d'une offre → ses candidatures, chip + "Voir toutes") + badge "X nouv." (pending) sur chaque offre.
+- ✅ Masquer/afficher une offre (Switch is_active) → PUT /api/jobs/{id}/active.
+- ✅ Moteur de recherche de candidats (GET /api/users?q=) par nom/email/poste/domaines/outils/nationalité + colonnes Nationalité & Poste.
+- ✅ IA Rédaction d'offre : POST /api/jobs/ai-draft (brief → formulaire pré-rempli, admin valide).
+- Statut d'appréciation du candidat (rating/admin_note — déjà présent, à mettre en avant).
+- Classification/statistiques des nationalités (vue dédiée).
 - Agenda hebdomadaire (vue calendrier semaine) + notification 5 min avant l'entretien.
-- Agent IA : fiche de poste → pré-remplit le formulaire d'offre (admin valide).
 - Chat : accusés de lecture (vus) + heures, statut en ligne + dernière connexion.
 
 ### 🟠 Phase Application (à faire)

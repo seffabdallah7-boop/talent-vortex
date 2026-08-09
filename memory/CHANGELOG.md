@@ -17,3 +17,9 @@
 - Priorisation IA des offres : Claude détecte les domaines (ai_domains) ; GET /api/jobs classe les offres par match_score selon le domaine du candidat. Recherche `q` côté serveur.
 - Anti double-candidature (POST /applications → 400) + bloc "déjà postulé" avec statut sur /jobs/:id.
 - Lecteur audio du message vocal avec vitesse de lecture (1x/1.25x/1.5x/2x) — AudioPlayer.jsx.
+
+### Phase Admin (partielle)
+- IA Rédaction d'offre : POST /api/jobs/ai-draft — un brief/fiche de poste pré-remplit le formulaire d'offre (Claude), l'admin corrige puis publie. Panneau "Générer avec l'IA" dans le dialog nouvelle offre.
+- Candidatures par offre : /jobs/all renvoie applicants + pending ; clic sur le compteur d'une offre filtre les candidatures (GET /applications?job_id=), chip "Candidatures pour : X" + "Voir toutes".
+- Masquer/afficher une offre : Switch "Visible" → PUT /api/jobs/{id}/active (retire l'offre du listing public).
+- Recherche de candidats : GET /api/users?q= (nom/email/poste/domaines/outils/nationalité/ville/pays) + colonnes Nationalité & Poste.

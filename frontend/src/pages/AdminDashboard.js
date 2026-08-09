@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription,
   AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
   const { dark, toggle } = useDarkMode();
   const navigate = useNavigate();
   const [section, setSection] = useState("overview");
+  const [jobFilter, setJobFilter] = useState(null);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -83,7 +85,7 @@ export default function AdminDashboard() {
           {NAV.map((n) => (
             <button
               key={n.key}
-              onClick={() => setSection(n.key)}
+              onClick={() => { setSection(n.key); if (n.key === "applications") setJobFilter(null); }}
               data-testid={`nav-${n.key}`}
               className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
             >
@@ -112,13 +114,13 @@ export default function AdminDashboard() {
       <main className="flex-1 overflow-y-auto">
         <div className="md:hidden flex gap-2 p-3 overflow-x-auto border-b border-border">
           {NAV.map((n) => (
-            <button key={n.key} onClick={() => setSection(n.key)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${section === n.key ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{n.label}</button>
+            <button key={n.key} onClick={() => { setSection(n.key); if (n.key === "applications") setJobFilter(null); }} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${section === n.key ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{n.label}</button>
           ))}
         </div>
         <div className="p-6 md:p-8 max-w-6xl">
           {section === "overview" && <Overview />}
-          {section === "jobs" && <Jobs />}
-          {section === "applications" && <Applications />}
+          {section === "jobs" && <Jobs onViewApplications={(job) => { setJobFilter(job); setSection("applications"); }} />}
+          {section === "applications" && <Applications jobFilter={jobFilter} onClearJobFilter={() => setJobFilter(null)} />}
           {section === "contracts" && <Contracts />}
           {section === "interviews" && <Interviews />}
           {section === "candidates" && <Candidates />}
@@ -165,7 +167,7 @@ function Overview() {
 
 const EMPTY_JOB = { title: "", company: "", location: "", type: "Temps plein", category: "General", description: "", requirements: "", salary: "" };
 
-function Jobs() {
+function Jobs({ onViewApplications }) {
   const [jobs, setJobs] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -195,6 +197,14 @@ function Jobs() {
 
   const remove = async () => { await api.delete(`/jobs/${del.id}`); toast.success("Offre supprimée"); setDel(null); load(); };
 
+  const toggleActive = async (j) => {
+    try {
+      await api.put(`/jobs/${j.id}/active`, { is_active: !j.is_active });
+      toast.success(j.is_active ? "Offre masquée" : "Offre visible");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+
   const generateAi = async () => {
     setAiLoading(true);
     try {
@@ -221,13 +231,19 @@ function Jobs() {
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Poste</TableHead><TableHead>Lieu</TableHead><TableHead>Candidats</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Poste</TableHead><TableHead>Lieu</TableHead><TableHead>Candidatures</TableHead><TableHead>Visible</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {jobs.map((j) => (
                 <TableRow key={j.id} data-testid={`job-row-${j.id}`}>
                   <TableCell><div className="font-medium">{j.title}</div><div className="text-xs text-muted-foreground">{j.company}</div></TableCell>
                   <TableCell>{j.location}</TableCell>
-                  <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{j.applicants || 0}</span></TableCell>
+                  <TableCell>
+                    <button onClick={() => onViewApplications({ id: j.id, title: j.title })} data-testid={`view-job-apps-${j.id}`} className="inline-flex items-center gap-1.5 hover:opacity-80">
+                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{j.applicants || 0}</span>
+                      {j.pending > 0 && <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs font-semibold" data-testid={`job-pending-${j.id}`}>{j.pending} nouv.</span>}
+                    </button>
+                  </TableCell>
+                  <TableCell><Switch checked={!!j.is_active} onCheckedChange={() => toggleActive(j)} data-testid={`toggle-job-${j.id}`} /></TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(j)} data-testid={`edit-job-${j.id}`}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => setDel(j)} data-testid={`delete-job-${j.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -282,7 +298,7 @@ function Jobs() {
   );
 }
 
-function Applications() {
+function Applications({ jobFilter, onClearJobFilter }) {
   const [apps, setApps] = useState([]);
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState(null);
@@ -290,7 +306,12 @@ function Applications() {
   const [note, setNote] = useState("");
   const [rating, setRating] = useState(0);
 
-  const load = useCallback(() => api.get(`/applications?status=${filter}`).then(({ data }) => setApps(data)).catch(() => {}), [filter]);
+  const load = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set("status", filter);
+    if (jobFilter?.id) params.set("job_id", jobFilter.id);
+    return api.get(`/applications?${params.toString()}`).then(({ data }) => setApps(data)).catch(() => {});
+  }, [filter, jobFilter]);
   useEffect(() => { load(); }, [load]);
 
   const setStatus = async (id, status) => {
@@ -327,6 +348,13 @@ function Applications() {
           </Select>
         </div>
       </div>
+
+      {jobFilter && (
+        <div className="mb-4 flex items-center gap-2" data-testid="job-filter-chip">
+          <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-medium">Candidatures pour : {jobFilter.title}</span>
+          <Button variant="ghost" size="sm" className="rounded-full" onClick={onClearJobFilter} data-testid="clear-job-filter">Voir toutes</Button>
+        </div>
+      )}
 
       {apps.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucune candidature.</div>
@@ -406,8 +434,9 @@ function Candidates() {
   const { user: me } = useAuth();
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
-  const load = useCallback(() => api.get("/users").then(({ data }) => setList(data)).catch(() => {}), []);
-  useEffect(() => { load(); }, [load]);
+  const [q, setQ] = useState("");
+  const load = useCallback(() => api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`).then(({ data }) => setList(data)).catch(() => {}), [q]);
+  useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
   const remove = async () => {
     try {
       await api.delete(`/users/${del.user_id}`);
@@ -425,14 +454,21 @@ function Candidates() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold mb-2">Utilisateurs & rôles</h1>
-      <p className="text-muted-foreground mb-6">Gérez les comptes : promouvoir en administrateur, rétrograder en candidat, ou supprimer.</p>
+      <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+        <div>
+          <h1 className="font-display text-3xl font-semibold mb-2">Utilisateurs & rôles</h1>
+          <p className="text-muted-foreground">Recherchez par nom, poste, domaine ou nationalité ; gérez les rôles.</p>
+        </div>
+        <div className="w-full sm:w-80">
+          <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un candidat (poste, domaine, nationalité...)" className="rounded-full" />
+        </div>
+      </div>
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun utilisateur.</div>
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Rôle</TableHead><TableHead>Candidatures</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {list.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
@@ -440,6 +476,8 @@ function Candidates() {
                   <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
                     <TableCell className="font-medium">{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{u.nationality || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{u.current_position || "—"}</TableCell>
                     <TableCell>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.role === "admin" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>
                         {u.role === "admin" ? "Administrateur" : "Candidat"}

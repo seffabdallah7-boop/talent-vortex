@@ -684,6 +684,7 @@ async def list_all_jobs(admin: dict = Depends(require_admin)):
     jobs = await db.jobs.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     for j in jobs:
         j["applicants"] = await db.applications.count_documents({"job_id": j["id"]})
+        j["pending"] = await db.applications.count_documents({"job_id": j["id"], "status": "pending"})
     return jobs
 
 
@@ -769,6 +770,18 @@ async def update_job(job_id: str, body: JobInput, admin: dict = Depends(require_
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Offre introuvable")
     return await db.jobs.find_one({"id": job_id}, {"_id": 0})
+
+
+class JobActiveInput(BaseModel):
+    is_active: bool
+
+
+@api.put("/jobs/{job_id}/active")
+async def set_job_active(job_id: str, body: JobActiveInput, admin: dict = Depends(require_admin)):
+    res = await db.jobs.update_one({"id": job_id}, {"$set": {"is_active": body.is_active}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Offre introuvable")
+    return {"ok": True, "is_active": body.is_active}
 
 
 @api.delete("/jobs/{job_id}")
@@ -880,10 +893,12 @@ async def my_contracts(user: dict = Depends(get_current_user)):
 
 
 @api.get("/applications")
-async def all_applications(status: Optional[str] = Query(None), admin: dict = Depends(require_admin)):
+async def all_applications(status: Optional[str] = Query(None), job_id: Optional[str] = Query(None), admin: dict = Depends(require_admin)):
     q = {}
     if status and status != "all":
         q["status"] = status
+    if job_id:
+        q["job_id"] = job_id
     apps = await db.applications.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
     return apps
 
@@ -961,8 +976,15 @@ async def list_candidates(admin: dict = Depends(require_admin)):
 
 
 @api.get("/users")
-async def list_users(admin: dict = Depends(require_admin)):
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(require_admin)):
+    query = {}
+    if q:
+        rx = {"$regex": re.escape(q), "$options": "i"}
+        query["$or"] = [
+            {"name": rx}, {"email": rx}, {"current_position": rx}, {"nationality": rx},
+            {"headline": rx}, {"bio": rx}, {"domains": rx}, {"tools": rx}, {"city": rx}, {"country": rx},
+        ]
+    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
     for u in users:
         u["application_count"] = await db.applications.count_documents({"candidate_id": u["user_id"]})
     return users
