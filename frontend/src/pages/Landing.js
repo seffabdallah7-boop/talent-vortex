@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import api from "@/lib/api";
 import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
@@ -14,6 +15,7 @@ const AV2 = "https://images.pexels.com/photos/8101982/pexels-photo-8101982.jpeg?
 const CATS = ["Tech", "Ressources Humaines", "Design", "Data", "Marketing", "Finance"];
 
 export default function Landing() {
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
   const [q, setQ] = useState("");
 
@@ -38,15 +40,15 @@ export default function Landing() {
           <div className="lg:col-span-7">
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 mb-7">
               <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              <span className="label-caps text-muted-foreground">Recrutement nouvelle génération</span>
+              <span className="label-caps text-muted-foreground">{t("landing.badge")}</span>
             </motion.div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold leading-[0.95]">
-              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="block">Votre voix</motion.span>
-              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="block text-stroke">au cœur du</motion.span>
-              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }} className="block">recrutement.</motion.span>
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="block">{t("landing.heroLine1")}</motion.span>
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="block text-stroke">{t("landing.heroLine2")}</motion.span>
+              <motion.span initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }} className="block">{t("landing.heroLine3")}</motion.span>
             </h1>
             <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }} className="text-base md:text-lg text-muted-foreground max-w-lg mt-7">
-              Déposez votre CV, enregistrez un message vocal jusqu'à 10 minutes et suivez le statut de chaque candidature — en toute transparence.
+              {t("landing.subtitle")}
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.33 }} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-lg">
               <div className="relative flex-1">
@@ -55,12 +57,12 @@ export default function Landing() {
                   data-testid="job-search-input"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Poste, entreprise, ville..."
+                  placeholder={t("landing.searchPlaceholder")}
                   className="pl-12 h-12 rounded-none border-2 border-foreground/15 focus-visible:border-primary bg-card"
                 />
               </div>
               <Button asChild className="rounded-none h-12 px-8" data-testid="hero-cta">
-                <a href="#offres">Voir les offres <ArrowRight className="h-4 w-4 ml-2" /></a>
+                <a href="#offres">{t("landing.seeJobs")} <ArrowRight className="h-4 w-4 ml-2" /></a>
               </Button>
             </motion.div>
             <div className="mt-8 flex items-center gap-3 text-sm text-muted-foreground">
@@ -70,7 +72,7 @@ export default function Landing() {
                 ))}
                 <span className="h-8 w-8 rounded-full border-2 border-background bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">+9</span>
               </div>
-              <span>Des candidats recrutés chaque semaine</span>
+              <span>{t("landing.recruited")}</span>
             </div>
           </div>
 
@@ -83,7 +85,7 @@ export default function Landing() {
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Développeur Full-Stack</span>
-                    <span className="status-accepted rounded-full px-2.5 py-0.5 text-xs font-semibold">Acceptée</span>
+                    <span className="status-accepted rounded-full px-2.5 py-0.5 text-xs font-semibold">{t("landing.statusAccepted")}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Designer UI/UX</span>
@@ -108,14 +110,14 @@ export default function Landing() {
 
       <section className="max-w-7xl mx-auto px-5 py-20">
         <div className="flex items-end justify-between mb-12 flex-wrap gap-4">
-          <h2 className="font-display text-3xl lg:text-5xl font-semibold max-w-md leading-tight">Postuler n'a jamais été aussi humain.</h2>
-          <p className="text-muted-foreground max-w-sm">Trois étapes, quelques minutes. Votre personnalité fait la différence.</p>
+          <h2 className="font-display text-3xl lg:text-5xl font-semibold max-w-md leading-tight">{t("landing.sectionTitle")}</h2>
+          <p className="text-muted-foreground max-w-sm">{t("landing.sectionSubtitle")}</p>
         </div>
         <div className="grid md:grid-cols-3 gap-px bg-border border border-border">
           {[
-            { n: "01", Icon: FileAudio, t: "CV + Message vocal", d: "Joignez votre CV et enregistrez jusqu'à 10 minutes de motivation vocale." },
-            { n: "02", Icon: Bot, t: "Assistant IA 24/7", d: "Un assistant intelligent répond à toutes vos questions, à tout moment." },
-            { n: "03", Icon: ShieldCheck, t: "Suivi transparent", d: "En attente, acceptée ou refusée : suivez chaque statut en temps réel." },
+            { n: "01", Icon: FileAudio, t: t("landing.f1t"), d: t("landing.f1d") },
+            { n: "02", Icon: Bot, t: t("landing.f2t"), d: t("landing.f2d") },
+            { n: "03", Icon: ShieldCheck, t: t("landing.f3t"), d: t("landing.f3d") },
           ].map((f, i) => (
             <motion.div
               key={i}
@@ -139,14 +141,14 @@ export default function Landing() {
       <section id="offres" className="max-w-7xl mx-auto px-5 pb-24">
         <div className="flex items-end justify-between mb-10 border-t-2 border-foreground/15 pt-8">
           <div>
-            <p className="label-caps text-primary mb-2">Offres d'emploi</p>
-            <h2 className="font-display text-3xl lg:text-5xl font-semibold">{filtered.length} poste{filtered.length > 1 ? "s" : ""} disponible{filtered.length > 1 ? "s" : ""}</h2>
+            <p className="label-caps text-primary mb-2">{t("landing.offersLabel")}</p>
+            <h2 className="font-display text-3xl lg:text-5xl font-semibold">{t("landing.postsAvailable", { count: filtered.length })}</h2>
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="border-2 border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-jobs">
-            Aucune offre pour le moment. Revenez bientôt !
+            {t("landing.noJobs")}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,10 +197,10 @@ export default function Landing() {
               </div>
               <span className="font-display text-xl font-semibold">Talent Vortex</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2026 Talent Vortex — Le recrutement qui vous ressemble.</p>
+            <p className="text-sm text-muted-foreground">{t("landing.footerTagline")}</p>
           </div>
           <a href="#offres" className="group font-display text-2xl md:text-3xl font-semibold flex items-center gap-2 hover:text-primary transition-colors">
-            Voir les offres <MoveUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+            {t("landing.seeJobs")} <MoveUpRight className="h-6 w-6 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
           </a>
         </div>
       </footer>

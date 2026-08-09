@@ -37,3 +37,8 @@
 ### Appel vidéo pro (fait)
 - Partage d'écran + coupure micro/caméra : natifs via la barre d'outils Jitsi (meet.jit.si), iframe autorisant display-capture.
 - Bouton "Inviter" : copie le lien d'invitation de la salle (https://meet.jit.si/&lt;room&gt;) pour convier une personne externe.
+
+### Traduction FR/EN (fondation)
+- react-i18next + détection navigateur + persistance localStorage ("lang"). Sélecteur FR/EN global (LanguageSwitcher) dans la Navbar et la page Auth.
+- Écrans traduits : Navbar, page d'accueil (hero, sections, features, footer), page de connexion/inscription/OTP/mot de passe oublié.
+- Reste en français (extensible à la demande) : tableaux de bord internes admin/candidat, libellés issus de la base (catégories d'offres, statuts data).

@@ -4,9 +4,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useDarkMode } from "@/context/DarkModeContext";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell } from "lucide-react";
 
 function NotificationBell() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState({ items: [], unread: 0 });
   const load = () => api.get("/notifications").then(({ data }) => setData(data)).catch(() => {});
@@ -24,7 +27,7 @@ function NotificationBell() {
       {open && (
         <div className="absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto rounded-xl border border-border bg-card shadow-xl z-50 p-2" data-testid="notif-panel">
           {data.items.length === 0 ? (
-            <p className="text-sm text-muted-foreground p-3 text-center">Aucune notification</p>
+            <p className="text-sm text-muted-foreground p-3 text-center">{t("nav.noNotifications")}</p>
           ) : data.items.map((n) => (
             <div key={n.id} className="p-3 rounded-lg hover:bg-secondary">
               <p className="text-sm font-medium">{n.title}</p>
@@ -40,6 +43,7 @@ function NotificationBell() {
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useDarkMode();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -53,8 +57,9 @@ export default function Navbar() {
         </Link>
         <nav className="flex items-center gap-3">
           <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
-            Offres
+            {t("nav.offers")}
           </Link>
+          <LanguageSwitcher />
           <button
             onClick={toggle}
             data-testid="dark-toggle-btn"
@@ -73,7 +78,7 @@ export default function Navbar() {
                 className="rounded-full"
               >
                 <LayoutDashboard className="h-4 w-4 mr-2" />
-                {user.role === "admin" ? "Administration" : "Mon espace"}
+                {user.role === "admin" ? t("nav.admin") : t("nav.mySpace")}
               </Button>
               <Button variant="outline" onClick={() => { logout(); navigate("/"); }} data-testid="nav-logout-btn" className="rounded-full">
                 <LogOut className="h-4 w-4" />
@@ -81,7 +86,7 @@ export default function Navbar() {
             </>
           ) : (
             <Button onClick={() => navigate("/login")} data-testid="nav-login-btn" className="rounded-full">
-              Connexion
+              {t("nav.login")}
             </Button>
           )}
         </nav>

@@ -50,7 +50,8 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 
 ### 🟠 Phase Application (en cours)
 - ✅ Appel vidéo entretien avancé : partage d'écran + mute micro/caméra (natifs Jitsi) + lien d'invitation (bouton "Inviter").
-- Traduction FR/EN (react-i18next, sélecteur global). **(PROCHAIN)**
+- ✅ Traduction FR/EN (fondation) : react-i18next + sélecteur global. Traduits : Navbar, accueil, auth. Écrans internes encore en FR (extensible).
+- App React Native (mobile). **(PROCHAIN — selon crédit)**
 - Fathom (à reconfirmer techniquement — non compatible Jitsi ; alternative résumé IA).
 - Traduction FR/EN (react-i18next, sélecteur global).
 - App React Native (mobile).
