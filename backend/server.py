@@ -682,9 +682,14 @@ async def list_jobs(q: Optional[str] = Query(None), authorization: Optional[str]
 @api.get("/jobs/all")
 async def list_all_jobs(admin: dict = Depends(require_admin)):
     jobs = await db.jobs.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    counts = await db.applications.aggregate([
+        {"$group": {"_id": "$job_id", "total": {"$sum": 1}, "pending": {"$sum": {"$cond": [{"$eq": ["$status", "pending"]}, 1, 0]}}}},
+    ]).to_list(5000)
+    cmap = {c["_id"]: c for c in counts}
     for j in jobs:
-        j["applicants"] = await db.applications.count_documents({"job_id": j["id"]})
-        j["pending"] = await db.applications.count_documents({"job_id": j["id"], "status": "pending"})
+        c = cmap.get(j["id"], {})
+        j["applicants"] = c.get("total", 0)
+        j["pending"] = c.get("pending", 0)
     return jobs
 
 
@@ -970,8 +975,10 @@ async def download_file(file_id: str, user: dict = Depends(get_current_user)):
 @api.get("/candidates")
 async def list_candidates(admin: dict = Depends(require_admin)):
     users = await db.users.find({"role": "candidate"}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+    counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
+    cmap = {c["_id"]: c["n"] for c in counts}
     for u in users:
-        u["application_count"] = await db.applications.count_documents({"candidate_id": u["user_id"]})
+        u["application_count"] = cmap.get(u["user_id"], 0)
     return users
 
 
@@ -985,8 +992,10 @@ async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(requi
             {"headline": rx}, {"bio": rx}, {"domains": rx}, {"tools": rx}, {"city": rx}, {"country": rx},
         ]
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+    counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
+    cmap = {c["_id"]: c["n"] for c in counts}
     for u in users:
-        u["application_count"] = await db.applications.count_documents({"candidate_id": u["user_id"]})
+        u["application_count"] = cmap.get(u["user_id"], 0)
     return users
 
 
