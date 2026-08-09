@@ -34,7 +34,9 @@ export default function CandidateDashboard() {
   const [profile, setProfile] = useState(null);
   const [section, setSection] = useState("applications");
   const [call, setCall] = useState(null);
+  const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
+  const alerted = useRef(new Set());
 
   const loadAll = useCallback(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});
@@ -48,6 +50,29 @@ export default function CandidateDashboard() {
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  useEffect(() => {
+    const check = () => {
+      const now = Date.now();
+      for (const i of interviews) {
+        if (!i.date || !i.time) continue;
+        const start = new Date(`${i.date}T${i.time}`).getTime();
+        const diff = start - now;
+        if (diff > 0 && diff <= 5 * 60 * 1000) {
+          setReminder(i);
+          if (!alerted.current.has(i.id)) {
+            alerted.current.add(i.id);
+            toast.info(`Votre entretien « ${i.title} » commence dans ${Math.ceil(diff / 60000)} min`, { duration: 10000 });
+          }
+          return;
+        }
+      }
+      setReminder(null);
+    };
+    check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+  }, [interviews]);
 
   const unreadByType = (t) => notifs.filter((n) => !n.read && n.type === t).length;
 
@@ -95,6 +120,18 @@ export default function CandidateDashboard() {
 
         {/* Content */}
         <main className="min-w-0">
+          {reminder && (
+            <div className="rounded-2xl border border-primary bg-primary/10 p-4 mb-6 flex items-center justify-between gap-3" data-testid="interview-reminder-banner">
+              <div className="flex items-center gap-3">
+                <CalendarDays className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <p className="font-medium">Entretien imminent : {reminder.title}</p>
+                  <p className="text-sm text-muted-foreground">Aujourd'hui à {reminder.time}</p>
+                </div>
+              </div>
+              <Button size="sm" className="rounded-full" onClick={() => setCall({ room: `recrutai-itw-${reminder.id}`, audioOnly: false })} data-testid="reminder-join-btn"><Video className="h-4 w-4 mr-1.5" /> Rejoindre</Button>
+            </div>
+          )}
           {profile && !profile.profile_completed && (
             <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5 mb-6 flex items-start gap-3" data-testid="profile-incomplete-banner">
               <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />

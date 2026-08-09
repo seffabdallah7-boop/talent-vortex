@@ -1027,6 +1027,35 @@ async def delete_candidate(user_id: str, admin: dict = Depends(require_admin)):
 # ---------------------------------------------------------------------------
 # Admin <-> Candidate chat (polling based)
 # ---------------------------------------------------------------------------
+PRESENCE_WINDOW = 90
+
+
+def _is_online(last_seen: Optional[str]) -> bool:
+    if not last_seen:
+        return False
+    try:
+        ts = datetime.fromisoformat(last_seen)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - ts).total_seconds() <= PRESENCE_WINDOW
+    except Exception:
+        return False
+
+
+@api.post("/presence/ping")
+async def presence_ping(user: dict = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"last_seen": now}})
+    return {"ok": True, "last_seen": now}
+
+
+@api.get("/presence/admin")
+async def admin_presence(user: dict = Depends(get_current_user)):
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "last_seen": 1}).to_list(100)
+    seens = [a.get("last_seen") for a in admins if a.get("last_seen")]
+    return {"online": any(_is_online(s) for s in seens), "last_seen": max(seens) if seens else None}
+
+
 @api.get("/chat/conversations")
 async def conversations(admin: dict = Depends(require_admin)):
     pipeline = [
@@ -1043,9 +1072,12 @@ async def conversations(admin: dict = Depends(require_admin)):
     result = []
     for c in convs:
         unread = await db.messages.count_documents({"conversation_id": c["_id"], "sender_role": "candidate", "read": False})
+        cand = await db.users.find_one({"user_id": c["_id"]}, {"_id": 0, "last_seen": 1})
+        ls = cand.get("last_seen") if cand else None
         result.append({
             "candidate_id": c["_id"], "candidate_name": c.get("candidate_name", ""),
             "last_text": c.get("last_text", ""), "last_at": c.get("last_at"), "unread": unread,
+            "last_seen": ls, "online": _is_online(ls),
         })
     return result
 

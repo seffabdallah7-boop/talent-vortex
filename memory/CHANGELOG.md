@@ -23,3 +23,17 @@
 - Candidatures par offre : /jobs/all renvoie applicants + pending ; clic sur le compteur d'une offre filtre les candidatures (GET /applications?job_id=), chip "Candidatures pour : X" + "Voir toutes".
 - Masquer/afficher une offre : Switch "Visible" → PUT /api/jobs/{id}/active (retire l'offre du listing public).
 - Recherche de candidats : GET /api/users?q= (nom/email/poste/domaines/outils/nationalité/ville/pays) + colonnes Nationalité & Poste.
+
+### Agenda (fait)
+- Vue calendrier **semaine** dans l'agenda admin (bascule Semaine/Liste, navigation semaine précédente/suivante/Aujourd'hui, entretiens placés par jour, jour courant surligné, clic = éditer, Rejoindre).
+- **Rappel 5 min avant** côté candidat : vérification toutes les 30s, bannière "Entretien imminent" + bouton Rejoindre + toast (fonctionne tant que l'app est ouverte).
+
+### Chat enrichi (fait)
+- Présence : POST /api/presence/ping (heartbeat 30s), GET /api/presence/admin. Statut "en ligne" si last_seen < 90s.
+- Admin : pastille de présence par conversation + en-tête "En ligne / Hors ligne · vu il y a X".
+- Candidat : en-tête présence admin dans le panneau Support.
+- Heures sur chaque message + accusés de lecture ("✓ Envoyé" / "✓✓ Vu") côté candidat et admin.
+
+### Appel vidéo pro (fait)
+- Partage d'écran + coupure micro/caméra : natifs via la barre d'outils Jitsi (meet.jit.si), iframe autorisant display-capture.
+- Bouton "Inviter" : copie le lien d'invitation de la salle (https://meet.jit.si/&lt;room&gt;) pour convier une personne externe.

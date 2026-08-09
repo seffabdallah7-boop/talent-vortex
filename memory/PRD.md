@@ -45,11 +45,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - ✅ IA Rédaction d'offre : POST /api/jobs/ai-draft (brief → formulaire pré-rempli, admin valide).
 - Statut d'appréciation du candidat (rating/admin_note — déjà présent, à mettre en avant).
 - Classification/statistiques des nationalités (vue dédiée).
-- Agenda hebdomadaire (vue calendrier semaine) + notification 5 min avant l'entretien.
-- Chat : accusés de lecture (vus) + heures, statut en ligne + dernière connexion.
+- ✅ Agenda hebdomadaire (vue calendrier semaine, bascule Semaine/Liste) + rappel 5 min avant l'entretien (client, bannière + toast).
+- ✅ Chat : accusés de lecture (vus) + heures, statut en ligne + dernière connexion (présence via ping/last_seen).
 
-### 🟠 Phase Application (à faire)
-- Appel vidéo entretien avancé : partage d'écran, mute micro/caméra, lien d'invitation.
+### 🟠 Phase Application (en cours)
+- ✅ Appel vidéo entretien avancé : partage d'écran + mute micro/caméra (natifs Jitsi) + lien d'invitation (bouton "Inviter").
+- Traduction FR/EN (react-i18next, sélecteur global). **(PROCHAIN)**
 - Fathom (à reconfirmer techniquement — non compatible Jitsi ; alternative résumé IA).
 - Traduction FR/EN (react-i18next, sélecteur global).
 - App React Native (mobile).

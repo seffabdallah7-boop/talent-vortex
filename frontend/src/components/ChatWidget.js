@@ -7,6 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import VideoCall from "@/components/VideoCall";
 
+const fmtTime = (iso) => { try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+const relTime = (iso) => {
+  try {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "à l'instant";
+    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+    return `le ${new Date(iso).toLocaleDateString("fr-FR")}`;
+  } catch { return ""; }
+};
+
 function anonId() {
   let id = localStorage.getItem("ai_session");
   if (!id) {
@@ -25,6 +36,7 @@ export default function ChatWidget() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [call, setCall] = useState(null);
+  const [adminPresence, setAdminPresence] = useState(null);
   const scrollRef = useRef(null);
   const sessionId = user?.user_id || anonId();
 
@@ -41,6 +53,22 @@ export default function ChatWidget() {
     const load = () => api.get("/chat/messages").then(({ data }) => setSupMsgs(data)).catch(() => {});
     load();
     const int = setInterval(load, 4000);
+    return () => clearInterval(int);
+  }, [open, tab, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const ping = () => api.post("/presence/ping").catch(() => {});
+    ping();
+    const t = setInterval(ping, 30000);
+    return () => clearInterval(t);
+  }, [user]);
+
+  useEffect(() => {
+    if (!open || tab !== "support" || !user) return;
+    const load = () => api.get("/presence/admin").then(({ data }) => setAdminPresence(data)).catch(() => {});
+    load();
+    const int = setInterval(load, 15000);
     return () => clearInterval(int);
   }, [open, tab, user]);
 
@@ -117,6 +145,13 @@ export default function ChatWidget() {
               </button>
             </div>
 
+            {tab === "support" && isCandidate && (
+              <div className="px-4 py-2 border-b border-border flex items-center gap-2 text-xs bg-background/40" data-testid="admin-presence">
+                <span className={`h-2 w-2 rounded-full ${adminPresence?.online ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                <span className="text-muted-foreground">{adminPresence?.online ? "Administrateur en ligne" : adminPresence?.last_seen ? `Hors ligne · vu ${relTime(adminPresence.last_seen)}` : "Administrateur hors ligne"}</span>
+              </div>
+            )}
+
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-background/60">
               {tab === "ai" ? (
                 <>
@@ -138,7 +173,7 @@ export default function ChatWidget() {
                 <>
                   {supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez à l'administrateur, il vous répondra ici.</p>}
                   {supMsgs.map((m) => (
-                    <Bubble key={m.id} mine={m.sender_role === "candidate"} text={m.text} />
+                    <Bubble key={m.id} mine={m.sender_role === "candidate"} text={m.text} time={m.created_at} read={m.read} />
                   ))}
                 </>
               )}
@@ -172,11 +207,20 @@ export default function ChatWidget() {
   );
 }
 
-function Bubble({ mine, text }) {
+function Bubble({ mine, text, time, read }) {
+  const showMeta = time || (mine && read !== undefined);
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap ${mine ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-secondary text-secondary-foreground rounded-bl-sm"}`}>
-        {text}
+      <div className="max-w-[80%]">
+        <div className={`rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap ${mine ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-secondary text-secondary-foreground rounded-bl-sm"}`}>
+          {text}
+        </div>
+        {showMeta && (
+          <div className={`mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${mine ? "justify-end" : "justify-start"}`}>
+            {time && <span>{fmtTime(time)}</span>}
+            {mine && read !== undefined && <span data-testid="msg-read-status">{read ? "✓✓ Vu" : "✓ Envoyé"}</span>}
+          </div>
+        )}
       </div>
     </motion.div>
   );

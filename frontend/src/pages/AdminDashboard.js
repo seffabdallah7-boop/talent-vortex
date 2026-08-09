@@ -20,7 +20,7 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
-  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles,
+  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
@@ -71,6 +71,13 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [section, setSection] = useState("overview");
   const [jobFilter, setJobFilter] = useState(null);
+
+  useEffect(() => {
+    const ping = () => api.post("/presence/ping").catch(() => {});
+    ping();
+    const t = setInterval(ping, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -512,6 +519,18 @@ function Candidates() {
   );
 }
 
+const chatTime = (iso) => { try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
+const relSeen = (iso) => {
+  if (!iso) return "jamais";
+  try {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "à l'instant";
+    if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+    if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+    return `le ${new Date(iso).toLocaleDateString("fr-FR")}`;
+  } catch { return ""; }
+};
+
 function Messages() {
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
@@ -541,6 +560,8 @@ function Messages() {
     setText("");
   };
 
+  const activeConv = active ? (convs.find((c) => c.candidate_id === active.candidate_id) || active) : null;
+
   return (
     <div>
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
@@ -550,7 +571,10 @@ function Messages() {
           {convs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : convs.map((c) => (
             <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className={`w-full text-left p-4 border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
               <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{c.candidate_name || "Candidat"}</span>
+                <span className="font-medium text-sm flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${c.online ? "bg-green-500" : "bg-muted-foreground/40"}`} data-testid={`conv-presence-${c.candidate_id}`} />
+                  {c.candidate_name || "Candidat"}
+                </span>
                 {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">{c.unread}</span>}
               </div>
               <p className="text-xs text-muted-foreground truncate mt-1">{c.last_text}</p>
@@ -562,8 +586,14 @@ function Messages() {
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Sélectionnez une conversation</div>
           ) : (
             <>
-              <div className="p-4 border-b border-border font-medium flex items-center justify-between">
-                <span>{active.candidate_name || "Candidat"}</span>
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <div className="font-medium">{active.candidate_name || "Candidat"}</div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid="active-presence">
+                    <span className={`h-2 w-2 rounded-full ${activeConv?.online ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                    {activeConv?.online ? "En ligne" : `Hors ligne · vu ${relSeen(activeConv?.last_seen)}`}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: true })} data-testid="admin-audio-call-btn"><Phone className="h-4 w-4" /></Button>
@@ -572,7 +602,13 @@ function Messages() {
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {msgs.map((m) => (
                   <div key={m.id} className={`flex ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${m.sender_role === "admin" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{m.text}</div>
+                    <div className="max-w-[75%]">
+                      <div className={`rounded-2xl px-3.5 py-2 text-sm ${m.sender_role === "admin" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{m.text}</div>
+                      <div className={`mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
+                        <span>{chatTime(m.created_at)}</span>
+                        {m.sender_role === "admin" && <span>{m.read ? "✓✓ Vu" : "✓ Envoyé"}</span>}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -711,6 +747,58 @@ function Contracts() {
 
 const EMPTY_ITW = { title: "", candidate_id: "", candidate_name: "", date: "", time: "", location: "", notes: "", status: "scheduled" };
 
+const DAYN = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function startOfWeek(offset) {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // Monday = 0
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + offset * 7);
+}
+
+function WeekAgenda({ list, offset, setOffset, onJoin, onEdit }) {
+  const monday = startOfWeek(offset);
+  const days = Array.from({ length: 7 }, (_, k) => { const d = new Date(monday); d.setDate(monday.getDate() + k); return d; });
+  const todayIso = isoLocal(new Date());
+  const label = `${monday.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} — ${days[6].toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`;
+  return (
+    <div data-testid="week-agenda">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="rounded-full h-8 w-8" onClick={() => setOffset(offset - 1)} data-testid="week-prev"><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => setOffset(0)} data-testid="week-today">Aujourd'hui</Button>
+          <Button variant="outline" size="icon" className="rounded-full h-8 w-8" onClick={() => setOffset(offset + 1)} data-testid="week-next"><ChevronRight className="h-4 w-4" /></Button>
+        </div>
+        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
+        {days.map((d, k) => {
+          const iso = isoLocal(d);
+          const items = list.filter((i) => i.date === iso).sort((a, b) => a.time.localeCompare(b.time));
+          const isToday = iso === todayIso;
+          return (
+            <div key={iso} className={`rounded-xl border ${isToday ? "border-primary" : "border-border"} bg-card min-h-[120px]`} data-testid={`week-day-${iso}`}>
+              <div className={`px-3 py-2 border-b text-center ${isToday ? "bg-primary/10 border-primary/30" : "border-border bg-secondary/40"}`}>
+                <div className="text-xs text-muted-foreground">{DAYN[k]}</div>
+                <div className={`font-display font-semibold ${isToday ? "text-primary" : ""}`}>{d.getDate()}</div>
+              </div>
+              <div className="p-2 space-y-2">
+                {items.length === 0 ? <p className="text-[11px] text-muted-foreground/50 text-center py-2">—</p> : items.map((i) => (
+                  <button key={i.id} onClick={() => onEdit(i)} data-testid={`week-itw-${i.id}`} className="w-full text-left rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors p-2">
+                    <div className="font-mono text-xs font-semibold text-primary">{i.time}</div>
+                    <div className="text-xs font-medium truncate">{i.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{i.candidate_name}</div>
+                    <span onClick={(e) => { e.stopPropagation(); onJoin(i); }} className="inline-flex items-center gap-1 text-[11px] text-primary mt-1 hover:underline" data-testid={`week-join-${i.id}`}><Video className="h-3 w-3" /> Rejoindre</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Interviews() {
   const [list, setList] = useState([]);
   const [open, setOpen] = useState(false);
@@ -719,6 +807,8 @@ function Interviews() {
   const [del, setDel] = useState(null);
   const [call, setCall] = useState(null);
   const [candidates, setCandidates] = useState([]);
+  const [view, setView] = useState("week");
+  const [weekOffset, setWeekOffset] = useState(0);
   const load = useCallback(() => api.get(`/interviews`).then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get(`/candidates`).then(({ data }) => setCandidates(data)).catch(() => {}); }, []);
@@ -746,10 +836,18 @@ function Interviews() {
           <h1 className="font-display text-3xl font-semibold">Agenda des entretiens</h1>
           <p className="text-muted-foreground text-sm">{list.length} entretien{list.length > 1 ? "s" : ""} planifié{list.length > 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={openNew} className="rounded-full" data-testid="new-interview-btn"><Plus className="h-4 w-4 mr-2" /> Planifier</Button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-full border border-border p-0.5">
+            <button onClick={() => setView("week")} data-testid="agenda-view-week" className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === "week" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Semaine</button>
+            <button onClick={() => setView("list")} data-testid="agenda-view-list" className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Liste</button>
+          </div>
+          <Button onClick={openNew} className="rounded-full" data-testid="new-interview-btn"><Plus className="h-4 w-4 mr-2" /> Planifier</Button>
+        </div>
       </div>
 
-      {dates.length === 0 ? (
+      {view === "week" ? (
+        <WeekAgenda list={list} offset={weekOffset} setOffset={setWeekOffset} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} onEdit={openEdit} />
+      ) : dates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">
           <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
           Aucun entretien planifié.
