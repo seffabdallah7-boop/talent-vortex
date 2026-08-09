@@ -19,7 +19,7 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
-  CalendarDays, ScrollText, Download, Star, Video, Phone,
+  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
@@ -172,11 +172,13 @@ function Jobs() {
   const [form, setForm] = useState(EMPTY_JOB);
   const [saving, setSaving] = useState(false);
   const [del, setDel] = useState(null);
+  const [aiBrief, setAiBrief] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const load = useCallback(() => api.get("/jobs/all").then(({ data }) => setJobs(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY_JOB); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(EMPTY_JOB); setAiBrief(""); setOpen(true); };
   const openEdit = (j) => { setEditing(j); setForm({ ...EMPTY_JOB, ...j }); setOpen(true); };
 
   const save = async () => {
@@ -192,6 +194,16 @@ function Jobs() {
   };
 
   const remove = async () => { await api.delete(`/jobs/${del.id}`); toast.success("Offre supprimée"); setDel(null); load(); };
+
+  const generateAi = async () => {
+    setAiLoading(true);
+    try {
+      const { data } = await api.post("/jobs/ai-draft", { brief: aiBrief });
+      setForm((f) => ({ ...EMPTY_JOB, ...f, ...data }));
+      toast.success("Offre pré-remplie par l'IA. Vérifiez et ajustez avant de publier.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setAiLoading(false); }
+  };
 
   return (
     <div>
@@ -231,6 +243,15 @@ function Jobs() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Modifier l'offre" : "Nouvelle offre"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {!editing && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2" data-testid="ai-job-panel">
+                <Label className="flex items-center gap-1.5 text-primary"><Sparkles className="h-4 w-4" /> Générer avec l'IA</Label>
+                <Textarea data-testid="ai-brief-input" rows={3} value={aiBrief} onChange={(e) => setAiBrief(e.target.value)} placeholder="Collez une fiche de poste ou décrivez le poste en quelques mots — l'IA pré-remplit le formulaire." className="bg-card" />
+                <Button type="button" size="sm" onClick={generateAi} disabled={aiLoading || !aiBrief.trim()} className="rounded-full" data-testid="ai-generate-btn">
+                  {aiLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Génération...</> : <><Sparkles className="h-4 w-4 mr-2" /> Pré-remplir avec l'IA</>}
+                </Button>
+              </div>
+            )}
             <div><Label>Intitulé du poste</Label><Input data-testid="job-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Entreprise</Label><Input data-testid="job-company-input" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} className="mt-1" /></div>

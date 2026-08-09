@@ -20,6 +20,7 @@ import random
 import re
 import io
 import csv
+import json
 from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form,
     Header, Query, Response, BackgroundTasks,
@@ -705,6 +706,61 @@ async def create_job(body: JobInput, admin: dict = Depends(require_admin)):
     await db.jobs.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+class JobDraftInput(BaseModel):
+    brief: str
+
+
+def _extract_json(raw: str) -> dict:
+    try:
+        return json.loads(raw)
+    except Exception:
+        pass
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            return {}
+    return {}
+
+
+@api.post("/jobs/ai-draft")
+async def ai_job_draft(body: JobDraftInput, admin: dict = Depends(require_admin)):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=503, detail="Assistant IA indisponible")
+    if not (body.brief or "").strip():
+        raise HTTPException(status_code=400, detail="Veuillez fournir une fiche de poste ou une description.")
+    system = (
+        "Tu es un assistant RH qui rédige des offres d'emploi en français. "
+        "À partir d'une fiche de poste ou d'un brief, tu génères une offre structurée. "
+        "Réponds UNIQUEMENT par un objet JSON valide, sans texte autour, avec exactement ces clés : "
+        "title (intitulé du poste), company (entreprise, laisse vide si inconnu), location (lieu/ville, télétravail si applicable), "
+        "type (un parmi: Temps plein, Temps partiel, Stage, Alternance, Freelance, CDD, CDI), "
+        "category (un parmi: Tech, Data, Design, Marketing, Finance, Ressources Humaines, Commercial, Juridique, Sante, Ingenierie, General), "
+        "salary (fourchette si mentionnée, sinon vide), "
+        "description (2 à 4 paragraphes attractifs et professionnels décrivant le poste et les missions), "
+        "requirements (le profil recherché sous forme de puces avec des tirets)."
+    )
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"jobdraft-{uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=f"Fiche de poste / brief:\n{body.brief}"))
+        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+    except Exception as e:
+        logger.error(f"ai_job_draft: {e}")
+        raise HTTPException(status_code=502, detail="La génération par l'IA a échoué. Réessayez.")
+    data = _extract_json(raw)
+    keys = ["title", "company", "location", "type", "category", "description", "requirements", "salary"]
+    out = {k: (str(data.get(k)) if data.get(k) is not None else "") for k in keys}
+    if not out["type"]:
+        out["type"] = "Temps plein"
+    if not out["category"]:
+        out["category"] = "General"
+    return out
 
 
 @api.put("/jobs/{job_id}")
