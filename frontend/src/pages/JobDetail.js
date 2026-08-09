@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
 import VoiceRecorder from "@/components/VoiceRecorder";
+import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -21,10 +22,21 @@ export default function JobDetail() {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [myApp, setMyApp] = useState(null);
 
   useEffect(() => {
     api.get(`/jobs/${id}`).then(({ data }) => setJob(data)).catch(() => navigate("/"));
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (user && user.role !== "admin") {
+      api.get("/applications/me")
+        .then(({ data }) => setMyApp((data || []).find((a) => a.job_id === id) || null))
+        .catch(() => {});
+    } else {
+      setMyApp(null);
+    }
+  }, [id, user, done]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -97,6 +109,17 @@ export default function JobDetail() {
             </div>
           ) : user.role === "admin" ? (
             <p className="text-muted-foreground">Les administrateurs ne peuvent pas postuler.</p>
+          ) : myApp ? (
+            <div className="rounded-xl border border-border bg-secondary/40 p-6" data-testid="already-applied">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-medium mb-1">Vous avez déjà postulé à cette offre.</p>
+                  <p className="text-sm text-muted-foreground">Postulé le {new Date(myApp.created_at).toLocaleDateString("fr-FR")}</p>
+                </div>
+                <StatusBadge status={myApp.status} />
+              </div>
+              <Button variant="outline" onClick={() => navigate("/dashboard")} className="rounded-full mt-4" data-testid="view-my-application-btn">Voir ma candidature</Button>
+            </div>
           ) : (
             <form onSubmit={submit} className="space-y-6">
               <div>

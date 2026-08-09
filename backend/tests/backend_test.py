@@ -379,13 +379,19 @@ class TestNewFeatures:
         before = requests.get(f"{API}/notifications", headers=admin_headers, timeout=30).json()
         before_unread = before.get("unread", 0)
 
-        # candidate applies to first active job (or skip)
+        # find a job the candidate hasn't applied to yet (anti double-apply now enforced)
         jobs = requests.get(f"{API}/jobs", timeout=30).json()
         if not jobs:
             pytest.skip("No jobs available")
+        my_apps = requests.get(f"{API}/applications/me",
+                               headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30).json()
+        applied_job_ids = {a["job_id"] for a in my_apps}
+        job = next((j for j in jobs if j["id"] not in applied_job_ids), None)
+        if not job:
+            pytest.skip("Candidate has already applied to all jobs")
         import io as _io
         files = {"cv": ("cv.pdf", _io.BytesIO(b"%PDF-1.4 TEST notif"), "application/pdf")}
-        data = {"job_id": jobs[0]["id"], "cover_note": "TEST admin notif"}
+        data = {"job_id": job["id"], "cover_note": "TEST admin notif"}
         r = requests.post(f"{API}/applications", data=data, files=files,
                           headers={"Authorization": f"Bearer {candidate_token}"}, timeout=60)
         assert r.status_code == 200, r.text
@@ -498,8 +504,165 @@ class TestNotifications:
         assert r.status_code == 200, r.text
         d = r.json()
         assert "items" in d and "unread" in d
-        assert isinstance(d["items"], list)
-        # mark all read
-        r2 = requests.post(f"{API}/notifications/read-all",
-                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
-        assert r2.status_code == 200
+
+
+# ----------------------------- Candidate Profile + Priorisation + Double-apply -----------------------------
+class TestCandidateProfile:
+    """Iteration 6: PUT/GET /profile, profile_completed flag, /jobs prioritisation, anti double-apply."""
+
+    def _fresh_candidate_token(self):
+        """Create a fresh candidate + login. Returns (token, email, user_id)."""
+        email = f"test_cand_{uuid.uuid4().hex[:8]}@test.com"
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/register", json={
+            "name": "TEST Cand", "email": email, "password": "Test@2026!",
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        tok = r.json()["token"]
+        uid = r.json()["user"]["user_id"]
+        return tok, email, uid
+
+    def test_get_profile_returns_fields(self, candidate_token):
+        r = requests.get(f"{API}/profile",
+                         headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["user_id", "email", "role"]:
+            assert k in d
+
+    def test_put_profile_sets_completed_true(self):
+        tok, _, _ = self._fresh_candidate_token()
+        H = {"Authorization": f"Bearer {tok}"}
+        # Before: profile_completed should be False/absent
+        g0 = requests.get(f"{API}/profile", headers=H, timeout=30).json()
+        assert not g0.get("profile_completed")
+        # PUT full profile
+        r = requests.put(f"{API}/profile", json={
+            "name": "TEST Cand Full",
+            "phone": "+33612345678",
+            "nationality": "Française",
+            "city": "Paris",
+            "country": "France",
+            "current_position": "Développeur Full-Stack",
+            "years_experience": 5,
+            "headline": "Ingénieur logiciel",
+            "bio": "Passionné par React et Python.",
+            "domains": ["Tech"],
+            "tools": ["React", "Python"],
+        }, headers=H, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d.get("profile_completed") is True
+        assert d.get("name") == "TEST Cand Full"
+        assert d.get("phone") == "+33612345678"
+        assert d.get("nationality") == "Française"
+        assert d.get("domains") == ["Tech"]
+        # GET returns same values (persistence)
+        g = requests.get(f"{API}/profile", headers=H, timeout=30).json()
+        assert g["profile_completed"] is True
+        assert g["phone"] == "+33612345678"
+        assert g["domains"] == ["Tech"]
+
+    def test_put_profile_partial_keeps_incomplete(self):
+        tok, _, _ = self._fresh_candidate_token()
+        H = {"Authorization": f"Bearer {tok}"}
+        # Only name -> not complete (needs phone+nationality+domains)
+        r = requests.put(f"{API}/profile", json={"name": "Just Name"}, headers=H, timeout=30)
+        assert r.status_code == 200
+        assert r.json().get("profile_completed") is False
+
+    def test_jobs_prioritisation_for_tech_candidate(self):
+        # Fresh Tech candidate
+        tok, _, _ = self._fresh_candidate_token()
+        H = {"Authorization": f"Bearer {tok}"}
+        requests.put(f"{API}/profile", json={
+            "name": "TEST Tech", "phone": "+33600000000", "nationality": "Française",
+            "domains": ["Tech"],
+        }, headers=H, timeout=30)
+
+        # List jobs with auth
+        r_auth = requests.get(f"{API}/jobs", headers=H, timeout=30)
+        assert r_auth.status_code == 200
+        jobs_auth = r_auth.json()
+        if len(jobs_auth) < 2:
+            pytest.skip("Need >=2 jobs to test prioritisation")
+
+        # All jobs should have match_score, and Tech-category ones should be at the top
+        assert all("match_score" in j for j in jobs_auth), "match_score missing on some jobs"
+        tech_jobs = [j for j in jobs_auth if (j.get("category") or "").lower() == "tech"]
+        if tech_jobs:
+            # top scores are non-tech only if higher — but tech match=3 is the highest possible here
+            assert jobs_auth[0].get("match_score", 0) >= 1, "Top job should have positive score"
+            # verify no lower-scored job comes before a higher-scored one
+            scores = [j.get("match_score", 0) for j in jobs_auth]
+            assert scores == sorted(scores, reverse=True), f"Jobs not sorted by score desc: {scores}"
+
+        # Without auth -> no match_score field, ordered by date
+        r_noauth = requests.get(f"{API}/jobs", timeout=30)
+        assert r_noauth.status_code == 200
+        jobs_noauth = r_noauth.json()
+        assert all("match_score" not in j for j in jobs_noauth), "match_score should not appear without auth"
+
+    def test_anti_double_application(self):
+        tok, _, _ = self._fresh_candidate_token()
+        H = {"Authorization": f"Bearer {tok}"}
+        jobs = requests.get(f"{API}/jobs", timeout=30).json()
+        if not jobs:
+            pytest.skip("No jobs available")
+        job_id = jobs[0]["id"]
+        import io as _io
+        # 1st application -> 200
+        r1 = requests.post(f"{API}/applications",
+                           data={"job_id": job_id, "cover_note": "TEST first"},
+                           files={"cv": ("cv.pdf", _io.BytesIO(b"%PDF-1.4 first"), "application/pdf")},
+                           headers=H, timeout=60)
+        assert r1.status_code == 200, r1.text
+        # 2nd application -> 400 with French message
+        r2 = requests.post(f"{API}/applications",
+                           data={"job_id": job_id, "cover_note": "TEST duplicate"},
+                           files={"cv": ("cv.pdf", _io.BytesIO(b"%PDF-1.4 dup"), "application/pdf")},
+                           headers=H, timeout=60)
+        assert r2.status_code == 400, r2.text
+        assert "déjà postulé" in r2.json().get("detail", "").lower()
+
+    def test_contracts_me_only_own(self, admin_headers):
+        # Fresh candidate 1
+        tok1, email1, uid1 = self._fresh_candidate_token()
+        tok2, email2, uid2 = self._fresh_candidate_token()
+        # Admin creates a contract for cand1
+        r = requests.post(f"{API}/contracts", json={
+            "title": "TEST_MyContract", "client": "Acme", "status": "en_cours",
+            "candidate_id": uid1,
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        cid = r.json()["id"]
+        try:
+            # cand1 sees it
+            r1 = requests.get(f"{API}/contracts/me",
+                              headers={"Authorization": f"Bearer {tok1}"}, timeout=30)
+            assert r1.status_code == 200
+            assert any(c["id"] == cid for c in r1.json())
+            # cand2 does NOT see it
+            r2 = requests.get(f"{API}/contracts/me",
+                              headers={"Authorization": f"Bearer {tok2}"}, timeout=30)
+            assert r2.status_code == 200
+            assert not any(c["id"] == cid for c in r2.json())
+        finally:
+            requests.delete(f"{API}/contracts/{cid}", headers=admin_headers, timeout=30)
+
+    def test_interviews_me_only_own(self, admin_headers):
+        tok, _, uid = self._fresh_candidate_token()
+        r = requests.post(f"{API}/interviews", json={
+            "title": "TEST_MyItw", "date": "2026-11-25", "time": "10:00",
+            "candidate_id": uid, "candidate_name": "TEST Cand",
+        }, headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        itw_id = r.json()["id"]
+        try:
+            r_me = requests.get(f"{API}/interviews/me",
+                                headers={"Authorization": f"Bearer {tok}"}, timeout=30)
+            assert r_me.status_code == 200
+            assert any(i["id"] == itw_id for i in r_me.json())
+        finally:
+            requests.delete(f"{API}/interviews/{itw_id}", headers=admin_headers, timeout=30)

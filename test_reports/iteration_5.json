@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 5 (CANDIDAT phase): Backend 36/36 pytest passing (added TestCandidateProfile: 7 new tests for GET/PUT /profile + profile_completed, /jobs prioritisation with match_score, anti double-apply 400 with FR message, contracts/me + interviews/me ownership scoping; also fixed the existing test_admin_notif_on_new_application which was breaking because of the new anti-double-apply rule). Frontend: fixed critical ReferenceError in /pages/JobDetail.js (myApp state was referenced on lines 101/106/108 but never declared, which crashed the page for any logged-in candidate). After fix all 7 UI flows PASS: (1) sidebar with 4 buttons + '!' badge on Mon profil, (2) profile-incomplete-banner shows when profile incomplete and hides after full save, (3) sidebar section switching works (applications/interviews/contracts/profile), (4) PUT /profile clears both banner + '!' badge, (5) already-applied block shows on Data Analyst offer for cand_1786303173 AND for the freshly-created candidate after they apply, submit-application-btn correctly hidden, (6) AudioPlayer cycles 1x → 1.25x → 1.5x → 2x → 1x on real voice-player-<appId>-speed button, play button voice-player-<appId>-play present, (7) JobDetail renders without crash for both anonymous and logged-in users.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter6.xml"
+  ],
+  "action_items": [
+    "None blocking — the myApp ReferenceError in JobDetail.js has been fixed by the testing agent (added const [myApp,setMyApp]=useState(null) + useEffect fetching /applications/me and filtering by job_id). Main agent should be aware this bug was shipped and would have crashed every job detail page for logged-in candidates."
+  ],
+  "critical_code_review_comments": [
+    "CRITICAL (fixed) — /app/frontend/src/pages/JobDetail.js used `myApp` on lines 101/106/108/110 without declaring the state. Any logged-in non-admin candidate viewing /jobs/:id would trigger `ReferenceError: myApp is not defined` and see a broken page. Fixed by adding useState + useEffect that calls /applications/me and finds the matching job_id. Also re-fetches when `done` flips true so the block appears immediately after successful apply.",
+    "server.py PUT /profile: profile_completed is computed with `merged.get('domains')` but a candidate could send domains=[] (empty list) which is falsy — this is fine, but consider explicitly requiring len>=1. Currently works because ProfileInput filters None only (empty list is kept).",
+    "server.py detect_profile_domains uses model 'claude-sonnet-4-6' — confirm this identifier is still valid in the emergentintegrations LlmChat lib. If it fails, ai_domains stays empty (non-blocking as documented).",
+    "server.py _job_match_score awards +3 when tl in cat OR cat in tl. `cat in tl` (e.g. cat='' in tl='tech') triggers +3 for every tag because empty string is in every string. Guarded by `if tl and (tl in cat or (cat and cat in tl))` — cat check is present, good.",
+    "CandidateDashboard.js sets section='profile' on every reload when profile.profile_completed is false — good UX; but it silently overrides any explicit user click (e.g., candidate clicks 'Mes postulations', /profile response arrives late and switches back to 'profile'). Consider only auto-setting on first mount, not every loadAll().",
+    "server.py is now 1349 lines — still a candidate for splitting into routers (auth/profile/jobs/applications/contracts/interviews/notifications).",
+    "server.py still exposes leftover ADMIN_ACCESS_CODE env var and Optional admin_code field on LoginRequest (dead code, not enforced) — noted in previous iteration.",
+    "AudioPlayer.jsx: the underlying <audio> element has no preload attribute — on slow networks the play button may lag on first click; consider preload='metadata'.",
+    "AudioPlayer.jsx: onTimeUpdate uses e.target.duration which can be NaN before metadata loaded; the guard `if (a.duration)` handles it, good."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/JobDetail.js (added missing myApp useState + useEffect that fetches /applications/me and filters by job_id)",
+    "/app/backend/tests/backend_test.py (added TestCandidateProfile class with 7 new tests: get/put profile, completion flag, prioritisation match_score, anti double-apply, contracts/me + interviews/me ownership; also made test_admin_notif_on_new_application pick a not-yet-applied job to work with the new anti-double-apply rule)"
+  ],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "100% of critical flows verified"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (NO admin code). Candidate candidate1@test.com / Test@2026! . Pre-existing Tech candidate: cand_1786303173@test.com / Test@2026! (Data Analyst already applied). OTP + RESET codes readable from /var/log/supervisor/backend.err.log.",
+  "seed_data_creation": "Left in DB: 1 fresh candidate test_ui2_1786303649@test.com with completed profile (Tech,Data) and 1 application (with fake voice.webm) on Data Analyst offer used to exercise AudioPlayer speed cycle. Multiple TEST_ prefixed candidates created by TestCandidateProfile tests (not cleaned up — negligible).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow unchanged: captcha -> /auth/login {email,password,captcha_id,captcha_answer} -> /auth/verify-otp {email,code}. OTP in backend.err.log. Registration returns token directly, no OTP. Faster UI test path: register via POST /api/auth/register, grab token, then page.evaluate('localStorage.setItem(\"token\",TOKEN)') and page.goto('/dashboard'). New endpoints validated: GET/PUT /api/profile with completion flag, GET /api/jobs adds match_score field when Bearer token belongs to candidate with domains/ai_domains, POST /api/applications returns 400 'Vous avez déjà postulé à cette offre.' on duplicate. Frontend: candidate dashboard sidebar data-testids = candidate-sidebar, sidebar-{applications,interviews,contracts,profile}, sidebar-badge-{key}, profile-incomplete-banner, profile-form, profile-{name,phone,nationality,city,country,years,position,domains,tools,headline,bio}, save-profile-btn, ai-domains. JobDetail: already-applied, view-my-application-btn. AudioPlayer inside apps: voice-player-<appId>, voice-player-<appId>-play, voice-player-<appId>-speed (cycles 1x/1.25x/1.5x/2x).",
+  "rca of the issue": "JobDetail.js was authored referencing `myApp` in the conditional-render tree without ever declaring it via useState nor fetching from /applications/me. In React, referencing an undeclared identifier during render throws ReferenceError, which unmounts the whole component. Any candidate visiting a job page would see either a blank page or the error boundary. Reproduction: login as candidate, click any job card, page crashes. Fix: add `const [myApp,setMyApp]=useState(null)` and a second useEffect that GETs /applications/me and setMyApp((data||[]).find(a=>a.job_id===id)||null), depending on [id,user,done] so it refreshes after a successful apply. Verified: JobDetail now renders for anonymous (login prompt), for candidate-without-application (form visible), for candidate-with-application (already-applied block with StatusBadge visible)."
+}

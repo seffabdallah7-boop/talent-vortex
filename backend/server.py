@@ -127,6 +127,18 @@ def public_user(u: dict) -> dict:
         "role": u.get("role", "candidate"),
         "picture": u.get("picture"),
         "created_at": u.get("created_at"),
+        "phone": u.get("phone", ""),
+        "nationality": u.get("nationality", ""),
+        "city": u.get("city", ""),
+        "country": u.get("country", ""),
+        "domains": u.get("domains", []),
+        "tools": u.get("tools", []),
+        "years_experience": u.get("years_experience"),
+        "current_position": u.get("current_position", ""),
+        "headline": u.get("headline", ""),
+        "bio": u.get("bio", ""),
+        "ai_domains": u.get("ai_domains", []),
+        "profile_completed": u.get("profile_completed", False),
     }
 
 
@@ -561,12 +573,108 @@ async def me(user: dict = Depends(get_current_user)):
     return public_user(user)
 
 
+class ProfileInput(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    nationality: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    domains: Optional[List[str]] = None
+    tools: Optional[List[str]] = None
+    years_experience: Optional[int] = None
+    current_position: Optional[str] = None
+    headline: Optional[str] = None
+    bio: Optional[str] = None
+
+
+async def detect_profile_domains(profile: dict) -> List[str]:
+    text = " | ".join(filter(None, [
+        profile.get("current_position"),
+        profile.get("headline"),
+        profile.get("bio"),
+        ", ".join(profile.get("domains") or []),
+        ", ".join(profile.get("tools") or []),
+    ]))
+    if not text.strip() or not EMERGENT_LLM_KEY:
+        return []
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"domain-{uuid.uuid4().hex[:8]}",
+            system_message=(
+                "Tu classes un profil candidat. Reponds UNIQUEMENT par 1 a 3 domaines separes par des virgules, "
+                "choisis parmi: Tech, Data, Design, Marketing, Finance, Ressources Humaines, Commercial, "
+                "Juridique, Sante, Ingenierie, General. Aucune autre phrase."
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=f"Profil: {text}"))
+        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        return [t.strip() for t in raw.replace("\n", ",").split(",") if t.strip()][:3]
+    except Exception as e:
+        logger.error(f"detect_profile_domains: {e}")
+        return []
+
+
+async def refresh_user_domains(user_id: str):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not u:
+        return
+    tags = await detect_profile_domains(u)
+    if tags:
+        await db.users.update_one({"user_id": user_id}, {"$set": {"ai_domains": tags}})
+
+
+@api.get("/profile")
+async def get_profile(user: dict = Depends(get_current_user)):
+    return public_user(user)
+
+
+@api.put("/profile")
+async def update_profile(body: ProfileInput, background: BackgroundTasks, user: dict = Depends(get_current_user)):
+    upd = {k: v for k, v in body.model_dump().items() if v is not None}
+    if upd:
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": upd})
+    merged = {**user, **upd}
+    complete = bool(merged.get("name") and merged.get("phone") and merged.get("nationality") and (merged.get("domains")))
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"profile_completed": complete}})
+    background.add_task(refresh_user_domains, user["user_id"])
+    fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return public_user(fresh)
+
+
 # ---------------------------------------------------------------------------
 # Jobs
 # ---------------------------------------------------------------------------
+def _job_match_score(job: dict, tags: list) -> int:
+    hay = " ".join(filter(None, [job.get("category", ""), job.get("title", ""), job.get("description", ""), job.get("requirements", "")])).lower()
+    cat = (job.get("category", "") or "").lower()
+    score = 0
+    for t in tags:
+        tl = (t or "").lower().strip()
+        if not tl:
+            continue
+        if tl and (tl in cat or (cat and cat in tl)):
+            score += 3
+        elif tl in hay:
+            score += 1
+    return score
+
+
 @api.get("/jobs")
-async def list_jobs():
-    jobs = await db.jobs.find({"is_active": True}, {"_id": 0}).sort("created_at", -1).to_list(500)
+async def list_jobs(q: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+    query = {"is_active": True}
+    if q:
+        rx = {"$regex": re.escape(q), "$options": "i"}
+        query["$or"] = [{"title": rx}, {"company": rx}, {"location": rx}, {"category": rx}, {"description": rx}]
+    jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    token = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
+    if token:
+        u = await resolve_token(token)
+        if u and u.get("role") == "candidate":
+            tags = (u.get("ai_domains") or []) + (u.get("domains") or [])
+            if tags:
+                for j in jobs:
+                    j["match_score"] = _job_match_score(j, tags)
+                jobs.sort(key=lambda j: (j.get("match_score", 0), j.get("created_at", "")), reverse=True)
     return jobs
 
 
@@ -642,6 +750,8 @@ async def create_application(
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Offre introuvable")
+    if await db.applications.find_one({"job_id": job_id, "candidate_id": user["user_id"]}):
+        raise HTTPException(status_code=400, detail="Vous avez déjà postulé à cette offre.")
 
     # CV upload
     cv_bytes = await cv.read()
@@ -706,6 +816,11 @@ async def create_application(
 async def my_applications(user: dict = Depends(get_current_user)):
     apps = await db.applications.find({"candidate_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return apps
+
+
+@api.get("/contracts/me")
+async def my_contracts(user: dict = Depends(get_current_user)):
+    return await db.contracts.find({"candidate_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @api.get("/applications")
