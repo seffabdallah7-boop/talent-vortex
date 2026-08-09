@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { fileUrl, formatApiError } from "@/lib/api";
@@ -34,6 +34,7 @@ export default function CandidateDashboard() {
   const [profile, setProfile] = useState(null);
   const [section, setSection] = useState("applications");
   const [call, setCall] = useState(null);
+  const didAutoNav = useRef(false);
 
   const loadAll = useCallback(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});
@@ -42,7 +43,7 @@ export default function CandidateDashboard() {
     api.get("/notifications").then(({ data }) => setNotifs(data.items || [])).catch(() => {});
     api.get("/profile").then(({ data }) => {
       setProfile(data);
-      if (!data.profile_completed) setSection("profile");
+      if (!data.profile_completed && !didAutoNav.current) { setSection("profile"); didAutoNav.current = true; }
     }).catch(() => {});
   }, []);
 

@@ -34,13 +34,25 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Stats admin.
 - Testé: 27/27 backend, flux frontend critiques OK.
 
-## Backlog
-- P1: Enregistrement/upload vocal E2E automatisé (testé manuellement seulement) ; limite de taille des uploads.
-- P1: Chat temps réel (WebSocket) au lieu du polling.
-- P2: Notifications email (candidature reçue / statut changé) via Resend.
-- P2: Filtres/recherche avancés côté admin ; pagination.
-- P2: App React Native (mobile).
-- P2: Rate-limiting sur /api/ai/chat.
+## Roadmap validée avec l'utilisateur (ordre : Candidat → Admin → App)
+### ✅ Phase Candidat (fait, 2026-06)
+- Sidebar (postulations/entretiens/contrats/profil) + badges, profil enrichi + IA priorisation offres, anti-doublon, recherche, lecteur vocal avec vitesse.
+
+### 🟡 Phase Admin (à faire)
+- Regrouper les candidatures par offre (clic sur offre → ses candidatures) + badge nb nouvelles candidatures sur la carte offre.
+- Masquer/afficher une offre (toggle is_active) côté admin.
+- Moteur de recherche de candidats (par expérience/profil).
+- Statut d'appréciation du candidat (déjà: rating/admin_note — à exposer proprement).
+- Classification des nationalités des candidats.
+- Agenda hebdomadaire (vue calendrier semaine) + notification 5 min avant l'entretien.
+- Agent IA : fiche de poste → pré-remplit le formulaire d'offre (admin valide).
+- Chat : accusés de lecture (vus) + heures, statut en ligne + dernière connexion.
+
+### 🟠 Phase Application (à faire)
+- Appel vidéo entretien avancé : partage d'écran, mute micro/caméra, lien d'invitation.
+- Fathom (à reconfirmer techniquement — non compatible Jitsi ; alternative résumé IA).
+- Traduction FR/EN (react-i18next, sélecteur global).
+- App React Native (mobile).
 
 ## Next Tasks
-- Selon retour utilisateur.
+- Démarrer la Phase Admin (regroupement candidatures par offre + masquage d'offre).
