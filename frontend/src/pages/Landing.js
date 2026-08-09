@@ -171,6 +171,11 @@ export default function Landing() {
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-xs font-semibold border border-foreground/15 px-3 py-1">{job.category}</span>
                       <span className="text-xs text-muted-foreground">{job.type}</span>
+                      {job.match_percent && (
+                        <span className="text-xs font-bold text-primary bg-primary/10 rounded-full px-2.5 py-1 flex items-center gap-1" data-testid={`match-badge-${job.id}`}>
+                          <Star className="h-3 w-3 fill-primary" /> {t("landing.match", { percent: job.match_percent })}
+                        </span>
+                      )}
                       <MoveUpRight className="ml-auto h-5 w-5 text-muted-foreground transition-transform group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                     </div>
                     <h3 className={`font-display font-semibold mb-1 group-hover:text-primary transition-colors ${featured ? "text-2xl lg:text-3xl" : "text-xl"}`}>{job.title}</h3>

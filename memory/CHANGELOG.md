@@ -42,3 +42,7 @@
 - react-i18next + détection navigateur + persistance localStorage ("lang"). Sélecteur FR/EN global (LanguageSwitcher) dans la Navbar et la page Auth.
 - Écrans traduits : Navbar, page d'accueil (hero, sections, features, footer), page de connexion/inscription/OTP/mot de passe oublié.
 - Reste en français (extensible à la demande) : tableaux de bord internes admin/candidat, libellés issus de la base (catégories d'offres, statuts data).
+
+### Score d'adéquation + optimisations (fait)
+- Badge "★ Match {percent}%" sur les cartes d'offres pour le candidat connecté (calculé côté serveur : match_percent dérivé du match_score, 55 + score*12, plafonné à 96%). Traduit FR/EN.
+- Optimisation N+1 : /jobs/all, /candidates, /users utilisent désormais une seule agrégation MongoDB (comptages groupés). Contrôle de déploiement : aucun blocage.

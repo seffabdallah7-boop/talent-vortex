@@ -674,7 +674,9 @@ async def list_jobs(q: Optional[str] = Query(None), authorization: Optional[str]
             tags = (u.get("ai_domains") or []) + (u.get("domains") or [])
             if tags:
                 for j in jobs:
-                    j["match_score"] = _job_match_score(j, tags)
+                    s = _job_match_score(j, tags)
+                    j["match_score"] = s
+                    j["match_percent"] = min(96, 55 + s * 12) if s > 0 else None
                 jobs.sort(key=lambda j: (j.get("match_score", 0), j.get("created_at", "")), reverse=True)
     return jobs
 
