@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 6 (Home tab + Avatars/Profile dialog). Backend: added TestProfileEnrichment (5 new tests) covering GET /api/users/{id} shape/404/admin-guard, GET /api/applications carries candidate_picture, GET /api/chat/conversations carries picture. Full regression: 41/41 pytest passing. Frontend: verified all 8 requested UI flows end-to-end via Playwright with real captcha+OTP login. Candidate: sidebar-home present and default section is 'home'; candidate-home renders 5 job cards; 3 show Postuler (home-apply-<id>), 1 shows Voir (home-view-<id>) — the pre-applied Data Analyst offer correctly displays already-applied status/badge; home-job-search filters cards (5 -> 2 for 'data'); clicking Postuler navigates to /jobs/<id>#postuler and the application form is rendered. Admin: nav-applications table renders app-avatar-<appId> on every row (9 avatars found), clicking avatar opens candidate-profile-dialog with profile-name-heading, expertise chips, stats, applications list and interviews; opening a candidature detail exposes view-full-profile-btn that opens the same dialog; nav-candidates table has 31 open-profile-<userId> buttons wired to the dialog; nav-messages conversation list plus active chat header (chat-open-profile) both open the dialog. No blockers.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CandidateProfileDialog", "issues": ["A11y: Radix DialogContent emits 'Missing Description or aria-describedby' warning (DialogHeader is sr-only but no <DialogDescription>). Not blocking; consider adding an sr-only DialogDescription for screen readers."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter6_full.xml"
+  ],
+  "action_items": [
+    "(Optional) Add an sr-only <DialogDescription> to CandidateProfileDialog to silence Radix a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_user_detail returns applications/interviews/contracts by candidate_id — good. But interviews sort key uses ('date',1) then ('time',1) as string sort; works because both are ISO-like strings ('YYYY-MM-DD' + 'HH:MM'), keep as-is.",
+    "applications endpoint fetches user pictures with a single $in query — efficient. However candidate_picture is set to None when the user was deleted; frontend Avatar handles empty src by falling back to initials, so this is safe.",
+    "CandidateProfileDialog.jsx fires api.get(`/users/${userId}`) but silently swallows errors (.catch(() => {})) — user sees an infinite spinner if the request 404s or 401s. Consider surfacing an error state.",
+    "AdminDashboard.js applications table row still has row-level onClick to open the detail; the avatar button uses stopPropagation-less onClick meaning it also opens the row detail. Verified empirically the dialog wins (React portal on top), but consider adding e.stopPropagation() on Avatar onClick to make it deterministic.",
+    "server.py still 1499 lines — recommend splitting into routers (auth, users, applications, chat, contracts, interviews).",
+    "CandidateDashboard JobsHome fetches jobs/apps from parent — good; but 'apps' is filtered client-side by job_id/status meaning even removed jobs stay listed until parent refreshes. Non-blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestProfileEnrichment class — 5 new tests, total suite 41)"
+  ],
+  "success_rate": {"backend": "100% (41/41)", "frontend": "100% of 8 requested flows"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha + OTP from backend.err.log). Candidate cand_1786303173@test.com / Test@2026! (Tech, already applied to Data Analyst). Registration returns token directly.",
+  "seed_data_creation": "5 TEST_pe_* candidates created by TestProfileEnrichment (not cleaned up — negligible).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Candidate default section is 'home' (sidebar-home). JobsHome data-testids: candidate-home, home-job-search, home-job-<jobId>, home-apply-<jobId> (asChild <a> with href /jobs/<id>#postuler), home-view-<jobId>. Admin profile dialog data-testids: candidate-profile-dialog, profile-name-heading, profile-avatar, profile-app-<appId>. Trigger data-testids: app-avatar-<appId> (Applications table), view-full-profile-btn (Application detail header), open-profile-<userId> (Users table, whole name+avatar button), chat-open-profile (Messages active chat header). Backend GET /api/users/{id} requires admin bearer and returns {user, applications, interviews, contracts}. /api/applications now includes candidate_picture (nullable), /api/chat/conversations includes picture (nullable).",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,11 +28,12 @@ const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateStri
 export default function CandidateDashboard() {
   const { user, checkAuth } = useAuth();
   const [apps, setApps] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [interviews, setInterviews] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [notifs, setNotifs] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [section, setSection] = useState("applications");
+  const [section, setSection] = useState("home");
   const [call, setCall] = useState(null);
   const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
@@ -40,6 +41,7 @@ export default function CandidateDashboard() {
 
   const loadAll = useCallback(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});
+    api.get("/jobs").then(({ data }) => setJobs(data)).catch(() => {});
     api.get("/interviews/me").then(({ data }) => setInterviews(data)).catch(() => {});
     api.get("/contracts/me").then(({ data }) => setContracts(data)).catch(() => {});
     api.get("/notifications").then(({ data }) => setNotifs(data.items || [])).catch(() => {});
@@ -77,6 +79,7 @@ export default function CandidateDashboard() {
   const unreadByType = (t) => notifs.filter((n) => !n.read && n.type === t).length;
 
   const NAV = [
+    { key: "home", label: "Accueil", Icon: Home },
     { key: "applications", label: "Mes postulations", Icon: FileText, badge: unreadByType("status"), count: apps.length },
     { key: "interviews", label: "Mes entretiens", Icon: CalendarDays, badge: unreadByType("interview"), count: interviews.length },
     { key: "contracts", label: "Contrats obtenus", Icon: ScrollText, count: contracts.length },
@@ -113,8 +116,8 @@ export default function CandidateDashboard() {
               </button>
             ))}
           </nav>
-          <Button asChild className="rounded-full w-full mt-6" data-testid="browse-jobs-btn">
-            <Link to="/"><Plus className="h-4 w-4 mr-2" /> Nouvelle candidature</Link>
+          <Button className="rounded-full w-full mt-6" onClick={() => setSection("home")} data-testid="browse-jobs-btn">
+            <Plus className="h-4 w-4 mr-2" /> Nouvelle candidature
           </Button>
         </aside>
 
@@ -143,7 +146,8 @@ export default function CandidateDashboard() {
             </div>
           )}
 
-          {section === "applications" && <Applications apps={apps} />}
+          {section === "home" && <JobsHome jobs={jobs} apps={apps} />}
+          {section === "applications" && <Applications apps={apps} onBrowse={() => setSection("home")} />}
           {section === "interviews" && <InterviewsView interviews={interviews} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} />}
           {section === "contracts" && <ContractsView contracts={contracts} />}
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
@@ -154,13 +158,94 @@ export default function CandidateDashboard() {
   );
 }
 
-function Applications({ apps }) {
+function JobsHome({ jobs, apps }) {
+  const [q, setQ] = useState("");
+  const statusByJob = {};
+  for (const a of apps) statusByJob[a.job_id] = a.status;
+
+  const filtered = jobs.filter(
+    (j) =>
+      j.title.toLowerCase().includes(q.toLowerCase()) ||
+      j.company.toLowerCase().includes(q.toLowerCase()) ||
+      j.location.toLowerCase().includes(q.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6" data-testid="candidate-home">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="label-caps text-primary mb-1">Offres disponibles</p>
+          <h2 className="font-display text-2xl font-semibold">{filtered.length} publication{filtered.length > 1 ? "s" : ""}</h2>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une offre..." className="pl-10 rounded-full" data-testid="home-job-search" />
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-jobs-home">
+          <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+          Aucune offre disponible pour le moment.
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {filtered.map((job, i) => {
+            const status = statusByJob[job.id];
+            return (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: (i % 4) * 0.05 }}
+                className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 hover:border-primary transition-colors"
+                data-testid={`home-job-${job.id}`}
+              >
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-xs font-semibold rounded-full bg-secondary px-3 py-1">{job.category}</span>
+                  <span className="text-xs text-muted-foreground">{job.type}</span>
+                  {job.match_percent ? (
+                    <span className="text-xs font-bold text-primary bg-primary/10 rounded-full px-2.5 py-1 flex items-center gap-1" data-testid={`home-match-${job.id}`}>
+                      <Star className="h-3 w-3 fill-primary" /> {job.match_percent}% compatible
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="font-display text-xl font-semibold mb-1">{job.title}</h3>
+                <p className="text-sm font-medium text-muted-foreground mb-3">{job.company}</p>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-5">
+                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {job.location}</span>
+                  {job.salary && <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {job.salary}</span>}
+                </div>
+                <div className="mt-auto flex items-center justify-between gap-3">
+                  {status ? (
+                    <>
+                      <StatusBadge status={status} />
+                      <Button asChild variant="outline" size="sm" className="rounded-full" data-testid={`home-view-${job.id}`}>
+                        <Link to={`/jobs/${job.id}`}>Voir</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <Button asChild size="sm" className="rounded-full ml-auto" data-testid={`home-apply-${job.id}`}>
+                      <Link to={`/jobs/${job.id}#postuler`}>Postuler <ArrowRight className="h-4 w-4 ml-1.5" /></Link>
+                    </Button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Applications({ apps, onBrowse }) {
   if (apps.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border p-16 text-center" data-testid="no-applications">
         <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
         <p className="text-muted-foreground mb-5">Vous n'avez pas encore postulé.</p>
-        <Button asChild className="rounded-full"><Link to="/">Parcourir les offres</Link></Button>
+        <Button onClick={onBrowse} className="rounded-full">Parcourir les offres</Button>
       </div>
     );
   }

@@ -907,6 +907,13 @@ async def all_applications(status: Optional[str] = Query(None), job_id: Optional
     if job_id:
         q["job_id"] = job_id
     apps = await db.applications.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    ids = list({a["candidate_id"] for a in apps if a.get("candidate_id")})
+    pics = {}
+    if ids:
+        async for u in db.users.find({"user_id": {"$in": ids}}, {"_id": 0, "user_id": 1, "picture": 1}):
+            pics[u["user_id"]] = u.get("picture")
+    for a in apps:
+        a["candidate_picture"] = pics.get(a.get("candidate_id"))
     return apps
 
 
@@ -1001,6 +1008,17 @@ async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(requi
     return users
 
 
+@api.get("/users/{user_id}")
+async def get_user_detail(user_id: str, admin: dict = Depends(require_admin)):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    apps = await db.applications.find({"candidate_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    interviews = await db.interviews.find({"candidate_id": user_id}, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(500)
+    contracts = await db.contracts.find({"candidate_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return {"user": public_user(u), "applications": apps, "interviews": interviews, "contracts": contracts}
+
+
 @api.get("/admin/nationalities")
 async def nationalities(admin: dict = Depends(require_admin)):
     agg = await db.users.aggregate([
@@ -1093,12 +1111,12 @@ async def conversations(admin: dict = Depends(require_admin)):
     result = []
     for c in convs:
         unread = await db.messages.count_documents({"conversation_id": c["_id"], "sender_role": "candidate", "read": False})
-        cand = await db.users.find_one({"user_id": c["_id"]}, {"_id": 0, "last_seen": 1})
+        cand = await db.users.find_one({"user_id": c["_id"]}, {"_id": 0, "last_seen": 1, "picture": 1})
         ls = cand.get("last_seen") if cand else None
         result.append({
             "candidate_id": c["_id"], "candidate_name": c.get("candidate_name", ""),
             "last_text": c.get("last_text", ""), "last_at": c.get("last_at"), "unread": unread,
-            "last_seen": ls, "online": _is_online(ls),
+            "last_seen": ls, "online": _is_online(ls), "picture": cand.get("picture") if cand else None,
         })
     return result
 

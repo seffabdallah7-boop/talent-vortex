@@ -666,3 +666,66 @@ class TestCandidateProfile:
             assert any(i["id"] == itw_id for i in r_me.json())
         finally:
             requests.delete(f"{API}/interviews/{itw_id}", headers=admin_headers, timeout=30)
+
+
+# ----------------------------- NEW iter6: profile detail + avatars enrichment -----------------------------
+class TestProfileEnrichment:
+    """GET /users/{id} (admin), applications candidate_picture, chat conv picture"""
+
+    def _fresh_candidate(self):
+        email = f"TEST_pe_{uuid.uuid4().hex[:6]}@test.com"
+        cid, ans = get_captcha()
+        r = requests.post(f"{API}/auth/register", json={
+            "name": "TEST Enrich", "email": email, "password": "Test@2026!",
+            "captcha_id": cid, "captcha_answer": ans,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        return r.json()["token"], r.json()["user"]["user_id"], email
+
+    def test_get_user_detail_shape(self, admin_headers):
+        tok, uid, email = self._fresh_candidate()
+        # candidate updates profile a little
+        requests.put(f"{API}/profile", json={
+            "phone": "+33123456789", "nationality": "FR",
+            "domains": ["Tech"], "tools": ["Python"], "bio": "TEST bio", "years_experience": 3,
+        }, headers={"Authorization": f"Bearer {tok}"}, timeout=30)
+
+        r = requests.get(f"{API}/users/{uid}", headers=admin_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert set(["user", "applications", "interviews", "contracts"]).issubset(d.keys())
+        u = d["user"]
+        assert u["email"].lower() == email.lower()
+        assert u["user_id"] == uid
+        assert "password_hash" not in u
+        assert d["applications"] == [] or isinstance(d["applications"], list)
+        assert isinstance(d["interviews"], list)
+        assert isinstance(d["contracts"], list)
+
+    def test_get_user_detail_404(self, admin_headers):
+        r = requests.get(f"{API}/users/nonexistent-id-xyz", headers=admin_headers, timeout=30)
+        assert r.status_code == 404
+
+    def test_get_user_detail_requires_admin(self, candidate_token):
+        # Grab any user_id
+        r = requests.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        uid = r.json()["user_id"]
+        r2 = requests.get(f"{API}/users/{uid}",
+                          headers={"Authorization": f"Bearer {candidate_token}"}, timeout=30)
+        assert r2.status_code in (401, 403)
+
+    def test_applications_include_candidate_picture_field(self, admin_headers):
+        r = requests.get(f"{API}/applications", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        apps = r.json()
+        assert isinstance(apps, list)
+        # Field must be present (value may be None) on every row when apps exist
+        for a in apps[:10]:
+            assert "candidate_picture" in a, f"missing candidate_picture: {a.keys()}"
+
+    def test_chat_conversations_include_picture_field(self, admin_headers):
+        r = requests.get(f"{API}/chat/conversations", headers=admin_headers, timeout=30)
+        assert r.status_code == 200
+        for c in r.json()[:10]:
+            assert "picture" in c
+            assert "candidate_id" in c

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="5" time="5.731" timestamp="2026-08-09T21:44:32.235255+00:00" hostname="agent-env-8e5587bd-b98d-4e15-abea-3637c48d358e"><testcase classname="tests.backend_test.TestProfileEnrichment" name="test_get_user_detail_shape" time="3.084"><failure message="AssertionError: assert 'test_pe_087268@test.com' == 'TEST_pe_087268@test.com'&#10;  &#10;  - TEST_pe_087268@test.com&#10;  ? ^^^^&#10;  + test_pe_087268@test.com&#10;  ? ^^^^">backend/tests/backend_test.py:698: in test_get_user_detail_shape
+    assert u["email"] == email
+E   AssertionError: assert 'test_pe_087268@test.com' == 'TEST_pe_087268@test.com'
+E     
+E     - TEST_pe_087268@test.com
+E     ? ^^^^
+E     + test_pe_087268@test.com
+E     ? ^^^^</failure></testcase><testcase classname="tests.backend_test.TestProfileEnrichment" name="test_get_user_detail_404" time="0.158" /><testcase classname="tests.backend_test.TestProfileEnrichment" name="test_get_user_detail_requires_admin" time="1.742" /><testcase classname="tests.backend_test.TestProfileEnrichment" name="test_applications_include_candidate_picture_field" time="0.136" /><testcase classname="tests.backend_test.TestProfileEnrichment" name="test_chat_conversations_include_picture_field" time="0.105" /></testsuite></testsuites>

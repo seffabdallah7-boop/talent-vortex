@@ -1,0 +1,178 @@
+import { useEffect, useState } from "react";
+import api, { fileUrl } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar } from "@/components/Avatar";
+import StatusBadge from "@/components/StatusBadge";
+import {
+  Loader2, Mail, Phone, MapPin, Briefcase, Globe, Star, CalendarDays,
+  FileText, ScrollText, Sparkles, Clock,
+} from "lucide-react";
+
+const fmtDate = (d) => {
+  try { return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }); }
+  catch { return d; }
+};
+
+function Chips({ items, variant = "secondary" }) {
+  if (!items || items.length === 0) return <span className="text-sm text-muted-foreground">Non renseigné</span>;
+  const cls = variant === "primary" ? "bg-primary/10 text-primary" : "bg-secondary text-foreground";
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((it, i) => (
+        <span key={i} className={`rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>{it}</span>
+      ))}
+    </div>
+  );
+}
+
+export default function CandidateProfileDialog({ userId, open, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && userId) {
+      setLoading(true);
+      setData(null);
+      api.get(`/users/${userId}`)
+        .then(({ data }) => setData(data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [open, userId]);
+
+  const u = data?.user;
+  const apps = data?.applications || [];
+  const interviews = data?.interviews || [];
+  const contracts = data?.contracts || [];
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="candidate-profile-dialog">
+        <DialogHeader className="sr-only"><DialogTitle>Profil du candidat</DialogTitle></DialogHeader>
+        {loading || !u ? (
+          <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+        ) : (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-start gap-4">
+              <Avatar name={u.name} src={u.picture} size={72} testId="profile-avatar" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-2xl font-semibold" data-testid="profile-name-heading">{u.name || "Sans nom"}</h2>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.role === "admin" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                    {u.role === "admin" ? "Administrateur" : "Candidat"}
+                  </span>
+                </div>
+                {(u.headline || u.current_position) && (
+                  <p className="text-muted-foreground mt-0.5">{u.headline || u.current_position}</p>
+                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {u.email}</span>
+                  {u.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> {u.phone}</span>}
+                  {u.nationality && <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> {u.nationality}</span>}
+                  {(u.city || u.country) && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {[u.city, u.country].filter(Boolean).join(", ")}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: "Candidatures", value: apps.length, Icon: FileText },
+                { label: "Entretiens", value: interviews.length, Icon: CalendarDays },
+                { label: "Contrats", value: contracts.length, Icon: ScrollText },
+                { label: "Années d'exp.", value: u.years_experience ?? "—", Icon: Briefcase },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl border border-border bg-card p-3 text-center">
+                  <s.Icon className="h-4 w-4 text-primary mx-auto mb-1.5" />
+                  <p className="font-display text-xl font-semibold leading-none">{s.value}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Expertise */}
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+              <p className="font-medium">Expertise</p>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Domaines</p>
+                <Chips items={u.domains} variant="primary" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5">Outils maîtrisés</p>
+                <Chips items={u.tools} />
+              </div>
+              {u.ai_domains?.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/20 p-3 text-sm">
+                  <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Domaines détectés par l'IA : <b>{u.ai_domains.join(", ")}</b></span>
+                </div>
+              )}
+            </div>
+
+            {/* Bio */}
+            {u.bio && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="font-medium mb-2">À propos</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{u.bio}</p>
+              </div>
+            )}
+
+            {/* Applications */}
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <p className="font-medium mb-3">Candidatures ({apps.length})</p>
+              {apps.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune candidature.</p>
+              ) : (
+                <div className="space-y-3">
+                  {apps.map((a) => (
+                    <div key={a.id} className="rounded-xl border border-border p-3" data-testid={`profile-app-${a.id}`}>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="font-medium text-sm">{a.job_title}</p>
+                          <p className="text-xs text-muted-foreground">Postulé le {fmtDate(a.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {a.rating > 0 && (
+                            <span className="flex items-center gap-0.5 text-primary text-xs font-semibold">
+                              <Star className="h-3.5 w-3.5 fill-primary" /> {a.rating}/5
+                            </span>
+                          )}
+                          <StatusBadge status={a.status} />
+                        </div>
+                      </div>
+                      {a.admin_note && <p className="text-xs text-muted-foreground italic mt-2">Note interne : {a.admin_note}</p>}
+                      <div className="flex gap-2 mt-2">
+                        {a.cv_file_id && (
+                          <a href={fileUrl(a.cv_file_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                            <FileText className="h-3.5 w-3.5" /> CV
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Interviews */}
+            {interviews.length > 0 && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="font-medium mb-3">Entretiens ({interviews.length})</p>
+                <div className="space-y-2">
+                  {interviews.map((i) => (
+                    <div key={i.id} className="flex items-center gap-3 text-sm">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{i.title}</span>
+                      <span className="text-muted-foreground">{fmtDate(i.date)} à {i.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

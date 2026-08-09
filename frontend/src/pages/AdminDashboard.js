@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
+import { Avatar } from "@/components/Avatar";
+import CandidateProfileDialog from "@/components/CandidateProfileDialog";
 
 const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
@@ -71,6 +73,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [section, setSection] = useState("overview");
   const [jobFilter, setJobFilter] = useState(null);
+  const [profileId, setProfileId] = useState(null);
 
   useEffect(() => {
     const ping = () => api.post("/presence/ping").catch(() => {});
@@ -127,14 +130,15 @@ export default function AdminDashboard() {
         <div className="p-6 md:p-8 max-w-6xl">
           {section === "overview" && <Overview />}
           {section === "jobs" && <Jobs onViewApplications={(job) => { setJobFilter(job); setSection("applications"); }} />}
-          {section === "applications" && <Applications jobFilter={jobFilter} onClearJobFilter={() => setJobFilter(null)} />}
+          {section === "applications" && <Applications jobFilter={jobFilter} onClearJobFilter={() => setJobFilter(null)} onOpenProfile={setProfileId} />}
           {section === "contracts" && <Contracts />}
           {section === "interviews" && <Interviews />}
-          {section === "candidates" && <Candidates />}
-          {section === "messages" && <Messages />}
+          {section === "candidates" && <Candidates onOpenProfile={setProfileId} />}
+          {section === "messages" && <Messages onOpenProfile={setProfileId} />}
           {section === "theme" && <ThemeSection />}
         </div>
       </main>
+      <CandidateProfileDialog userId={profileId} open={!!profileId} onClose={() => setProfileId(null)} />
     </div>
   );
 }
@@ -305,7 +309,7 @@ function Jobs({ onViewApplications }) {
   );
 }
 
-function Applications({ jobFilter, onClearJobFilter }) {
+function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) {
   const [apps, setApps] = useState([]);
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState(null);
@@ -372,7 +376,21 @@ function Applications({ jobFilter, onClearJobFilter }) {
             <TableBody>
               {apps.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
-                  <TableCell><div className="font-medium">{a.candidate_name}</div><div className="text-xs text-muted-foreground">{a.candidate_email}</div></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        name={a.candidate_name}
+                        src={a.candidate_picture}
+                        size={36}
+                        onClick={(e) => { e.stopPropagation(); onOpenProfile(a.candidate_id); }}
+                        testId={`app-avatar-${a.id}`}
+                      />
+                      <div>
+                        <div className="font-medium">{a.candidate_name}</div>
+                        <div className="text-xs text-muted-foreground">{a.candidate_email}</div>
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell>{a.job_title}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   <TableCell className="text-right"><Button variant="outline" size="sm" className="rounded-full">Examiner</Button></TableCell>
@@ -387,11 +405,17 @@ function Applications({ jobFilter, onClearJobFilter }) {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           {detail && (
             <>
-              <DialogHeader><DialogTitle>{detail.candidate_name}</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-3">
+                  <Avatar name={detail.candidate_name} src={detail.candidate_picture} size={40} />
+                  {detail.candidate_name}
+                </DialogTitle>
+              </DialogHeader>
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <StatusBadge status={detail.status} />
                   <span className="text-sm text-muted-foreground">• {detail.job_title}</span>
+                  <Button variant="outline" size="sm" className="rounded-full ml-auto" onClick={() => onOpenProfile(detail.candidate_id)} data-testid="view-full-profile-btn">Voir le profil complet</Button>
                 </div>
                 <p className="text-sm text-muted-foreground">{detail.candidate_email}</p>
                 {detail.cover_note && <div className="rounded-lg bg-secondary/50 p-3"><p className="text-xs font-semibold mb-1">Note de motivation</p><p className="text-sm italic">"{detail.cover_note}"</p></div>}
@@ -437,7 +461,7 @@ function Applications({ jobFilter, onClearJobFilter }) {
   );
 }
 
-function Candidates() {
+function Candidates({ onOpenProfile }) {
   const { user: me } = useAuth();
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
@@ -496,7 +520,12 @@ function Candidates() {
                 const isSelf = me && u.user_id === me.user_id;
                 return (
                   <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
-                    <TableCell className="font-medium">{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</TableCell>
+                    <TableCell className="font-medium">
+                      <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(u.user_id)} data-testid={`open-profile-${u.user_id}`}>
+                        <Avatar name={u.name} src={u.picture} size={36} />
+                        <span>{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</span>
+                      </button>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.nationality || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.current_position || "—"}</TableCell>
@@ -546,7 +575,7 @@ const relSeen = (iso) => {
   } catch { return ""; }
 };
 
-function Messages() {
+function Messages({ onOpenProfile }) {
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
   const [msgs, setMsgs] = useState([]);
@@ -585,14 +614,19 @@ function Messages() {
         <div className="rounded-2xl border border-border bg-card overflow-y-auto">
           {convs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : convs.map((c) => (
             <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className={`w-full text-left p-4 border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${c.online ? "bg-green-500" : "bg-muted-foreground/40"}`} data-testid={`conv-presence-${c.candidate_id}`} />
-                  {c.candidate_name || "Candidat"}
-                </span>
-                {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">{c.unread}</span>}
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <Avatar name={c.candidate_name} src={c.picture} size={40} />
+                  <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${c.online ? "bg-green-500" : "bg-muted-foreground/40"}`} data-testid={`conv-presence-${c.candidate_id}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm truncate">{c.candidate_name || "Candidat"}</span>
+                    {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">{c.unread}</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{c.last_text}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground truncate mt-1">{c.last_text}</p>
             </button>
           ))}
         </div>
@@ -602,13 +636,16 @@ function Messages() {
           ) : (
             <>
               <div className="p-4 border-b border-border flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{active.candidate_name || "Candidat"}</div>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid="active-presence">
-                    <span className={`h-2 w-2 rounded-full ${activeConv?.online ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-                    {activeConv?.online ? "En ligne" : `Hors ligne · vu ${relSeen(activeConv?.last_seen)}`}
+                <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(active.candidate_id)} data-testid="chat-open-profile">
+                  <Avatar name={active.candidate_name} src={activeConv?.picture} size={40} />
+                  <div>
+                    <div className="font-medium">{active.candidate_name || "Candidat"}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid="active-presence">
+                      <span className={`h-2 w-2 rounded-full ${activeConv?.online ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                      {activeConv?.online ? "En ligne" : `Hors ligne · vu ${relSeen(activeConv?.last_seen)}`}
+                    </div>
                   </div>
-                </div>
+                </button>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: true })} data-testid="admin-audio-call-btn"><Phone className="h-4 w-4" /></Button>
