@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only regression test for the navbar logo (data-testid='nav-logo') auth-aware navigation fix in /app/frontend/src/components/Navbar.js. All 4 scenarios PASS: (1) logged-out logo click on landing -> '/', (2) candidate logged-in logo click from landing '/' -> '/dashboard', (3) candidate logged-in logo click from a job detail page '/jobs/<id>' -> '/dashboard', (4) admin logged-in login redirect to '/admin' and logo click from landing '/' -> '/admin'. Login flow via captcha-only (no OTP) works with the seeded candidate and admin credentials. Token is stored in localStorage under key 'token'. No console errors observed during the flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Navbar.js: the auth-aware Link target `user ? (user.role === 'admin' ? '/admin' : '/dashboard') : '/'` is a clean minimal fix and matches the same pattern used by nav-dashboard-btn (line 82) and NotificationBell openNotif (line 25). Consistent and correct."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (4/4 logo-navigation scenarios)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026!; Candidate cand_1786303173@test.com / Test@2026! (both worked via captcha-only login).",
+  "seed_data_creation": "None (used existing seeded candidate + admin).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login page selectors: data-testid=auth-email, auth-password, captcha-question ('a + b ='), captcha-input, auth-submit-btn, tab-register, register-name. Login is captcha-only (no OTP). Landing '/' shows the Navbar (logo, logout, dashboard buttons). The admin dashboard '/admin' uses its own sidebar layout (no top Navbar), but the admin can still visit '/' where the Navbar shows -- clicking nav-logo correctly routes to '/admin' when the admin is authenticated.",
+  "rca of the issue": "Previous bug: navbar logo Link had `to='/'` hardcoded, so authenticated users were always sent to the public landing. Fix applied by main agent (Navbar.js line 58): `to={user ? (user.role === 'admin' ? '/admin' : '/dashboard') : '/'}`. Verified working end-to-end for both candidate and admin, and preserved for logged-out users."
+}
