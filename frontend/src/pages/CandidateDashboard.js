@@ -14,9 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const STEPS = [
   { key: "pending", label: "Reçue / En attente", Icon: Clock },
@@ -34,6 +35,7 @@ export default function CandidateDashboard() {
   const [notifs, setNotifs] = useState([]);
   const [profile, setProfile] = useState(null);
   const [section, setSection] = useState("home");
+  const [mobileNav, setMobileNav] = useState(false);
   const [call, setCall] = useState(null);
   const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
@@ -86,6 +88,34 @@ export default function CandidateDashboard() {
     { key: "profile", label: "Mon profil", Icon: User, badge: profile && !profile.profile_completed ? "!" : 0 },
   ];
 
+  const selectSection = (key) => { setSection(key); setMobileNav(false); };
+  const navBlock = (
+    <>
+      <nav className="space-y-1.5">
+        {NAV.map((n) => (
+          <button
+            key={n.key}
+            onClick={() => selectSection(n.key)}
+            data-testid={`sidebar-${n.key}`}
+            className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground hover:text-foreground"}`}
+          >
+            <n.Icon className="h-4 w-4" />
+            <span className="flex-1 text-left">{n.label}</span>
+            {typeof n.count === "number" && n.count > 0 && (
+              <span className={`text-xs ${section === n.key ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{n.count}</span>
+            )}
+            {n.badge ? (
+              <span data-testid={`sidebar-badge-${n.key}`} className="h-5 min-w-5 px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{n.badge}</span>
+            ) : null}
+          </button>
+        ))}
+      </nav>
+      <Button className="rounded-full w-full mt-6" onClick={() => selectSection("home")} data-testid="browse-jobs-btn">
+        <Plus className="h-4 w-4 mr-2" /> Nouvelle candidature
+      </Button>
+    </>
+  );
+
   return (
     <div className="App">
       <Navbar />
@@ -93,32 +123,30 @@ export default function CandidateDashboard() {
       <div className="max-w-7xl mx-auto px-5 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-24 h-fit" data-testid="candidate-sidebar">
-          <div className="mb-6">
-            <p className="label-caps text-primary mb-1">Espace candidat</p>
-            <h1 className="font-display text-2xl font-semibold leading-tight">{user?.name}</h1>
+          {/* Mobile menu bar */}
+          <div className="lg:hidden mb-2 flex items-center gap-3">
+            <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+              <SheetTrigger asChild>
+                <button className="h-10 w-10 rounded-lg border border-border flex items-center justify-center hover:bg-secondary transition-colors" data-testid="candidate-mobile-menu-btn" aria-label="Menu"><Menu className="h-5 w-5" /></button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <SheetHeader className="text-left mb-4"><SheetTitle>Espace candidat</SheetTitle></SheetHeader>
+                {navBlock}
+              </SheetContent>
+            </Sheet>
+            <div className="min-w-0">
+              <p className="label-caps text-primary">Espace candidat</p>
+              <h1 className="font-display text-lg font-semibold leading-tight truncate">{user?.name}</h1>
+            </div>
           </div>
-          <nav className="space-y-1.5">
-            {NAV.map((n) => (
-              <button
-                key={n.key}
-                onClick={() => setSection(n.key)}
-                data-testid={`sidebar-${n.key}`}
-                className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground hover:text-foreground"}`}
-              >
-                <n.Icon className="h-4 w-4" />
-                <span className="flex-1 text-left">{n.label}</span>
-                {typeof n.count === "number" && n.count > 0 && (
-                  <span className={`text-xs ${section === n.key ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{n.count}</span>
-                )}
-                {n.badge ? (
-                  <span data-testid={`sidebar-badge-${n.key}`} className="h-5 min-w-5 px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{n.badge}</span>
-                ) : null}
-              </button>
-            ))}
-          </nav>
-          <Button className="rounded-full w-full mt-6" onClick={() => setSection("home")} data-testid="browse-jobs-btn">
-            <Plus className="h-4 w-4 mr-2" /> Nouvelle candidature
-          </Button>
+          {/* Desktop sidebar */}
+          <div className="hidden lg:block">
+            <div className="mb-6">
+              <p className="label-caps text-primary mb-1">Espace candidat</p>
+              <h1 className="font-display text-2xl font-semibold leading-tight">{user?.name}</h1>
+            </div>
+            {navBlock}
+          </div>
         </aside>
 
         {/* Content */}
@@ -210,7 +238,9 @@ function JobsHome({ jobs, apps }) {
                     </span>
                   ) : null}
                 </div>
-                <h3 className="font-display text-xl font-semibold mb-1">{job.title}</h3>
+                <Link to={`/jobs/${job.id}`} className="hover:text-primary transition-colors" data-testid={`home-job-title-${job.id}`}>
+                  <h3 className="font-display text-xl font-semibold mb-1">{job.title}</h3>
+                </Link>
                 <p className="text-sm font-medium text-muted-foreground mb-3">{job.company}</p>
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-5">
                   <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {job.location}</span>

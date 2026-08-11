@@ -8,8 +8,10 @@ import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell } from "lucide-react";
 
-function NotificationBell() {
+export function NotificationBell() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState({ items: [], unread: 0 });
   const load = () => api.get("/notifications").then(({ data }) => setData(data)).catch(() => {});
@@ -17,6 +19,10 @@ function NotificationBell() {
   const toggle = async () => {
     const n = !open; setOpen(n);
     if (n && data.unread > 0) { await api.post("/notifications/read-all").catch(() => {}); load(); }
+  };
+  const openNotif = () => {
+    setOpen(false);
+    navigate(user?.role === "admin" ? "/admin" : "/dashboard");
   };
   return (
     <div className="relative">
@@ -29,10 +35,10 @@ function NotificationBell() {
           {data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground p-3 text-center">{t("nav.noNotifications")}</p>
           ) : data.items.map((n) => (
-            <div key={n.id} className="p-3 rounded-lg hover:bg-secondary">
+            <button key={n.id} onClick={openNotif} data-testid={`notif-item-${n.id}`} className="w-full text-left p-3 rounded-lg hover:bg-secondary transition-colors">
               <p className="text-sm font-medium">{n.title}</p>
               <p className="text-xs text-muted-foreground">{n.body}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}

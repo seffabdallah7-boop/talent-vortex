@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 7 — Phase A interactivity/navigation frontend-only tests via Playwright (real captcha + OTP). Executed all 8 requested flows on desktop (1920x1080) and mobile (390x844) viewports as admin (seffabdallah7@gmail.com) and as an existing candidate (cand_1786303173@test.com). One FAIL found: the four 'En attente / status filter' navigations from the Tableau de bord do NOT apply the status filter on the Candidatures section — the filter stays on 'Toutes'. Root cause identified in code. All other flows PASS: stat-Offres actives -> Jobs, stat-Candidats -> Utilisateurs, stat-Candidatures -> Candidatures (all), stat-Contrats actifs -> Contrats filtered on 'En cours', stat-Entretiens à venir -> Agenda, open-job-<id> navigates to /jobs/<id>, contract-row-<id> opens edit dialog with prefilled data, delete/edit action buttons on contract row use stopPropagation correctly (edit dialog does not double-open when clicking delete), admin mobile-menu-btn opens drawer and nav-candidates navigates + closes drawer, candidate-mobile-menu-btn opens drawer and sidebar-applications navigates + closes drawer, home-job-title-<id> on candidate 'Accueil' navigates to /jobs/<id>, notif-bell opens notif-panel and clicking a notif-item-<id> navigates to /dashboard (candidate) and closes the panel.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard Applications",
+        "issue": "Applications component ignores the initialStatus prop. Root: function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) (line 368) does NOT destructure initialStatus, and const [filter, setFilter] = useState('all') (line 370) hard-codes 'all'. Result: clicking stat-En attente, stat-card-pending, stat-card-accepted and stat-card-rejected navigates to Candidatures section but filter stays 'Toutes' (no filtering applied). AdminDashboard already passes initialStatus={appStatus} on line 178.",
+        "selector": "[data-testid=stat-En attente], [data-testid=stat-card-pending], [data-testid=stat-card-accepted], [data-testid=stat-card-rejected]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminDashboard header", "issues": ["Admin dashboard has no top Navbar (uses only its own sidebar), so the notification bell (data-testid notif-bell) is NOT reachable from /admin. The bell only exists on pages that mount <Navbar/> (Landing, JobDetail, CandidateDashboard). If admins are expected to receive notifications from /admin, add a top-bar with NotificationBell in AdminDashboard."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX (HIGH): In /app/frontend/src/pages/AdminDashboard.js line 368, destructure initialStatus and initialize filter from it. Suggested change: function Applications({ jobFilter, initialStatus, onClearJobFilter, onOpenProfile }) { const [filter, setFilter] = useState(initialStatus || 'all'); useEffect(() => { setFilter(initialStatus || 'all'); }, [initialStatus]); ... }. This fixes stat-En attente / stat-card-pending / stat-card-accepted / stat-card-rejected navigation filter.",
+    "OPTIONAL: Expose NotificationBell inside AdminDashboard (currently only in pages using <Navbar/>) so admins can reach notifications from /admin."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.js line 368 signature drops initialStatus — direct bug for 4 of the 9 requested navigation flows.",
+    "Contracts component correctly reads initialFilter (line 744) — same pattern should be applied to Applications for initialStatus. Also consider syncing when the prop changes (useEffect on initialStatus) so re-clicking a different stat card after leaving/returning updates the filter.",
+    "AdminDashboard.js is now 1066 lines — recommend splitting into per-section modules (Overview/Jobs/Applications/Contracts/Interviews/Candidates/Messages) to keep files <700 lines per code_review_guidelines.",
+    "NotificationBell load() re-runs every 15s but does not clear the setInterval across navigations to /admin (Navbar not mounted there) — fine as-is because Navbar only mounts on public/candidate routes."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "12/16 flows PASS (75%). 4 failures all rooted in the single Applications initialStatus bug."},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha + OTP from backend.err.log). Candidate cand_1786303173@test.com / Test@2026! now ALSO requires OTP (previously registration path returned token directly; the login path enforces OTP for candidates as well). Registration flow returned token directly (no OTP) — used to create tv_m_<ts>@test.com and tv_test_<ts>@test.com throwaway accounts.",
+  "seed_data_creation": "2 throwaway candidate accounts registered for testing (tv_test_1786414087@test.com, tv_m_1786414126@test.com). No admin/data modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fix scope is one-liner: /app/frontend/src/pages/AdminDashboard.js line 368 must destructure initialStatus and useState(initialStatus||'all'). After fix, re-verify: stat-En attente, stat-card-pending, stat-card-accepted, stat-card-rejected each set the status-filter to the corresponding value. NOTE for playwright login: (1) captcha-question test-id is on <span> which briefly shows dots before render — poll for regex '(\\d+)\\s*([+\\-*])\\s*(\\d+)' up to 10s. (2) Both admin AND existing seeded candidates require OTP after login; grep OTP from /var/log/supervisor/backend.err.log (line 'OTP <email> = 123456'). (3) Admin has NO Navbar => notif-bell only reachable on candidate/public pages. Contracts had only 1 row ('Contrat Dev Web' — En cours) at test time — enough to validate row click + stopPropagation. All contract-related e.stopPropagation is on <TableCell className='text-right' onClick={e => e.stopPropagation()}> (line 798) — validated by clicking delete and confirming edit dialog did not open.",
+  "rca of the issue": "BUG: stat-En attente / stat-card-{pending,accepted,rejected} navigate but do not filter. RCA: AdminDashboard.js passes initialStatus={appStatus} to <Applications ... /> at line 178, but the Applications component at line 368 destructures only {jobFilter, onClearJobFilter, onOpenProfile}. The prop is dropped and local state defaults to 'all', so the Select shows 'Toutes'. Reproduction: log in as admin, from Tableau de bord click any of the 4 mentioned buttons → Candidatures opens but header Select still says 'Toutes' and table shows unfiltered list. Fix (main agent): add initialStatus to Applications signature and initialize + useEffect-sync filter from it (mirroring how Contracts uses initialFilter). This single-line-ish change resolves all 4 failures."
+}

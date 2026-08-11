@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
-  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon,
+  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon, Menu,
   CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
 import { Avatar } from "@/components/Avatar";
 import CandidateProfileDialog from "@/components/CandidateProfileDialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { NotificationBell } from "@/components/Navbar";
 
 const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
@@ -67,6 +69,19 @@ function hexToHsl(hex) {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 
+function NavButtons({ section, onSelect }) {
+  return NAV.map((n) => (
+    <button
+      key={n.key}
+      onClick={() => onSelect(n.key)}
+      data-testid={`nav-${n.key}`}
+      className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+    >
+      <n.Icon className="h-4.5 w-4.5" /> {n.label}
+    </button>
+  ));
+}
+
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useDarkMode();
@@ -74,6 +89,22 @@ export default function AdminDashboard() {
   const [section, setSection] = useState("overview");
   const [jobFilter, setJobFilter] = useState(null);
   const [profileId, setProfileId] = useState(null);
+  const [mobileNav, setMobileNav] = useState(false);
+  const [appStatus, setAppStatus] = useState("all");
+  const [contractStatus, setContractStatus] = useState("all");
+
+  const selectSection = (key) => {
+    setSection(key);
+    if (key === "applications") { setJobFilter(null); setAppStatus("all"); }
+    setMobileNav(false);
+  };
+
+  const goto = (key, opts = {}) => {
+    setAppStatus(opts.appStatus ?? "all");
+    if (opts.contractStatus !== undefined) setContractStatus(opts.contractStatus);
+    if (key === "applications") setJobFilter(null);
+    setSection(key);
+  };
 
   useEffect(() => {
     const ping = () => api.post("/presence/ping").catch(() => {});
@@ -92,28 +123,22 @@ export default function AdminDashboard() {
           <span className="font-display text-lg font-semibold">Talent Vortex</span>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              onClick={() => { setSection(n.key); if (n.key === "applications") setJobFilter(null); }}
-              data-testid={`nav-${n.key}`}
-              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
-            >
-              <n.Icon className="h-4.5 w-4.5" /> {n.label}
-            </button>
-          ))}
+          <NavButtons section={section} onSelect={selectSection} />
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <div className="flex items-center justify-between px-1">
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            <button
-              onClick={toggle}
-              data-testid="admin-dark-toggle"
-              aria-label="Basculer le thème"
-              className="h-8 w-8 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
-            >
-              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <NotificationBell />
+              <button
+                onClick={toggle}
+                data-testid="admin-dark-toggle"
+                aria-label="Basculer le thème"
+                className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
+              >
+                {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="admin-logout-btn">
             <LogOut className="h-4 w-4 mr-2" /> Déconnexion
@@ -122,16 +147,41 @@ export default function AdminDashboard() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="md:hidden flex gap-2 p-3 overflow-x-auto border-b border-border">
-          {NAV.map((n) => (
-            <button key={n.key} onClick={() => { setSection(n.key); if (n.key === "applications") setJobFilter(null); }} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${section === n.key ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{n.label}</button>
-          ))}
+        <div className="md:hidden flex items-center gap-3 p-3 border-b border-border">
+          <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+            <SheetTrigger asChild>
+              <button className="h-10 w-10 rounded-lg border border-border flex items-center justify-center hover:bg-secondary transition-colors" data-testid="mobile-menu-btn" aria-label="Menu">
+                <Menu className="h-5 w-5" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-72 flex flex-col">
+              <SheetHeader className="p-4 border-b border-border text-left">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
+                  Talent Vortex
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+                <NavButtons section={section} onSelect={selectSection} />
+              </nav>
+              <div className="p-3 border-t border-border">
+                <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="mobile-logout-btn">
+                  <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+          <span className="font-display text-lg font-semibold flex items-center gap-2">
+            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
+            Talent Vortex
+          </span>
+          <div className="ml-auto"><NotificationBell /></div>
         </div>
         <div className="p-6 md:p-8 max-w-6xl">
-          {section === "overview" && <Overview />}
+          {section === "overview" && <Overview onNavigate={goto} />}
           {section === "jobs" && <Jobs onViewApplications={(job) => { setJobFilter(job); setSection("applications"); }} />}
-          {section === "applications" && <Applications jobFilter={jobFilter} onClearJobFilter={() => setJobFilter(null)} onOpenProfile={setProfileId} />}
-          {section === "contracts" && <Contracts />}
+          {section === "applications" && <Applications jobFilter={jobFilter} initialStatus={appStatus} onClearJobFilter={() => setJobFilter(null)} onOpenProfile={setProfileId} />}
+          {section === "contracts" && <Contracts initialFilter={contractStatus} />}
           {section === "interviews" && <Interviews />}
           {section === "candidates" && <Candidates onOpenProfile={setProfileId} />}
           {section === "messages" && <Messages onOpenProfile={setProfileId} />}
@@ -143,34 +193,39 @@ export default function AdminDashboard() {
   );
 }
 
-function Overview() {
+function Overview({ onNavigate }) {
   const [stats, setStats] = useState(null);
   useEffect(() => { api.get("/admin/stats").then(({ data }) => setStats(data)).catch(() => {}); }, []);
   if (!stats) return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
   const cards = [
-    { label: "Offres actives", value: stats.active_jobs, Icon: Briefcase },
-    { label: "Candidats", value: stats.candidates, Icon: Users },
-    { label: "Candidatures", value: stats.applications, Icon: FileText },
-    { label: "En attente", value: stats.pending, Icon: CheckCircle2 },
-    { label: "Contrats actifs", value: stats.contracts_active, Icon: ScrollText },
-    { label: "Entretiens à venir", value: stats.upcoming_interviews, Icon: CalendarDays },
+    { label: "Offres actives", value: stats.active_jobs, Icon: Briefcase, target: ["jobs"] },
+    { label: "Candidats", value: stats.candidates, Icon: Users, target: ["candidates"] },
+    { label: "Candidatures", value: stats.applications, Icon: FileText, target: ["applications", { appStatus: "all" }] },
+    { label: "En attente", value: stats.pending, Icon: CheckCircle2, target: ["applications", { appStatus: "pending" }] },
+    { label: "Contrats actifs", value: stats.contracts_active, Icon: ScrollText, target: ["contracts", { contractStatus: "en_cours" }] },
+    { label: "Entretiens à venir", value: stats.upcoming_interviews, Icon: CalendarDays, target: ["interviews"] },
   ];
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold mb-6">Tableau de bord</h1>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-border bg-card p-5" data-testid={`stat-${c.label}`}>
+          <button
+            key={c.label}
+            onClick={() => onNavigate(...c.target)}
+            data-testid={`stat-${c.label}`}
+            className="text-left rounded-2xl border border-border bg-card p-5 hover:border-primary hover:-translate-y-0.5 transition-all"
+          >
             <c.Icon className="h-5 w-5 text-primary mb-3" />
             <p className="font-display text-3xl font-semibold">{c.value}</p>
             <p className="text-sm text-muted-foreground">{c.label}</p>
-          </div>
+          </button>
         ))}
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border status-pending p-5"><p className="font-display text-2xl font-semibold">{stats.pending}</p><p className="text-sm">En attente</p></div>
-        <div className="rounded-2xl border status-accepted p-5"><p className="font-display text-2xl font-semibold">{stats.accepted}</p><p className="text-sm">Acceptées</p></div>
-        <div className="rounded-2xl border status-rejected p-5"><p className="font-display text-2xl font-semibold">{stats.rejected}</p><p className="text-sm">Refusées</p></div>
+        <button onClick={() => onNavigate("applications", { appStatus: "pending" })} data-testid="stat-card-pending" className="text-left rounded-2xl border status-pending p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.pending}</p><p className="text-sm">En attente</p></button>
+        <button onClick={() => onNavigate("applications", { appStatus: "accepted" })} data-testid="stat-card-accepted" className="text-left rounded-2xl border status-accepted p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.accepted}</p><p className="text-sm">Acceptées</p></button>
+        <button onClick={() => onNavigate("applications", { appStatus: "rejected" })} data-testid="stat-card-rejected" className="text-left rounded-2xl border status-rejected p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.rejected}</p><p className="text-sm">Refusées</p></button>
       </div>
     </div>
   );
@@ -179,6 +234,7 @@ function Overview() {
 const EMPTY_JOB = { title: "", company: "", location: "", type: "Temps plein", category: "General", description: "", requirements: "", salary: "" };
 
 function Jobs({ onViewApplications }) {
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -246,7 +302,12 @@ function Jobs({ onViewApplications }) {
             <TableBody>
               {jobs.map((j) => (
                 <TableRow key={j.id} data-testid={`job-row-${j.id}`}>
-                  <TableCell><div className="font-medium">{j.title}</div><div className="text-xs text-muted-foreground">{j.company}</div></TableCell>
+                  <TableCell>
+                    <button onClick={() => navigate(`/jobs/${j.id}`)} className="text-left hover:text-primary transition-colors" data-testid={`open-job-${j.id}`}>
+                      <div className="font-medium">{j.title}</div>
+                      <div className="text-xs text-muted-foreground">{j.company}</div>
+                    </button>
+                  </TableCell>
                   <TableCell>{j.location}</TableCell>
                   <TableCell>
                     <button onClick={() => onViewApplications({ id: j.id, title: j.title })} data-testid={`view-job-apps-${j.id}`} className="inline-flex items-center gap-1.5 hover:opacity-80">
@@ -309,13 +370,15 @@ function Jobs({ onViewApplications }) {
   );
 }
 
-function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) {
+function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatus }) {
   const [apps, setApps] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(initialStatus || "all");
   const [detail, setDetail] = useState(null);
   const [del, setDel] = useState(null);
   const [note, setNote] = useState("");
   const [rating, setRating] = useState(0);
+
+  useEffect(() => { setFilter(initialStatus || "all"); }, [initialStatus]);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
@@ -324,6 +387,31 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) {
     return api.get(`/applications?${params.toString()}`).then(({ data }) => setApps(data)).catch(() => {});
   }, [filter, jobFilter]);
   useEffect(() => { load(); }, [load]);
+
+  const [schedule, setSchedule] = useState(null);
+  const [itwForm, setItwForm] = useState({ title: "", date: "", time: "", location: "", notes: "" });
+  const [scheduling, setScheduling] = useState(false);
+
+  const accept = async () => {
+    await setStatus(detail.id, "accepted");
+    const app = detail;
+    setDetail(null);
+    setItwForm({ title: `Entretien — ${app.job_title}`, date: "", time: "", location: "", notes: "" });
+    setSchedule({ candidate_id: app.candidate_id, candidate_name: app.candidate_name, application_id: app.id });
+  };
+  const saveSchedule = async () => {
+    setScheduling(true);
+    try {
+      await api.post("/interviews", {
+        title: itwForm.title, candidate_id: schedule.candidate_id, candidate_name: schedule.candidate_name,
+        application_id: schedule.application_id, date: itwForm.date, time: itwForm.time,
+        location: itwForm.location, notes: itwForm.notes, status: "scheduled",
+      });
+      toast.success("Entretien planifié — le candidat a été notifié.");
+      setSchedule(null);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setScheduling(false); }
+  };
 
   const setStatus = async (id, status) => {
     await api.put(`/applications/${id}/status`, { status });
@@ -439,7 +527,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) {
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Décision</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setStatus(detail.id, "accepted")} className="rounded-full status-accepted border-0" data-testid="accept-btn">Accepter</Button>
+                    <Button size="sm" onClick={accept} className="rounded-full status-accepted border-0" data-testid="accept-btn">Accepter</Button>
                     <Button size="sm" onClick={() => setStatus(detail.id, "rejected")} className="rounded-full status-rejected border-0" data-testid="reject-btn">Refuser</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "pending")} className="rounded-full">En attente</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDel(detail)} className="rounded-full ml-auto text-destructive" data-testid="delete-app-btn"><Trash2 className="h-4 w-4" /></Button>
@@ -448,6 +536,30 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile }) {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!schedule} onOpenChange={(v) => !v && setSchedule(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Planifier l'entretien</DialogTitle></DialogHeader>
+          {schedule && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Candidat accepté : <b>{schedule.candidate_name}</b>. Fixez la date de l'entretien — il apparaîtra dans son espace et il sera notifié.</p>
+              <div><Label>Intitulé</Label><Input data-testid="schedule-title-input" value={itwForm.title} onChange={(e) => setItwForm({ ...itwForm, title: e.target.value })} className="mt-1" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label>Date</Label><Input type="date" data-testid="schedule-date-input" value={itwForm.date} onChange={(e) => setItwForm({ ...itwForm, date: e.target.value })} className="mt-1" /></div>
+                <div><Label>Heure</Label><Input type="time" data-testid="schedule-time-input" value={itwForm.time} onChange={(e) => setItwForm({ ...itwForm, time: e.target.value })} className="mt-1" /></div>
+              </div>
+              <div><Label>Lieu / Lien visio</Label><Input value={itwForm.location} onChange={(e) => setItwForm({ ...itwForm, location: e.target.value })} className="mt-1" placeholder="Visio (par défaut Jitsi)" /></div>
+              <div><Label>Notes</Label><Textarea rows={2} value={itwForm.notes} onChange={(e) => setItwForm({ ...itwForm, notes: e.target.value })} className="mt-1" /></div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="rounded-full" onClick={() => setSchedule(null)}>Plus tard</Button>
+            <Button className="rounded-full" onClick={saveSchedule} disabled={scheduling || !itwForm.title || !itwForm.date || !itwForm.time} data-testid="save-schedule-btn">
+              {scheduling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Planifier"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -466,8 +578,14 @@ function Candidates({ onOpenProfile }) {
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
   const [q, setQ] = useState("");
+  const [minRating, setMinRating] = useState("all");
   const [nats, setNats] = useState([]);
-  const load = useCallback(() => api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`).then(({ data }) => setList(data)).catch(() => {}), [q]);
+  const load = useCallback(() => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (minRating !== "all") params.set("min_rating", minRating);
+    return api.get(`/users?${params.toString()}`).then(({ data }) => setList(data)).catch(() => {});
+  }, [q, minRating]);
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load]);
   useEffect(() => { api.get("/admin/nationalities").then(({ data }) => setNats(data)).catch(() => {}); }, []);
   const remove = async () => {
@@ -492,8 +610,21 @@ function Candidates({ onOpenProfile }) {
           <h1 className="font-display text-3xl font-semibold mb-2">Utilisateurs & rôles</h1>
           <p className="text-muted-foreground">Recherchez par nom, poste, domaine ou nationalité ; gérez les rôles.</p>
         </div>
-        <div className="w-full sm:w-80">
-          <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un candidat (poste, domaine, nationalité...)" className="rounded-full" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex-1 sm:w-72">
+            <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher (poste, domaine, nationalité...)" className="rounded-full" />
+          </div>
+          <Select value={minRating} onValueChange={setMinRating}>
+            <SelectTrigger className="w-44 rounded-full shrink-0" data-testid="rating-filter"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toute appréciation</SelectItem>
+              <SelectItem value="5">5 ★</SelectItem>
+              <SelectItem value="4">4 ★ et +</SelectItem>
+              <SelectItem value="3">3 ★ et +</SelectItem>
+              <SelectItem value="2">2 ★ et +</SelectItem>
+              <SelectItem value="1">1 ★ et +</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       {nats.length > 0 && (
@@ -514,7 +645,7 @@ function Candidates({ onOpenProfile }) {
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {list.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
@@ -529,6 +660,14 @@ function Candidates({ onOpenProfile }) {
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.nationality || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.current_position || "—"}</TableCell>
+                    <TableCell>
+                      {u.rating ? (
+                        <span className="inline-flex items-center gap-1 text-primary text-sm font-medium" data-testid={`rating-${u.user_id}`}>
+                          <Star className="h-3.5 w-3.5 fill-primary" /> {u.rating}
+                          <span className="text-muted-foreground text-xs">({u.rating_count})</span>
+                        </span>
+                      ) : <span className="text-muted-foreground text-sm">—</span>}
+                    </TableCell>
                     <TableCell>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.role === "admin" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>
                         {u.role === "admin" ? "Administrateur" : "Candidat"}
@@ -683,9 +822,9 @@ const C_STATUS = {
 };
 const EMPTY_CONTRACT = { title: "", client: "", candidate_name: "", job_title: "", amount: "", start_date: "", end_date: "", status: "en_cours", notes: "" };
 
-function Contracts() {
+function Contracts({ initialFilter }) {
   const [list, setList] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(initialFilter || "all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_CONTRACT);
@@ -733,13 +872,13 @@ function Contracts() {
             <TableHeader><TableRow><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {list.map((c) => (
-                <TableRow key={c.id} data-testid={`contract-row-${c.id}`}>
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => openEdit(c)} data-testid={`contract-row-${c.id}`}>
                   <TableCell className="font-medium">{c.title}</TableCell>
                   <TableCell className="text-muted-foreground">{c.client}</TableCell>
                   <TableCell className="text-muted-foreground">{c.candidate_name}</TableCell>
                   <TableCell>{c.amount}</TableCell>
                   <TableCell><span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(C_STATUS[c.status] || C_STATUS.en_cours).c}`}>{(C_STATUS[c.status] || C_STATUS.en_cours).l}</span></TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(c)} data-testid={`edit-contract-${c.id}`}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => setDel(c)} data-testid={`delete-contract-${c.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>

@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 8 retest of iteration_7 HIGH bug fix (Applications initialStatus) + new admin NotificationBell reachability. All 5 status-filter navigations from Tableau de bord now correctly apply the status-filter and filter the applications table. Admin desktop NotificationBell in sidebar footer works (opens notif-panel, items exist, click navigates to /admin, panel closes). Admin mobile top-bar NotificationBell is present and rendered (visible in screenshot). All iteration_7 regression flows still PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDashboard.js is now ~1070+ lines — still recommend splitting into per-section modules per code_review_guidelines (<700 lines).",
+    "Two NotificationBell instances mount inside AdminDashboard (sidebar + mobile top bar) — both run their own 15s poll interval. Consider hoisting notification state to a shared provider to avoid duplicate polling / duplicate API calls."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% — 5/5 status-filter nav PASS, 4/4 regression nav PASS, desktop+mobile notif-bell PASS, mobile-menu-btn PASS"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha + OTP from /var/log/supervisor/backend.err.log). Captcha input testid is 'captcha-input' (NOT 'captcha-answer'); submit testid is 'auth-submit-btn'; OTP verify testid is 'otp-verify-btn'.",
+  "seed_data_creation": "None. No admin/data modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration_7 HIGH bug fixed: /app/frontend/src/pages/AdminDashboard.js Applications() now destructures initialStatus, uses useState(initialStatus||'all') with useEffect sync — verified working for stat-En attente, stat-card-pending/accepted/rejected, and stat-Candidatures (Toutes). NotificationBell is imported from Navbar (line 30) and mounted at sidebar footer (line 132, desktop) + mobile top-bar (line 178). Login flow selector cheat-sheet: auth-email, auth-password, captcha-question (poll), captcha-input, auth-submit-btn, otp-input, otp-verify-btn. Admin login always requires OTP (grep 'OTP <email> = ' /var/log/supervisor/backend.err.log).",
+  "rca of the issue": "Previous bug RCA (iteration_7): Applications component dropped the initialStatus prop and defaulted local filter to 'all'. Fix (iteration_8, applied by main agent): destructured initialStatus in signature, useState(initialStatus||'all'), and added useEffect(()=>setFilter(initialStatus||'all'),[initialStatus]) mirroring Contracts.initialFilter. Retest confirms all 4 previously-failing flows and the 'Toutes' flow work; filter values observed: 'En attente' (2 rows), 'Acceptées' (6 rows), 'Refusées' (3 rows), 'Toutes' (11 rows)."
+}

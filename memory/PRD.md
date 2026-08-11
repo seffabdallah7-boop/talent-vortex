@@ -63,7 +63,19 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Backend : `GET /api/users/{id}` (admin) → {user, applications, interviews, contracts} ; `/api/applications` enrichi de `candidate_picture` ; `/api/chat/conversations` enrichi de `picture`.
 - Testé : 41/41 backend, 8/8 flux frontend (itération 6) — 100%.
 
-## Next Tasks
-- Traduire les tableaux de bord internes (Admin + Candidat) en FR/EN (P1).
-- Filtre par nationalité cliquable dans le dashboard Admin (P2).
-- Déploiement backend (prérequis app mobile React Native) via bouton Deploy.
+## Implemented (2026-06, itération 7-8 — Phase A : navigation & interactivité)
+- **Dashboard admin interactif** : toutes les cartes/compteurs sont cliquables → redirigent vers la liste filtrée (Offres, Candidats, Candidatures all/pending/accepted/rejected, Contrats en_cours, Entretiens).
+- **Lignes cliquables** : offres (→ /jobs/:id détail), contrats (→ dialogue détail/édition).
+- **Sidebar responsive** : bouton menu hamburger (haut-gauche) + drawer sur mobile/tablette, côté admin ET candidat.
+- **Cartes offres candidat** : titre cliquable → page détail.
+- **Notifications cliquables** : items de la cloche → redirigent vers le dashboard ; cloche ajoutée dans le dashboard admin (desktop + mobile).
+- Testé : 100% des flux Phase A (itérations 7-8).
+
+## Roadmap restante (validée avec l'utilisateur, juin 2026)
+- ✅ **Phase B — Appréciation admin** : colonne ★ (moyenne des ratings de candidatures) dans Utilisateurs + filtre `rating-filter` (min_rating). Backend `/users?min_rating=N`. Testé 100%.
+- ✅ **Phase C — Flux entretien** : bouton « Accepter » → dialogue « Planifier l'entretien » pré-rempli → POST /interviews → apparaît dans l'espace candidat (Mes entretiens) + notification. Testé 100%.
+- ✅ **Phase D — Notifications auto d'offres** : à la création d'une offre, `notify_matching_candidates` notifie (type "job") chaque candidat dont domains/ai_domains correspondent. Vérifié via curl.
+- 🟠 **Phase E — Appels audio/vidéo intégrés (Jitsi)** : boutons chat/audio/vidéo dans la fiche candidat ; appel entrant côté candidat (sonnerie + décrocher via polling) ; salle de réunion admin. (Fathom/Google Meet non intégrables — Jitsi retenu.)
+- 🟠 **Phase F — Auth** : supprimer l'OTP email à la connexion (garder captcha) ; session persistante 2 semaines. ⚠️ passer par integration_expert.
+- 🟠 **Phase G — IA de pré-qualification par chat** : après candidature, l'IA pose des questions selon la fiche de poste ; l'admin est notifié des réponses.
+- 🔵 **Phase H — Traduction complète FR/EN (tout à la fin)**.

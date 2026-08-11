@@ -704,7 +704,7 @@ async def get_job(job_id: str):
 
 
 @api.post("/jobs")
-async def create_job(body: JobInput, admin: dict = Depends(require_admin)):
+async def create_job(body: JobInput, background: BackgroundTasks, admin: dict = Depends(require_admin)):
     doc = body.model_dump()
     doc.update({
         "id": str(uuid.uuid4()),
@@ -713,7 +713,25 @@ async def create_job(body: JobInput, admin: dict = Depends(require_admin)):
     })
     await db.jobs.insert_one(doc)
     doc.pop("_id", None)
+    background.add_task(notify_matching_candidates, doc)
     return doc
+
+
+async def notify_matching_candidates(job: dict):
+    candidates = await db.users.find(
+        {"role": "candidate"},
+        {"_id": 0, "user_id": 1, "domains": 1, "ai_domains": 1},
+    ).to_list(5000)
+    for u in candidates:
+        tags = (u.get("ai_domains") or []) + (u.get("domains") or [])
+        if not tags:
+            continue
+        if _job_match_score(job, tags) > 0:
+            await notify_user(
+                u["user_id"], "job", "Nouvelle offre pour vous",
+                f"« {job.get('title', '')} » correspond à votre profil. Postulez dès maintenant !",
+                {"job_id": job["id"]},
+            )
 
 
 class JobDraftInput(BaseModel):
@@ -986,13 +1004,25 @@ async def list_candidates(admin: dict = Depends(require_admin)):
     users = await db.users.find({"role": "candidate"}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
     counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
     cmap = {c["_id"]: c["n"] for c in counts}
+    rmap = await _rating_map()
     for u in users:
         u["application_count"] = cmap.get(u["user_id"], 0)
+        r = rmap.get(u["user_id"])
+        u["rating"] = r["avg"] if r else None
+        u["rating_count"] = r["n"] if r else 0
     return users
 
 
+async def _rating_map() -> dict:
+    agg = await db.applications.aggregate([
+        {"$match": {"rating": {"$ne": None}}},
+        {"$group": {"_id": "$candidate_id", "avg": {"$avg": "$rating"}, "n": {"$sum": 1}}},
+    ]).to_list(5000)
+    return {r["_id"]: {"avg": round(r["avg"], 1), "n": r["n"]} for r in agg}
+
+
 @api.get("/users")
-async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(require_admin)):
+async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] = Query(None), admin: dict = Depends(require_admin)):
     query = {}
     if q:
         rx = {"$regex": re.escape(q), "$options": "i"}
@@ -1003,8 +1033,14 @@ async def list_users(q: Optional[str] = Query(None), admin: dict = Depends(requi
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
     counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
     cmap = {c["_id"]: c["n"] for c in counts}
+    rmap = await _rating_map()
     for u in users:
         u["application_count"] = cmap.get(u["user_id"], 0)
+        r = rmap.get(u["user_id"])
+        u["rating"] = r["avg"] if r else None
+        u["rating_count"] = r["n"] if r else 0
+    if min_rating:
+        users = [u for u in users if (u.get("rating") or 0) >= min_rating]
     return users
 
 
