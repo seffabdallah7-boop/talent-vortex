@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -43,7 +43,15 @@ export default function CandidateDashboard() {
   const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
   const alerted = useRef(new Set());
+  const [chatMeta, setChatMeta] = useState({ active: false, unread: 0 });
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const load = () => api.get("/chat/unread").then(({ data }) => setChatMeta(data)).catch(() => {});
+    load();
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const s = searchParams.get("section");
@@ -115,6 +123,7 @@ export default function CandidateDashboard() {
     { key: "interviews", label: "Mes entretiens", Icon: CalendarDays, badge: unreadByType("interview"), count: interviews.length },
     { key: "contracts", label: "Contrats obtenus", Icon: ScrollText, count: contracts.length },
     { key: "profile", label: "Mon profil", Icon: User, badge: profile && !profile.profile_completed ? "!" : 0 },
+    ...(chatMeta.active ? [{ key: "messages", label: "Messagerie recruteur", Icon: MessageCircle, badge: chatMeta.unread, action: "chat" }] : []),
   ];
 
   const selectSection = (key) => { setSection(key); setMobileNav(false); };
@@ -124,7 +133,7 @@ export default function CandidateDashboard() {
         {NAV.map((n) => (
           <button
             key={n.key}
-            onClick={() => selectSection(n.key)}
+            onClick={() => n.action === "chat" ? (window.dispatchEvent(new CustomEvent("open-support-chat")), setMobileNav(false)) : selectSection(n.key)}
             data-testid={`sidebar-${n.key}`}
             className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground hover:text-foreground"}`}
           >

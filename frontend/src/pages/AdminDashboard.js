@@ -74,7 +74,7 @@ function hexToHsl(hex) {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 
-function NavButtons({ section, onSelect }) {
+function NavButtons({ section, onSelect, badges = {} }) {
   return NAV.map((n) => (
     <button
       key={n.key}
@@ -83,6 +83,9 @@ function NavButtons({ section, onSelect }) {
       className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
     >
       <n.Icon className="h-4.5 w-4.5" /> {n.label}
+      {badges[n.key] > 0 && (
+        <span data-testid={`nav-badge-${n.key}`} className="ml-auto h-5 min-w-5 px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{badges[n.key]}</span>
+      )}
     </button>
   ));
 }
@@ -100,7 +103,15 @@ export default function AdminDashboard() {
   const [activeCall, setActiveCall] = useState(null);
   const [chatFocus, setChatFocus] = useState(null);
   const [initialSuggestionJob, setInitialSuggestionJob] = useState(null);
+  const [chatUnread, setChatUnread] = useState(0);
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const load = () => api.get("/chat/conversations").then(({ data }) => setChatUnread(data.reduce((s, c) => s + (c.unread || 0), 0))).catch(() => {});
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const s = searchParams.get("section");
@@ -151,7 +162,7 @@ export default function AdminDashboard() {
           <span className="font-display text-lg font-semibold">Talent Vortex</span>
         </div>
         <nav className="flex-1 p-3 space-y-1">
-          <NavButtons section={section} onSelect={selectSection} />
+          <NavButtons section={section} onSelect={selectSection} badges={{ messages: chatUnread }} />
         </nav>
         <div className="p-3 border-t border-border space-y-2">
           <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
@@ -189,7 +200,7 @@ export default function AdminDashboard() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-                <NavButtons section={section} onSelect={selectSection} />
+                <NavButtons section={section} onSelect={selectSection} badges={{ messages: chatUnread }} />
               </nav>
               <div className="p-3 border-t border-border">
                 <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="mobile-logout-btn">

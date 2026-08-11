@@ -103,6 +103,10 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Candidatures** : recherche (candidat/email/poste) + filtre par offre + suppression par ligne.
 - **Suppression généralisée** : toutes les listes admin disposent d'un delete.
 
+## Implemented (2026-06, itération 21 — Badges de messages non lus)
+- **Badge menu admin** : nombre total de messages non lus affiché sur l'item « Messages » (somme des conversations, poll 10 s).
+- **Badge menu candidat** : item « Messagerie recruteur » (visible si conversation active) avec compteur de messages recruteur non lus ; clic ouvre le chat. Validé par curl (admin=3, candidat=1).
+
 ## Implemented (2026-06, itération 20 — Email d'invitation + indicateur de frappe)
 - **Email d'invitation** : à l'activation d'une conversation, le candidat reçoit un email (`_invite_email_html`) l'invitant à ouvrir la « Messagerie recruteur » (en plus de la notification in-app).
 - **Indicateur de frappe** : `POST /chat/typing` + `other_typing` dans `GET /chat/messages` ; « en train d'écrire… » affiché des deux côtés (validé par curl, bidirectionnel).
