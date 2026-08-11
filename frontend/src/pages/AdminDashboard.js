@@ -155,11 +155,13 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen flex bg-background">
       <aside className="w-64 shrink-0 border-r border-border bg-card hidden md:flex flex-col">
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-border">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <Briefcase className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="font-display text-lg font-semibold">Talent Vortex</span>
+        <div className="h-16 flex items-center px-5 border-b border-border">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2.5" data-testid="admin-logo">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+              <Briefcase className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <span className="font-display text-lg font-semibold">Talent Vortex</span>
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           <NavButtons section={section} onSelect={selectSection} badges={{ messages: chatUnread }} />
@@ -209,10 +211,10 @@ export default function AdminDashboard() {
               </div>
             </SheetContent>
           </Sheet>
-          <span className="font-display text-lg font-semibold flex items-center gap-2">
+          <button onClick={() => navigate("/")} className="font-display text-lg font-semibold flex items-center gap-2" data-testid="mobile-logo">
             <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
             Talent Vortex
-          </span>
+          </button>
           <div className="ml-auto flex items-center gap-2"><LanguageSwitcher /><NotificationBell /></div>
         </div>
         <div className="p-6 md:p-8 max-w-6xl">

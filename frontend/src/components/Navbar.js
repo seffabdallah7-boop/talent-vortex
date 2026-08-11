@@ -95,7 +95,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40 glass border-b border-border">
       <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
-        <Link to={user ? (user.role === "admin" ? "/admin" : "/dashboard") : "/"} className="flex items-center gap-2.5" data-testid="nav-logo">
+        <Link to="/" className="flex items-center gap-2.5" data-testid="nav-logo">
           <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
             <Briefcase className="h-5 w-5 text-primary-foreground" />
           </div>
