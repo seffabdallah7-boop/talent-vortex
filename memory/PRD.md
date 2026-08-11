@@ -129,5 +129,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Messagerie admin — scroll interne** : panneau Messages en hauteur relative au viewport (`h-[calc(100vh-11rem)]`) ; seul l'intérieur (liste de messages + liste de conversations) défile, header/input fixes.
 - **Suppression de conversation** : nouveau `DELETE /api/chat/conversations/{candidate_id}` (admin) → supprime messages + doc conversation + marque les pièces jointes supprimées. Bouton corbeille (`conv-delete-<id>`) au survol de chaque conversation dans la liste admin. Testé 3/3 frontend.
 
+## Implemented (2026-06, itération 24 — Refactoring frontend + recherche/sélection conversations + déploiement)
+- **Refactoring frontend** : `AdminDashboard.js` (1548→1023 lignes) — extraction de `Candidates`, `Messages`, `Interviews` dans `/src/pages/admin/AdminCandidates.jsx`, `AdminMessages.jsx`, `AdminInterviews.jsx`. Comportement identique. Testé frontend 100 %.
+- **Recherche conversations (admin)** : barre `conv-search-input` filtrant par nom de candidat / dernier message.
+- **Sélection multiple** : mode `select-mode-toggle` avec cases par conversation → **Archiver** (désactiver en masse) ou **Supprimer** (en masse) + Annuler. Boucle sur `DELETE /chat/conversations/{id}` et `PUT .../active`.
+- **Déploiement** : contrôle de readiness PASS. Corrigé `.gitignore` (les `.env` sont désormais versionnables). Redirection Google `/dashboard#session_id=` confirmée correcte (callback géré par le hash).
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.
