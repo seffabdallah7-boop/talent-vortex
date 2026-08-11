@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Headset, Loader2, Video, Phone, Paperclip, Mic, Square } from "lucide-react";
+import { MessageCircle, X, Send, Bot, Headset, Loader2, Video, Phone, Paperclip, Mic, Square, ArrowLeft } from "lucide-react";
 import api, { sendChatAttachment } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -186,7 +186,7 @@ export default function ChatWidget() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => { setOpen((o) => !o); setTab("ai"); }}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
+        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl items-center justify-center ${open ? "hidden sm:flex" : "flex"}`}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
         {!open && isCandidate && chatMeta.unread > 0 && (
@@ -201,15 +201,16 @@ export default function ChatWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-[92vw] max-w-sm h-[540px] rounded-2xl glass shadow-2xl flex flex-col overflow-hidden"
+            className="fixed z-50 flex flex-col overflow-hidden glass shadow-2xl inset-x-0 bottom-0 w-full h-[90vh] rounded-t-2xl sm:inset-x-auto sm:left-auto sm:bottom-24 sm:right-6 sm:w-[92vw] sm:max-w-sm sm:h-[540px] sm:rounded-2xl"
             data-testid="chat-panel"
           >
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-primary text-primary-foreground">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button onClick={() => setOpen(false)} className="sm:hidden opacity-90 hover:opacity-100 shrink-0" aria-label="Retour" data-testid="chat-back-btn"><ArrowLeft className="h-5 w-5" /></button>
                 {tab === "ai" ? <Bot className="h-4 w-4" /> : <Headset className="h-4 w-4" />}
-                <span className="text-sm font-semibold" data-testid="chat-header-title">{tab === "ai" ? "Assistant IA" : "Messagerie recruteur"}</span>
+                <span className="text-sm font-semibold truncate" data-testid="chat-header-title">{tab === "ai" ? "Assistant IA" : "Messagerie recruteur"}</span>
               </div>
-              <button onClick={() => setOpen(false)} className="opacity-80 hover:opacity-100" aria-label="Fermer"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)} className="hidden sm:block opacity-80 hover:opacity-100" aria-label="Fermer" data-testid="chat-close-btn"><X className="h-4 w-4" /></button>
             </div>
 
             {tab === "support" && isCandidate && (

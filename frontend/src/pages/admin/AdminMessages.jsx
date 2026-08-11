@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import VideoCall from "@/components/VideoCall";
 import { Avatar } from "@/components/Avatar";
 import ChatMessageBubble from "@/components/ChatMessageBubble";
-import { Video, Phone, Loader2, Paperclip, Mic, Square, Send, Trash2, Search, Archive, X } from "lucide-react";
+import { Video, Phone, Loader2, Paperclip, Mic, Square, Send, Trash2, Search, Archive, X, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 const chatTime = (iso) => { try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
@@ -35,7 +35,7 @@ export default function Messages({ onOpenProfile, focus }) {
   const chunksRef = useRef([]);
   const unreadRef = useRef(null);
   const [candidates, setCandidates] = useState([]);
-  const [convFilter, setConvFilter] = useState("all");
+  const [convFilter, setConvFilter] = useState("active");
   const [convSearch, setConvSearch] = useState("");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
@@ -164,7 +164,7 @@ export default function Messages({ onOpenProfile, focus }) {
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
       <div className="grid md:grid-cols-3 gap-4 h-[calc(100vh-11rem)] min-h-[420px]">
-        <div className="rounded-2xl border border-border bg-card flex flex-col overflow-hidden">
+        <div className={`rounded-2xl border border-border bg-card flex-col overflow-hidden ${active ? "hidden md:flex" : "flex"}`}>
           <div className="p-2 border-b border-border space-y-2 shrink-0">
             <Select value="" onValueChange={startConv}>
               <SelectTrigger className="w-full rounded-full" data-testid="new-conv-select"><SelectValue placeholder="+ Nouvelle discussion" /></SelectTrigger>
@@ -228,13 +228,25 @@ export default function Messages({ onOpenProfile, focus }) {
             ))}
           </div>
         </div>
-        <div className="md:col-span-2 rounded-2xl border border-border bg-card flex flex-col overflow-hidden">
+        <div className={`md:col-span-2 rounded-2xl border border-border bg-card flex-col overflow-hidden ${active ? "flex" : "hidden md:flex"}`}>
           {!active ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">Sélectionnez une conversation</div>
           ) : (
             <>
+              <div className="md:hidden flex items-center gap-2.5 overflow-x-auto px-3 py-2 border-b border-border shrink-0" data-testid="mobile-conv-strip">
+                {shownConvs.map((c) => (
+                  <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`strip-conv-${c.candidate_id}`} className="shrink-0 relative" title={c.candidate_name}>
+                    <span className={`block rounded-full ${active?.candidate_id === c.candidate_id ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""}`}>
+                      <Avatar name={c.candidate_name} src={c.picture} size={40} />
+                    </span>
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${c.online ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                  </button>
+                ))}
+              </div>
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-                <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(active.candidate_id)} data-testid="chat-open-profile">
+                <div className="flex items-center gap-2 min-w-0">
+                <button onClick={() => setActive(null)} data-testid="mobile-back-btn" className="md:hidden shrink-0 h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"><ArrowLeft className="h-4 w-4" /></button>
+                <button className="flex items-center gap-3 hover:opacity-80 text-left min-w-0" onClick={() => onOpenProfile(active.candidate_id)} data-testid="chat-open-profile">
                   <Avatar name={active.candidate_name} src={activeConv?.picture} size={40} />
                   <div>
                     <div className="font-medium">{active.candidate_name || "Candidat"}</div>
@@ -244,6 +256,7 @@ export default function Messages({ onOpenProfile, focus }) {
                     </div>
                   </div>
                 </button>
+                </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant={activeConv?.active ? "default" : "outline"} className="rounded-full" onClick={toggleActive} data-testid="toggle-conv-active">{activeConv?.active ? "Désactiver" : "Activer"}</Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>

@@ -135,5 +135,9 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Sélection multiple** : mode `select-mode-toggle` avec cases par conversation → **Archiver** (désactiver en masse) ou **Supprimer** (en masse) + Annuler. Boucle sur `DELETE /chat/conversations/{id}` et `PUT .../active`.
 - **Déploiement** : contrôle de readiness PASS. Corrigé `.gitignore` (les `.env` sont désormais versionnables). Redirection Google `/dashboard#session_id=` confirmée correcte (callback géré par le hash).
 
+## Implemented (2026-06, itération 25 — Messagerie responsive)
+- **Admin Messages responsive** (`AdminMessages.jsx`) : filtre par défaut = **Actives**. Sur téléphone, clic sur une discussion → la liste disparaît et une bande horizontale de profils (avatars + points de présence, `mobile-conv-strip`) apparaît en haut avec un bouton retour (`mobile-back-btn`). Desktop inchangé (2 colonnes).
+- **ChatWidget candidat responsive** (`ChatWidget.js`) : sur **téléphone** le chat s'ouvre en plein écran (90vh hauteur, 100% largeur, ancré en bas) avec bouton **retour** (`chat-back-btn`) ; sur **ordinateur/tablette** (`sm:`) boîte flottante en bas à droite avec bouton **fermer** (`chat-close-btn`). Le bouton flottant est masqué sur mobile quand le chat est ouvert. Valeurs desktop identiques à avant (aucune régression).
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.
