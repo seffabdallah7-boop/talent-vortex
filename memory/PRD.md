@@ -56,5 +56,14 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Traduction FR/EN (react-i18next, sélecteur global).
 - App React Native (mobile).
 
+## Implemented (2026-06, itération 6)
+- **Candidat — onglet Accueil** : nouvelle page par défaut du dashboard candidat listant toutes les offres (cartes), avec recherche, badge de compatibilité IA, bouton « Postuler » (→ /jobs/:id#postuler) ou statut (En attente / Accepté / Refusé) + « Voir » si déjà postulé. Plus besoin de repasser par la landing page.
+- **Admin — photos/avatars partout** : composant `Avatar` (photo Google si dispo, sinon initiales colorées) affiché dans Candidatures, Utilisateurs et Messages (liste + en-tête de chat).
+- **Admin — profil candidat riche** : `CandidateProfileDialog` ouvert au clic sur l'avatar/nom, affichant expertise (domaines/outils), bio, stats, candidatures avec statut + note interne, entretiens.
+- Backend : `GET /api/users/{id}` (admin) → {user, applications, interviews, contracts} ; `/api/applications` enrichi de `candidate_picture` ; `/api/chat/conversations` enrichi de `picture`.
+- Testé : 41/41 backend, 8/8 flux frontend (itération 6) — 100%.
+
 ## Next Tasks
-- Démarrer la Phase Admin (regroupement candidatures par offre + masquage d'offre).
+- Traduire les tableaux de bord internes (Admin + Candidat) en FR/EN (P1).
+- Filtre par nationalité cliquable dans le dashboard Admin (P2).
+- Déploiement backend (prérequis app mobile React Native) via bouton Deploy.

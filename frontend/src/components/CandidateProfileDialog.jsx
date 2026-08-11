@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api, { fileUrl } from "@/lib/api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar } from "@/components/Avatar";
 import StatusBadge from "@/components/StatusBadge";
 import {
@@ -28,14 +28,16 @@ function Chips({ items, variant = "secondary" }) {
 export default function CandidateProfileDialog({ userId, open, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (open && userId) {
       setLoading(true);
       setData(null);
+      setError(false);
       api.get(`/users/${userId}`)
         .then(({ data }) => setData(data))
-        .catch(() => {})
+        .catch(() => setError(true))
         .finally(() => setLoading(false));
     }
   }, [open, userId]);
@@ -48,9 +50,11 @@ export default function CandidateProfileDialog({ userId, open, onClose }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="candidate-profile-dialog">
-        <DialogHeader className="sr-only"><DialogTitle>Profil du candidat</DialogTitle></DialogHeader>
-        {loading || !u ? (
+        <DialogHeader className="sr-only"><DialogTitle>Profil du candidat</DialogTitle><DialogDescription>Détails du profil, expertise et candidatures du candidat.</DialogDescription></DialogHeader>
+        {loading ? (
           <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+        ) : error || !u ? (
+          <div className="py-20 text-center text-muted-foreground" data-testid="profile-error">Impossible de charger ce profil.</div>
         ) : (
           <div className="space-y-6">
             {/* Header */}
