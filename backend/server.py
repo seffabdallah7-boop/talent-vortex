@@ -1361,6 +1361,13 @@ async def admin_presence(user: dict = Depends(get_current_user)):
     return {"online": any(_is_online(s) for s in seens), "last_seen": max(seens) if seens else None}
 
 
+async def _conv_active(conv_id: str) -> bool:
+    doc = await db.conversations.find_one({"conversation_id": conv_id}, {"_id": 0, "active": 1})
+    if doc is not None and "active" in doc:
+        return bool(doc["active"])
+    return (await db.messages.count_documents({"conversation_id": conv_id, "sender_role": "admin"})) > 0
+
+
 @api.get("/chat/conversations")
 async def conversations(admin: dict = Depends(require_admin)):
     pipeline = [
@@ -1374,17 +1381,52 @@ async def conversations(admin: dict = Depends(require_admin)):
         {"$sort": {"last_at": -1}},
     ]
     convs = await db.messages.aggregate(pipeline).to_list(1000)
+    seen = set()
     result = []
     for c in convs:
-        unread = await db.messages.count_documents({"conversation_id": c["_id"], "sender_role": "candidate", "read": False})
-        cand = await db.users.find_one({"user_id": c["_id"]}, {"_id": 0, "last_seen": 1, "picture": 1})
+        cid = c["_id"]
+        seen.add(cid)
+        unread = await db.messages.count_documents({"conversation_id": cid, "sender_role": "candidate", "read": False})
+        cand = await db.users.find_one({"user_id": cid}, {"_id": 0, "last_seen": 1, "picture": 1})
         ls = cand.get("last_seen") if cand else None
         result.append({
-            "candidate_id": c["_id"], "candidate_name": c.get("candidate_name", ""),
+            "candidate_id": cid, "candidate_name": c.get("candidate_name", ""),
             "last_text": c.get("last_text", ""), "last_at": c.get("last_at"), "unread": unread,
             "last_seen": ls, "online": _is_online(ls), "picture": cand.get("picture") if cand else None,
+            "active": await _conv_active(cid),
+        })
+    # Conversations activées par l'admin mais sans message
+    async for d in db.conversations.find({"active": True}, {"_id": 0, "conversation_id": 1}):
+        cid = d["conversation_id"]
+        if cid in seen:
+            continue
+        cand = await db.users.find_one({"user_id": cid}, {"_id": 0, "last_seen": 1, "picture": 1, "name": 1})
+        if not cand:
+            continue
+        result.append({
+            "candidate_id": cid, "candidate_name": cand.get("name", ""),
+            "last_text": "", "last_at": None, "unread": 0,
+            "last_seen": cand.get("last_seen"), "online": _is_online(cand.get("last_seen")),
+            "picture": cand.get("picture"), "active": True,
         })
     return result
+
+
+class ConvActiveInput(BaseModel):
+    active: bool
+
+
+@api.put("/chat/conversations/{candidate_id}/active")
+async def set_conversation_active(candidate_id: str, body: ConvActiveInput, admin: dict = Depends(require_admin)):
+    await db.conversations.update_one(
+        {"conversation_id": candidate_id},
+        {"$set": {"active": body.active, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    if body.active:
+        await notify_user(candidate_id, "message", "Messagerie activée",
+                          "Le recruteur a ouvert une discussion avec vous.", {"candidate_id": candidate_id})
+    return {"ok": True, "active": body.active}
 
 
 @api.get("/chat/messages")
@@ -1393,12 +1435,18 @@ async def get_messages(candidate_id: Optional[str] = Query(None), user: dict = D
         if not candidate_id:
             raise HTTPException(status_code=400, detail="candidate_id requis")
         conv = candidate_id
-        await db.messages.update_many({"conversation_id": conv, "sender_role": "candidate"}, {"$set": {"read": True}})
+        other_role = "candidate"
     else:
         conv = user["user_id"]
-        await db.messages.update_many({"conversation_id": conv, "sender_role": "admin"}, {"$set": {"read": True}})
+        other_role = "admin"
+    first = await db.messages.find_one(
+        {"conversation_id": conv, "sender_role": other_role, "read": False},
+        {"_id": 0, "id": 1}, sort=[("created_at", 1)],
+    )
+    first_unread = first["id"] if first else None
+    await db.messages.update_many({"conversation_id": conv, "sender_role": other_role, "read": False}, {"$set": {"read": True}})
     msgs = await db.messages.find({"conversation_id": conv}, {"_id": 0}).sort("created_at", 1).to_list(2000)
-    return msgs
+    return {"messages": msgs, "first_unread": first_unread}
 
 
 def _msg_email_html(sender_name: str, text: str) -> str:
@@ -1541,7 +1589,8 @@ async def chat_unread(user: dict = Depends(get_current_user)):
     conv = user["user_id"]
     total_admin = await db.messages.count_documents({"conversation_id": conv, "sender_role": "admin"})
     unread = await db.messages.count_documents({"conversation_id": conv, "sender_role": "admin", "read": False})
-    return {"has_admin": total_admin > 0, "unread": unread}
+    active = await _conv_active(conv)
+    return {"has_admin": total_admin > 0, "active": active, "unread": unread}
 
 
 # ---------------------------------------------------------------------------

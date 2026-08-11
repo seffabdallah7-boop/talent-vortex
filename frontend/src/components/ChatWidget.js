@@ -39,7 +39,8 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false);
   const [call, setCall] = useState(null);
   const [adminPresence, setAdminPresence] = useState(null);
-  const [chatMeta, setChatMeta] = useState({ has_admin: false, unread: 0 });
+  const [chatMeta, setChatMeta] = useState({ active: false, unread: 0 });
+  const [firstUnread, setFirstUnread] = useState(null);
   const scrollRef = useRef(null);
   const fileInputRef = useRef(null);
   const recRef = useRef(null);
@@ -56,7 +57,7 @@ export default function ChatWidget() {
     }
   }, [open, tab, sessionId]);
 
-  const loadSupport = () => api.get("/chat/messages").then(({ data }) => setSupMsgs(data)).catch(() => {});
+  const loadSupport = () => api.get("/chat/messages").then(({ data }) => { setSupMsgs(data.messages || []); setFirstUnread(data.first_unread || null); }).catch(() => {});
 
   useEffect(() => {
     if (!open || tab !== "support" || !user) return;
@@ -165,7 +166,7 @@ export default function ChatWidget() {
 
   const onSend = () => (tab === "ai" ? sendAi() : sendSupport());
   const isCandidate = user && user.role === "candidate";
-  const chatLocked = isCandidate && !chatMeta.has_admin;
+  const chatLocked = isCandidate && !chatMeta.active;
 
   return (
     <>
@@ -174,7 +175,7 @@ export default function ChatWidget() {
         data-testid="chat-toggle-btn"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); setTab("ai"); }}
         className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
@@ -193,21 +194,12 @@ export default function ChatWidget() {
             className="fixed bottom-24 right-6 z-50 w-[92vw] max-w-sm h-[540px] rounded-2xl glass shadow-2xl flex flex-col overflow-hidden"
             data-testid="chat-panel"
           >
-            <div className="flex border-b border-border">
-              <button
-                onClick={() => setTab("ai")}
-                data-testid="chat-tab-ai"
-                className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${tab === "ai" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                <Bot className="h-4 w-4" /> Assistant IA
-              </button>
-              <button
-                onClick={() => setTab("support")}
-                data-testid="chat-tab-support"
-                className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${tab === "support" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                <Headset className="h-4 w-4" /> Support
-              </button>
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-primary text-primary-foreground">
+              <div className="flex items-center gap-2">
+                {tab === "ai" ? <Bot className="h-4 w-4" /> : <Headset className="h-4 w-4" />}
+                <span className="text-sm font-semibold" data-testid="chat-header-title">{tab === "ai" ? "Assistant IA" : "Messagerie recruteur"}</span>
+              </div>
+              <button onClick={() => setOpen(false)} className="opacity-80 hover:opacity-100" aria-label="Fermer"><X className="h-4 w-4" /></button>
             </div>
 
             {tab === "support" && isCandidate && (
@@ -238,12 +230,21 @@ export default function ChatWidget() {
                 <>
                   {chatLocked && (
                     <div className="rounded-xl bg-secondary/60 border border-border p-4 text-center text-sm text-muted-foreground" data-testid="chat-locked-notice">
-                      La conversation sera activée dès que l'administrateur vous écrira. Vous recevrez une notification à ce moment-là.
+                      La messagerie sera disponible dès que le recruteur l'aura activée.
                     </div>
                   )}
-                  {!chatLocked && supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez à l'administrateur, il vous répondra ici.</p>}
+                  {!chatLocked && supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez au recruteur, il vous répondra ici.</p>}
                   {supMsgs.map((m) => (
-                    <ChatMessageBubble key={m.id} m={m} mine={m.sender_role === "candidate"} editable onEdit={editMsg} onDelete={deleteMsg} />
+                    <div key={m.id}>
+                      {firstUnread === m.id && (
+                        <div className="flex items-center gap-2 my-2" data-testid="unread-divider">
+                          <div className="flex-1 h-px bg-primary/40" />
+                          <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Nouveaux messages</span>
+                          <div className="flex-1 h-px bg-primary/40" />
+                        </div>
+                      )}
+                      <ChatMessageBubble m={m} mine={m.sender_role === "candidate"} editable onEdit={editMsg} onDelete={deleteMsg} />
+                    </div>
                   ))}
                 </>
               )}

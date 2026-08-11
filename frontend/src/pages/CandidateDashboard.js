@@ -216,6 +216,28 @@ export default function CandidateDashboard() {
   );
 }
 
+function RecruiterChatCard() {
+  const [meta, setMeta] = useState({ active: false, unread: 0 });
+  useEffect(() => {
+    const load = () => api.get("/chat/unread").then(({ data }) => setMeta(data)).catch(() => {});
+    load();
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, []);
+  if (!meta.active) return null;
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5 flex items-center justify-between gap-4" data-testid="recruiter-chat-card">
+      <div>
+        <p className="font-display font-semibold">Messagerie recruteur</p>
+        <p className="text-sm text-muted-foreground">{meta.unread > 0 ? `${meta.unread} nouveau(x) message(s) du recruteur` : "Discutez directement avec le recruteur."}</p>
+      </div>
+      <Button className="rounded-full shrink-0" onClick={() => window.dispatchEvent(new CustomEvent("open-support-chat"))} data-testid="open-recruiter-chat-btn">
+        Ouvrir{meta.unread > 0 ? ` (${meta.unread})` : ""}
+      </Button>
+    </div>
+  );
+}
+
 function JobsHome({ jobs, apps }) {
   const [q, setQ] = useState("");
   const statusByJob = {};
@@ -230,6 +252,7 @@ function JobsHome({ jobs, apps }) {
 
   return (
     <div className="space-y-6" data-testid="candidate-home">
+      <RecruiterChatCard />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label-caps text-primary mb-1">Offres disponibles</p>

@@ -884,6 +884,14 @@ function Messages({ onOpenProfile, focus }) {
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
       <div className="grid md:grid-cols-3 gap-4 h-[560px]">
         <div className="rounded-2xl border border-border bg-card overflow-y-auto">
+          <div className="p-2 border-b border-border">
+            <Select value="" onValueChange={startConv}>
+              <SelectTrigger className="w-full rounded-full" data-testid="new-conv-select"><SelectValue placeholder="+ Nouvelle discussion" /></SelectTrigger>
+              <SelectContent>
+                {candidates.map((c) => <SelectItem key={c.user_id} value={c.user_id}>{c.name} — {c.email}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           {convs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : convs.map((c) => (
             <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className={`w-full text-left p-4 border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
               <div className="flex items-center gap-3">
@@ -897,8 +905,11 @@ function Messages({ onOpenProfile, focus }) {
                     <span className="text-[10px] text-muted-foreground shrink-0" data-testid={`conv-time-${c.candidate_id}`}>{c.last_at ? chatTime(c.last_at) : ""}</span>
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className="text-xs text-muted-foreground truncate">{c.last_text || "Pièce jointe"}</p>
-                    {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">{c.unread}</span>}
+                    <p className="text-xs text-muted-foreground truncate">{c.last_text || (c.last_at ? "Pièce jointe" : "Discussion activée")}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!c.active && <span className="text-[9px] rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground" data-testid={`conv-inactive-${c.candidate_id}`}>inactive</span>}
+                      {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">{c.unread}</span>}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -922,13 +933,23 @@ function Messages({ onOpenProfile, focus }) {
                   </div>
                 </button>
                 <div className="flex gap-2">
+                  <Button size="sm" variant={activeConv?.active ? "default" : "outline"} className="rounded-full" onClick={toggleActive} data-testid="toggle-conv-active">{activeConv?.active ? "Désactiver" : "Activer"}</Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: true })} data-testid="admin-audio-call-btn"><Phone className="h-4 w-4" /></Button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {msgs.map((m) => (
-                  <ChatMessageBubble key={m.id} m={m} mine={m.sender_role === "admin"} editable onEdit={editMsg} onDelete={deleteMsg} />
+                  <div key={m.id}>
+                    {firstUnread === m.id && (
+                      <div className="flex items-center gap-2 my-2" data-testid="admin-unread-divider">
+                        <div className="flex-1 h-px bg-primary/40" />
+                        <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Nouveaux messages</span>
+                        <div className="flex-1 h-px bg-primary/40" />
+                      </div>
+                    )}
+                    <ChatMessageBubble m={m} mine={m.sender_role === "admin"} editable onEdit={editMsg} onDelete={deleteMsg} />
+                  </div>
                 ))}
               </div>
               <div className="p-3 border-t border-border flex items-center gap-2">

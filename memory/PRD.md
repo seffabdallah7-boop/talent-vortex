@@ -103,5 +103,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Candidatures** : recherche (candidat/email/poste) + filtre par offre + suppression par ligne.
 - **Suppression généralisée** : toutes les listes admin disposent d'un delete.
 
+## Implemented (2026-06, itération 19 — Conversations activables + séparation IA/recruteur)
+- **Activation/désactivation par l'admin** : `conversations.active` (collection dédiée) + `PUT /chat/conversations/{id}/active`. La liste admin montre le flag actif/inactif et un sélecteur « Nouvelle discussion » pour démarrer/activer un candidat.
+- **Accès candidat conditionnel** : `GET /chat/unread` renvoie `active` ; carte « Messagerie recruteur » (`recruiter-chat-card`) sur le dashboard candidat visible uniquement si active, avec bouton d'ouverture + compteur de non-lus.
+- **Séparation IA / recruteur** : suppression des onglets du widget ; l'assistant IA reste le widget flottant, la messagerie recruteur s'ouvre via la carte du dashboard (event `open-support-chat`). Verrou basé sur `active` (au lieu de has_admin).
+- **Premier message non lu** : `GET /chat/messages` renvoie `{messages, first_unread}` ; séparateur « Nouveaux messages » affiché côté candidat et admin avant le 1er non-lu.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.
