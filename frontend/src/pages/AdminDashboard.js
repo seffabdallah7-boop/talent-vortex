@@ -548,6 +548,9 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="outline" size="sm" className="rounded-full">Examiner</Button>
+                      {a.screening?.completed && (
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setExamApp(a); }} data-testid={`view-quiz-${a.id}`} title="Questionnaire du candidat"><ScrollText className="h-4 w-4 text-primary" /></Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDel(a); }} data-testid={`delete-app-row-${a.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </TableCell>
