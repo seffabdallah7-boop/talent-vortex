@@ -6,7 +6,32 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell } from "lucide-react";
+import { Avatar } from "@/components/Avatar";
+import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell, Sparkles, CalendarDays, FileText, MessageSquare } from "lucide-react";
+
+function notifRoute(n, role) {
+  if (role === "admin") {
+    if (n.type === "message" && n.candidate_id) return `/admin?section=messages&candidate=${n.candidate_id}&name=${encodeURIComponent(n.actor_name || "")}`;
+    if (n.type === "application") return `/admin?section=applications${n.candidate_id ? `&profile=${n.candidate_id}` : ""}`;
+    if (n.type === "screening") return `/admin?section=applications${n.candidate_id ? `&profile=${n.candidate_id}` : ""}`;
+    if (n.type === "suggestion" && n.job_id) return `/admin?section=suggestions&job=${n.job_id}`;
+    return "/admin";
+  }
+  if (n.type === "job" && n.job_id) return `/jobs/${n.job_id}`;
+  if (n.type === "interview") return "/dashboard?section=interviews";
+  if (n.type === "status") return "/dashboard?section=applications";
+  if (n.type === "message") return "/dashboard?chat=1";
+  return "/dashboard";
+}
+
+function NotifIcon({ n }) {
+  if (n.actor_picture || (n.actor_name && n.type !== "suggestion")) {
+    return <Avatar name={n.actor_name} src={n.actor_picture} size={38} />;
+  }
+  const map = { job: Briefcase, suggestion: Sparkles, interview: CalendarDays, application: FileText, screening: Sparkles, message: MessageSquare };
+  const Icon = map[n.type] || Bell;
+  return <div className="h-[38px] w-[38px] rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"><Icon className="h-4 w-4" /></div>;
+}
 
 export function NotificationBell() {
   const { t } = useTranslation();
@@ -20,9 +45,12 @@ export function NotificationBell() {
     const n = !open; setOpen(n);
     if (n && data.unread > 0) { await api.post("/notifications/read-all").catch(() => {}); load(); }
   };
-  const openNotif = () => {
+  const openNotif = (n) => {
     setOpen(false);
-    navigate(user?.role === "admin" ? "/admin" : "/dashboard");
+    navigate(notifRoute(n, user?.role));
+    if (n.type === "message" && user?.role !== "admin") {
+      setTimeout(() => window.dispatchEvent(new CustomEvent("open-support-chat")), 400);
+    }
   };
   return (
     <div className="relative">
@@ -31,13 +59,16 @@ export function NotificationBell() {
         {data.unread > 0 && <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center" data-testid="notif-count">{data.unread}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto rounded-xl border border-border bg-card shadow-xl z-50 p-2" data-testid="notif-panel">
+        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-border bg-card shadow-xl z-50 p-2" data-testid="notif-panel">
           {data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground p-3 text-center">{t("nav.noNotifications")}</p>
           ) : data.items.map((n) => (
-            <button key={n.id} onClick={openNotif} data-testid={`notif-item-${n.id}`} className="w-full text-left p-3 rounded-lg hover:bg-secondary transition-colors">
-              <p className="text-sm font-medium">{n.title}</p>
-              <p className="text-xs text-muted-foreground">{n.body}</p>
+            <button key={n.id} onClick={() => openNotif(n)} data-testid={`notif-item-${n.id}`} className="w-full text-left p-2.5 rounded-lg hover:bg-secondary transition-colors flex items-start gap-3">
+              <NotifIcon n={n} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{n.actor_name ? n.actor_name : n.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>
+              </div>
             </button>
           ))}
         </div>

@@ -83,6 +83,12 @@ export default function ChatWidget() {
     return () => clearInterval(t);
   }, [user, open, tab, supMsgs.length]);
 
+  useEffect(() => {
+    const h = () => { setOpen(true); setTab("support"); };
+    window.addEventListener("open-support-chat", h);
+    return () => window.removeEventListener("open-support-chat", h);
+  }, []);
+
   const sendAi = async () => {
     if (!text.trim() || sending) return;
     const msg = text.trim();

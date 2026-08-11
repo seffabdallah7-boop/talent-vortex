@@ -91,5 +91,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Testé itération 16 : backend 100% (8/8), frontend points 7/2/6 OK ; nav Suggestions ré-ajouté après correctif.
 - **Design** : image hero de la landing remplacée par un visuel professionnel généré (femme noire + homme en costume, bureau moderne avec skyline).
 
+## Implemented (2026-06, itération 17 — Publication/Notifications/Design)
+- **Récap suggestions à la publication** : à la création d'une offre, tâche de fond `notify_admin_suggestions` → notification in-app + email au recruteur avec le top 3 des profils (score + raison). Logique factorisée `compute_job_suggestions`.
+- **Header admin** : cloche notifications, sélecteur de langue et mode sombre déplacés dans un header collant en haut de page (`admin-header`) ; sidebar = email + déconnexion.
+- **Notifications cliquables + profils** : `GET /api/notifications` enrichi (actor_name/actor_picture du concerné). Clic → routage ciblé (admin : messages/candidate, applications/profile, suggestions/job ; candidat : /jobs/:id, section interviews/applications, ouverture du chat support). Avatar affiché dans chaque item (repli icône par type).
+- **Hero landing redesign** : image du duo pro en arrière-plan (droite) fondue par dégradé, carte statut flottante en glass — vérifié light/dark.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

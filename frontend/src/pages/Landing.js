@@ -35,10 +35,17 @@ export default function Landing() {
       <Navbar />
 
       <section className="relative overflow-hidden border-b border-border">
-        <div className="absolute inset-0 dot-grid opacity-70" />
-        <div className="relative max-w-7xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28 grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 mb-7">
+        {/* Image professionnelle en arrière-plan (droite), fondue dans la page */}
+        <div className="absolute inset-y-0 right-0 w-full lg:w-[62%] pointer-events-none">
+          <img src={HERO} alt="Recruteurs professionnels" className="h-full w-full object-cover object-top" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/10 lg:via-background/55" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
+        </div>
+        <div className="absolute inset-0 dot-grid opacity-30 pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-5 pt-16 pb-24 md:pt-24 md:pb-32">
+          <div className="max-w-xl lg:max-w-2xl">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 backdrop-blur px-3 py-1.5 mb-7">
               <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
               <span className="label-caps text-muted-foreground">{t("landing.badge")}</span>
             </motion.div>
@@ -75,27 +82,27 @@ export default function Landing() {
               <span>{t("landing.recruited")}</span>
             </div>
           </div>
-
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-5 relative">
-            <div className="absolute -right-3 -bottom-3 w-full h-full bg-primary hidden sm:block" />
-            <div className="relative border-2 border-foreground/15 bg-card overflow-hidden">
-              <img src={HERO} alt="Recruteurs professionnels" className="w-full h-64 md:h-80 object-cover object-top" />
-              <div className="p-5">
-                <p className="label-caps text-muted-foreground mb-3">Statut de candidature</p>
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Développeur Full-Stack</span>
-                    <span className="status-accepted rounded-full px-2.5 py-0.5 text-xs font-semibold">{t("landing.statusAccepted")}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Designer UI/UX</span>
-                    <span className="status-pending rounded-full px-2.5 py-0.5 text-xs font-semibold">En attente</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
         </div>
+
+        {/* Carte statut flottante en glass par-dessus l'image (desktop) */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="hidden lg:block absolute right-6 xl:right-12 bottom-10 z-10 w-80 glass rounded-2xl border border-border/60 shadow-2xl p-5"
+        >
+          <p className="label-caps text-muted-foreground mb-3">Statut de candidature</p>
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Développeur Full-Stack</span>
+              <span className="status-accepted rounded-full px-2.5 py-0.5 text-xs font-semibold">{t("landing.statusAccepted")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Designer UI/UX</span>
+              <span className="status-pending rounded-full px-2.5 py-0.5 text-xs font-semibold">En attente</span>
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       <div className="border-b border-border overflow-hidden py-4 bg-card">

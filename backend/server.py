@@ -1121,7 +1121,8 @@ async def submit_screening(app_id: str, body: ScreeningAnswers, user: dict = Dep
         "screening.completed_at": datetime.now(timezone.utc).isoformat(),
     }})
     await notify_admins("screening", "Examen de pré-qualification complété",
-                        f"{app.get('candidate_name','')} a répondu à l'examen pour « {app.get('job_title','')} ».")
+                        f"{app.get('candidate_name','')} a répondu à l'examen pour « {app.get('job_title','')} ».",
+                        {"candidate_id": app.get("candidate_id"), "application_id": app_id})
     return {"ok": True}
 
 
@@ -1842,6 +1843,20 @@ async def export_contracts(admin: dict = Depends(require_admin)):
 async def list_notifications(user: dict = Depends(get_current_user)):
     items = await db.notifications.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
     unread = await db.notifications.count_documents({"user_id": user["user_id"], "read": False})
+    is_admin = user.get("role") == "admin"
+    admin_cache = None
+    for it in items:
+        actor_id = it.get("candidate_id") if is_admin else None
+        if actor_id:
+            u = await db.users.find_one({"user_id": actor_id}, {"_id": 0, "name": 1, "picture": 1})
+            if u:
+                it["actor_name"] = u.get("name") or ""
+                it["actor_picture"] = u.get("picture")
+        elif not is_admin and it.get("type") in ("message", "interview", "status"):
+            if admin_cache is None:
+                admin_cache = await db.users.find_one({"role": "admin"}, {"_id": 0, "name": 1, "picture": 1}) or {}
+            it["actor_name"] = admin_cache.get("name") or "Recruteur"
+            it["actor_picture"] = admin_cache.get("picture")
     return {"items": items, "unread": unread}
 
 

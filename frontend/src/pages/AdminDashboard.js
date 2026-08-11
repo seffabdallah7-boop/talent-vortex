@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { fileUrl, formatApiError, API } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -98,6 +98,20 @@ export default function AdminDashboard() {
   const [contractStatus, setContractStatus] = useState("all");
   const [activeCall, setActiveCall] = useState(null);
   const [chatFocus, setChatFocus] = useState(null);
+  const [initialSuggestionJob, setInitialSuggestionJob] = useState(null);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const s = searchParams.get("section");
+    const candidate = searchParams.get("candidate");
+    const name = searchParams.get("name");
+    const profile = searchParams.get("profile");
+    const job = searchParams.get("job");
+    if (s) setSection(s);
+    if (candidate) setChatFocus({ candidate_id: candidate, candidate_name: name || "" });
+    if (profile) setProfileId(profile);
+    if (job) setInitialSuggestionJob(job);
+  }, [searchParams]);
 
   const callCandidate = async (candidate_id, candidate_name, mode) => {
     try {
@@ -199,7 +213,7 @@ export default function AdminDashboard() {
           {section === "messages" && <Messages onOpenProfile={setProfileId} focus={chatFocus} />}
           {section === "meeting" && <Meetings />}
           {section === "recordings" && <Recordings />}
-          {section === "suggestions" && <Suggestions onOpenProfile={setProfileId} />}
+          {section === "suggestions" && <Suggestions onOpenProfile={setProfileId} initialJob={initialSuggestionJob} />}
           {section === "theme" && <ThemeSection />}
         </div>
       </main>
@@ -1176,7 +1190,7 @@ function Meetings() {
   );
 }
 
-function Suggestions({ onOpenProfile }) {
+function Suggestions({ onOpenProfile, initialJob }) {
   const [jobs, setJobs] = useState([]);
   const [openJob, setOpenJob] = useState(null);
   const [sugg, setSugg] = useState({});
@@ -1184,18 +1198,27 @@ function Suggestions({ onOpenProfile }) {
 
   useEffect(() => { api.get("/jobs/all").then(({ data }) => setJobs(data)).catch(() => {}); }, []);
 
-  const toggle = async (job) => {
+  const loadSugg = useCallback(async (jobId) => {
+    setOpenJob(jobId);
+    setSugg((prev) => {
+      if (prev[jobId]) return prev;
+      setLoadingId(jobId);
+      api.get(`/jobs/${jobId}/suggestions`)
+        .then(({ data }) => setSugg((s) => ({ ...s, [jobId]: data })))
+        .catch(() => toast.error("Impossible de charger les suggestions."))
+        .finally(() => setLoadingId(null));
+      return prev;
+    });
+  }, []);
+
+  const toggle = (job) => {
     if (openJob === job.id) { setOpenJob(null); return; }
-    setOpenJob(job.id);
-    if (!sugg[job.id]) {
-      setLoadingId(job.id);
-      try {
-        const { data } = await api.get(`/jobs/${job.id}/suggestions`);
-        setSugg((s) => ({ ...s, [job.id]: data }));
-      } catch { toast.error("Impossible de charger les suggestions."); }
-      finally { setLoadingId(null); }
-    }
+    loadSugg(job.id);
   };
+
+  useEffect(() => {
+    if (initialJob && jobs.some((j) => j.id === initialJob)) loadSugg(initialJob);
+  }, [initialJob, jobs, loadSugg]);
 
   return (
     <div data-testid="suggestions-section">
