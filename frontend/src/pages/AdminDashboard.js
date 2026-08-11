@@ -817,6 +817,9 @@ function Messages({ onOpenProfile, focus }) {
   const chunksRef = useRef([]);
   const unreadRef = useRef(null);
   const [candidates, setCandidates] = useState([]);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingRef = useRef(0);
+  const pingTyping = () => { const n = Date.now(); if (active && n - typingRef.current > 2500) { typingRef.current = n; api.post("/chat/typing", { candidate_id: active.candidate_id }).catch(() => {}); } };
 
   useEffect(() => { if (focus?.candidate_id) setActive(focus); }, [focus]);
   useEffect(() => { api.get("/candidates").then(({ data }) => setCandidates(data)).catch(() => {}); }, []);
@@ -832,7 +835,7 @@ function Messages({ onOpenProfile, focus }) {
     if (!active) return;
     const load = () => api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => {
       if (Array.isArray(data)) { setMsgs(data); }
-      else { setMsgs(data.messages || []); setFirstUnread(data.first_unread || null); }
+      else { setMsgs(data.messages || []); setFirstUnread(data.first_unread || null); setOtherTyping(!!data.other_typing); }
     }).catch(() => {});
     load();
     const int = setInterval(load, 4000);
@@ -975,6 +978,7 @@ function Messages({ onOpenProfile, focus }) {
                     <ChatMessageBubble m={m} mine={m.sender_role === "admin"} editable onEdit={editMsg} onDelete={deleteMsg} />
                   </div>
                 ))}
+                {otherTyping && <p className="text-xs text-muted-foreground italic animate-pulse" data-testid="admin-typing-indicator">{active?.candidate_name || "Le candidat"} est en train d'écrire…</p>}
               </div>
               <div className="p-3 border-t border-border flex items-center gap-2">
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf,.doc,.docx,.txt,.xls,.xlsx" onChange={onPickFile} className="hidden" data-testid="admin-chat-file-input" />
@@ -984,7 +988,7 @@ function Messages({ onOpenProfile, focus }) {
                 <button onClick={recording ? stopRec : startRec} data-testid="admin-voice-btn" title="Message vocal" className={`h-10 w-10 shrink-0 rounded-full border flex items-center justify-center transition-colors ${recording ? "bg-red-500 text-white border-red-500 animate-pulse" : "border-border hover:bg-secondary"}`}>
                   {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </button>
-                <Input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Répondre..." className="rounded-full" data-testid="admin-chat-input" />
+                <Input value={text} onChange={(e) => { setText(e.target.value); pingTyping(); }} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Répondre..." className="rounded-full" data-testid="admin-chat-input" />
                 <Button size="icon" onClick={send} className="rounded-full shrink-0" data-testid="admin-chat-send"><Send className="h-4 w-4" /></Button>
               </div>
             </>

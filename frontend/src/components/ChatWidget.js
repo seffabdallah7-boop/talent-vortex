@@ -41,6 +41,9 @@ export default function ChatWidget() {
   const [adminPresence, setAdminPresence] = useState(null);
   const [chatMeta, setChatMeta] = useState({ active: false, unread: 0 });
   const [firstUnread, setFirstUnread] = useState(null);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingRef = useRef(0);
+  const pingTyping = () => { const n = Date.now(); if (n - typingRef.current > 2500) { typingRef.current = n; api.post("/chat/typing").catch(() => {}); } };
   const scrollRef = useRef(null);
   const unreadRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -58,7 +61,7 @@ export default function ChatWidget() {
     }
   }, [open, tab, sessionId]);
 
-  const loadSupport = () => api.get("/chat/messages").then(({ data }) => { setSupMsgs(data.messages || []); setFirstUnread(data.first_unread || null); }).catch(() => {});
+  const loadSupport = () => api.get("/chat/messages").then(({ data }) => { setSupMsgs(data.messages || []); setFirstUnread(data.first_unread || null); setOtherTyping(!!data.other_typing); }).catch(() => {});
 
   useEffect(() => {
     if (!open || tab !== "support" || !user) return;
@@ -253,6 +256,7 @@ export default function ChatWidget() {
                       <ChatMessageBubble m={m} mine={m.sender_role === "candidate"} editable onEdit={editMsg} onDelete={deleteMsg} />
                     </div>
                   ))}
+                  {otherTyping && <p className="text-xs text-muted-foreground italic px-1 animate-pulse" data-testid="typing-indicator">Le recruteur est en train d'écrire…</p>}
                 </>
               )}
             </div>
@@ -279,7 +283,7 @@ export default function ChatWidget() {
                 <Input
                   data-testid="chat-input"
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => { setText(e.target.value); if (tab === "support" && !chatLocked) pingTyping(); }}
                   onKeyDown={(e) => e.key === "Enter" && onSend()}
                   placeholder={tab === "support" && chatLocked ? "En attente de l'administrateur…" : "Votre message..."}
                   disabled={tab === "support" && chatLocked}

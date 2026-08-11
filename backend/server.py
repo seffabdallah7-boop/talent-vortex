@@ -391,6 +391,10 @@ class ChatEditInput(BaseModel):
     text: str
 
 
+class TypingInput(BaseModel):
+    candidate_id: Optional[str] = None
+
+
 class AiChatInput(BaseModel):
     session_id: str
     message: str
@@ -1416,6 +1420,19 @@ class ConvActiveInput(BaseModel):
     active: bool
 
 
+def _invite_email_html(name: str) -> str:
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Bonjour {name or ""},<br/><br/>'
+        f'Le recruteur vient d\'ouvrir une discussion avec vous. Connectez-vous à votre espace candidat '
+        f'et cliquez sur « Messagerie recruteur » depuis votre tableau de bord pour échanger.</td></tr>'
+        f'<tr><td style="padding-top:16px;color:#666;font-size:13px">À très vite sur Talent Vortex.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
 @api.put("/chat/conversations/{candidate_id}/active")
 async def set_conversation_active(candidate_id: str, body: ConvActiveInput, admin: dict = Depends(require_admin)):
     await db.conversations.update_one(
@@ -1426,6 +1443,10 @@ async def set_conversation_active(candidate_id: str, body: ConvActiveInput, admi
     if body.active:
         await notify_user(candidate_id, "message", "Messagerie activée",
                           "Le recruteur a ouvert une discussion avec vous.", {"candidate_id": candidate_id})
+        cand = await db.users.find_one({"user_id": candidate_id}, {"_id": 0, "email": 1, "name": 1})
+        if cand and cand.get("email"):
+            await send_email(cand["email"], "Le recruteur souhaite échanger avec vous — Talent Vortex",
+                             _invite_email_html(cand.get("name", "")))
     return {"ok": True, "active": body.active}
 
 
@@ -1446,7 +1467,35 @@ async def get_messages(candidate_id: Optional[str] = Query(None), user: dict = D
     first_unread = first["id"] if first else None
     await db.messages.update_many({"conversation_id": conv, "sender_role": other_role, "read": False}, {"$set": {"read": True}})
     msgs = await db.messages.find({"conversation_id": conv}, {"_id": 0}).sort("created_at", 1).to_list(2000)
-    return {"messages": msgs, "first_unread": first_unread}
+    # Indicateur de frappe : l'autre partie tape si son timestamp est récent (< 6 s)
+    other_typing = False
+    cdoc = await db.conversations.find_one({"conversation_id": conv}, {"_id": 0})
+    if cdoc:
+        ts = cdoc.get("typing_candidate_at" if other_role == "candidate" else "typing_admin_at")
+        if ts:
+            try:
+                other_typing = (datetime.now(timezone.utc) - datetime.fromisoformat(ts)).total_seconds() < 6
+            except Exception:
+                other_typing = False
+    return {"messages": msgs, "first_unread": first_unread, "other_typing": other_typing}
+
+
+@api.post("/chat/typing")
+async def chat_typing(body: TypingInput, user: dict = Depends(get_current_user)):
+    if user.get("role") == "admin":
+        if not body.candidate_id:
+            return {"ok": False}
+        conv = body.candidate_id
+        field = "typing_admin_at"
+    else:
+        conv = user["user_id"]
+        field = "typing_candidate_at"
+    await db.conversations.update_one(
+        {"conversation_id": conv},
+        {"$set": {field: datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
 
 
 def _msg_email_html(sender_name: str, text: str) -> str:
