@@ -712,6 +712,7 @@ async def create_job(body: JobInput, background: BackgroundTasks, admin: dict = 
     await db.jobs.insert_one(doc)
     doc.pop("_id", None)
     background.add_task(notify_matching_candidates, doc)
+    background.add_task(notify_admin_suggestions, doc)
     return doc
 
 
@@ -784,11 +785,7 @@ async def ai_rank_candidates(job: dict, candidates: list) -> dict:
         return {}
 
 
-@api.get("/jobs/{job_id}/suggestions")
-async def job_suggestions(job_id: str, admin: dict = Depends(require_admin)):
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
-    if not job:
-        raise HTTPException(status_code=404, detail="Offre introuvable")
+async def compute_job_suggestions(job: dict, limit: int = 20) -> list:
     candidates = await db.users.find({"role": "candidate"}, {"_id": 0}).to_list(5000)
     ranking = await ai_rank_candidates(job, candidates)
     result = []
@@ -808,7 +805,53 @@ async def job_suggestions(job_id: str, admin: dict = Depends(require_admin)):
             "domains": tags, "score": score, "reason": reason,
         })
     result.sort(key=lambda r: r["score"], reverse=True)
-    return result[:20]
+    return result[:limit]
+
+
+def suggestions_email_html(job: dict, top: list) -> str:
+    rows = ""
+    for c in top:
+        pos = c.get("current_position") or ""
+        pos_html = f'<br/><span style="color:#888">{pos}</span>' if pos else ""
+        rows += (
+            f'<tr><td style="padding-top:8px;color:#333">'
+            f'<b>{c.get("name","Candidat")}</b> — {c.get("score")}% compatible'
+            f'{pos_html}'
+            f'<br/><span style="color:#666;font-size:13px">{c.get("reason","")}</span></td></tr>'
+        )
+    return (
+        f'<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif">'
+        f'<tr><td align="center"><table width="480" cellpadding="0" cellspacing="0" style="background:#f7f7f8;border-radius:12px;padding:32px">'
+        f'<tr><td style="font-size:20px;font-weight:bold;color:#111">Talent Vortex</td></tr>'
+        f'<tr><td style="padding-top:12px;color:#333">Votre offre <b>{job.get("title","")}</b> vient d\'être publiée. '
+        f'Voici les profils déjà présents qui correspondent le mieux :</td></tr>'
+        f'{rows}'
+        f'<tr><td style="padding-top:16px;color:#666;font-size:13px">Consultez la section « Suggestions IA » de votre espace administration pour les contacter.</td></tr>'
+        f'</table></td></tr></table>'
+    )
+
+
+async def notify_admin_suggestions(job: dict):
+    top = await compute_job_suggestions(job, limit=3)
+    if not top:
+        return
+    names = ", ".join(f"{c['name']} ({c['score']}%)" for c in top)
+    admins = await notify_admins(
+        "suggestion", "Profils suggérés pour votre offre",
+        f"« {job.get('title','')} » : {names}.", {"job_id": job["id"]},
+    )
+    for a in admins:
+        if a.get("email"):
+            await send_email(a["email"], f"Profils suggérés — {job.get('title','')}",
+                             suggestions_email_html(job, top))
+
+
+@api.get("/jobs/{job_id}/suggestions")
+async def job_suggestions(job_id: str, admin: dict = Depends(require_admin)):
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Offre introuvable")
+    return await compute_job_suggestions(job)
 
 
 class JobDraftInput(BaseModel):
