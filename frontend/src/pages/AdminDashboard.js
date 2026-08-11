@@ -139,21 +139,7 @@ export default function AdminDashboard() {
           <NavButtons section={section} onSelect={selectSection} />
         </nav>
         <div className="p-3 border-t border-border space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            <div className="flex items-center gap-2 shrink-0">
-              <LanguageSwitcher />
-              <NotificationBell />
-              <button
-                onClick={toggle}
-                data-testid="admin-dark-toggle"
-                aria-label="Basculer le thème"
-                className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
-              >
-                {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
           <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="admin-logout-btn">
             <LogOut className="h-4 w-4 mr-2" /> Déconnexion
           </Button>
@@ -161,6 +147,18 @@ export default function AdminDashboard() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
+        <div className="hidden md:flex items-center justify-end gap-2 px-8 h-16 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-20" data-testid="admin-header">
+          <LanguageSwitcher />
+          <NotificationBell />
+          <button
+            onClick={toggle}
+            data-testid="admin-dark-toggle"
+            aria-label="Basculer le thème"
+            className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
+          >
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+        </div>
         <div className="md:hidden flex items-center gap-3 p-3 border-b border-border">
           <Sheet open={mobileNav} onOpenChange={setMobileNav}>
             <SheetTrigger asChild>
