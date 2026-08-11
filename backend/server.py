@@ -387,6 +387,10 @@ class ChatMessageInput(BaseModel):
     candidate_id: Optional[str] = None
 
 
+class ChatEditInput(BaseModel):
+    text: str
+
+
 class AiChatInput(BaseModel):
     session_id: str
     message: str
@@ -1216,7 +1220,7 @@ async def download_file(file_id: str, user: dict = Depends(get_current_user)):
     record = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
     if not record:
         raise HTTPException(status_code=404, detail="Fichier introuvable")
-    if user.get("role") != "admin" and record["owner_id"] != user["user_id"]:
+    if user.get("role") != "admin" and record["owner_id"] != user["user_id"] and record.get("conversation_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Acces refuse")
     data, content_type = get_object(record["storage_path"])
     return Response(content=data, media_type=record.get("content_type", content_type))
@@ -1408,20 +1412,43 @@ def _msg_email_html(sender_name: str, text: str) -> str:
     )
 
 
+async def _deliver_chat(doc, sender_role, conv, cand, preview):
+    # On ne crée PAS de notification in-app par message (évite de saturer la cloche).
+    # Les messages non lus sont signalés par le badge du chat. On garde l'email hors-ligne.
+    if sender_role == "candidate":
+        admins = await db.users.find({"role": "admin"}, {"_id": 0, "email": 1, "last_seen": 1}).to_list(50)
+        for a in admins:
+            if not _is_online(a.get("last_seen")) and a.get("email"):
+                await send_email(a["email"], "Nouveau message — Talent Vortex",
+                                 _msg_email_html(doc.get('candidate_name') or "Un candidat", preview))
+    else:
+        if cand and not _is_online(cand.get("last_seen")) and cand.get("email"):
+            await send_email(cand["email"], "Nouveau message du recruteur — Talent Vortex",
+                             _msg_email_html("Le recruteur", preview))
+
+
+def _attach_kind(content_type: str) -> str:
+    ct = (content_type or "").lower()
+    if ct.startswith("image/"):
+        return "image"
+    if ct.startswith("audio/"):
+        return "audio"
+    return "file"
+
+
+async def _resolve_conv(body_candidate_id, user):
+    if user.get("role") == "admin":
+        if not body_candidate_id:
+            raise HTTPException(status_code=400, detail="candidate_id requis")
+        conv = body_candidate_id
+        cand = await db.users.find_one({"user_id": conv}, {"_id": 0})
+        return conv, (cand.get("name", "") if cand else ""), "admin", cand
+    return user["user_id"], user.get("name", ""), "candidate", None
+
+
 @api.post("/chat/messages")
 async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_user)):
-    if user.get("role") == "admin":
-        if not body.candidate_id:
-            raise HTTPException(status_code=400, detail="candidate_id requis")
-        conv = body.candidate_id
-        cand = await db.users.find_one({"user_id": conv}, {"_id": 0})
-        candidate_name = cand.get("name", "") if cand else ""
-        sender_role = "admin"
-    else:
-        conv = user["user_id"]
-        candidate_name = user.get("name", "")
-        sender_role = "candidate"
-        cand = None
+    conv, candidate_name, sender_role, cand = await _resolve_conv(body.candidate_id, user)
     doc = {
         "id": str(uuid.uuid4()),
         "conversation_id": conv,
@@ -1429,26 +1456,84 @@ async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_
         "sender_id": user["user_id"],
         "sender_role": sender_role,
         "text": body.text,
+        "attachment": None,
+        "edited": False,
+        "deleted": False,
         "read": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
-    if sender_role == "candidate":
-        admins = await notify_admins("message", "Nouveau message",
-                                     f"{candidate_name or 'Un candidat'} vous a envoyé un message.",
-                                     {"candidate_id": conv})
-        for a in admins:
-            if not _is_online(a.get("last_seen")) and a.get("email"):
-                await send_email(a["email"], "Nouveau message — Talent Vortex",
-                                 _msg_email_html(candidate_name or "Un candidat", body.text))
-    else:
-        await notify_user(conv, "message", "Nouveau message",
-                          "L'équipe de recrutement vous a répondu.", {"candidate_id": conv})
-        if cand and not _is_online(cand.get("last_seen")) and cand.get("email"):
-            await send_email(cand["email"], "Nouveau message du recruteur — Talent Vortex",
-                             _msg_email_html("Le recruteur", body.text))
+    await _deliver_chat(doc, sender_role, conv, cand, body.text)
     return doc
+
+
+@api.post("/chat/attachments")
+async def send_attachment(
+    candidate_id: Optional[str] = Form(None),
+    text: str = Form(""),
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
+    conv, candidate_name, sender_role, cand = await _resolve_conv(candidate_id, user)
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 25 Mo)")
+    ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "bin"
+    path = f"{APP_NAME}/chat/{conv}/{uuid.uuid4()}.{ext}"
+    put_object(path, data, file.content_type or "application/octet-stream")
+    file_id = str(uuid.uuid4())
+    await db.files.insert_one({
+        "id": file_id, "storage_path": path, "original_filename": file.filename or "fichier",
+        "content_type": file.content_type or "application/octet-stream", "owner_id": user["user_id"],
+        "conversation_id": conv, "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    kind = _attach_kind(file.content_type)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "conversation_id": conv,
+        "candidate_name": candidate_name,
+        "sender_id": user["user_id"],
+        "sender_role": sender_role,
+        "text": text or "",
+        "attachment": {"file_id": file_id, "filename": file.filename or "fichier",
+                       "content_type": file.content_type or "application/octet-stream", "kind": kind},
+        "edited": False,
+        "deleted": False,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.messages.insert_one(doc)
+    doc.pop("_id", None)
+    labels = {"image": "🖼️ Image", "audio": "🎤 Message vocal", "file": "📎 Pièce jointe"}
+    await _deliver_chat(doc, sender_role, conv, cand, text or labels.get(kind, "Pièce jointe"))
+    return doc
+
+
+@api.put("/chat/messages/{msg_id}")
+async def edit_message(msg_id: str, body: ChatEditInput, user: dict = Depends(get_current_user)):
+    msg = await db.messages.find_one({"id": msg_id}, {"_id": 0})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message introuvable")
+    if msg.get("sender_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez modifier que vos propres messages")
+    if msg.get("attachment"):
+        raise HTTPException(status_code=400, detail="Les pièces jointes ne sont pas modifiables")
+    await db.messages.update_one({"id": msg_id}, {"$set": {"text": body.text, "edited": True}})
+    return await db.messages.find_one({"id": msg_id}, {"_id": 0})
+
+
+@api.delete("/chat/messages/{msg_id}")
+async def delete_message(msg_id: str, user: dict = Depends(get_current_user)):
+    msg = await db.messages.find_one({"id": msg_id}, {"_id": 0})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message introuvable")
+    if msg.get("sender_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez supprimer que vos propres messages")
+    await db.messages.update_one({"id": msg_id}, {"$set": {"text": "", "attachment": None, "deleted": True}})
+    return {"ok": True}
 
 
 @api.get("/chat/unread")
@@ -1841,6 +1926,9 @@ async def export_contracts(admin: dict = Depends(require_admin)):
 
 @api.get("/notifications")
 async def list_notifications(user: dict = Depends(get_current_user)):
+    # Nettoyage: supprime les notifications déjà lues et vieilles de plus d'une semaine.
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    await db.notifications.delete_many({"user_id": user["user_id"], "read": True, "created_at": {"$lt": cutoff}})
     items = await db.notifications.find({"user_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
     unread = await db.notifications.count_documents({"user_id": user["user_id"], "read": False})
     is_admin = user.get("role") == "admin"
@@ -1864,6 +1952,25 @@ async def list_notifications(user: dict = Depends(get_current_user)):
 async def read_all_notifications(user: dict = Depends(get_current_user)):
     await db.notifications.update_many({"user_id": user["user_id"], "read": False}, {"$set": {"read": True}})
     return {"ok": True}
+
+
+@api.delete("/notifications/{notif_id}")
+async def delete_notification(notif_id: str, user: dict = Depends(get_current_user)):
+    await db.notifications.delete_one({"id": notif_id, "user_id": user["user_id"]})
+    return {"ok": True}
+
+
+@api.delete("/notifications")
+async def clear_notifications(user: dict = Depends(get_current_user)):
+    await db.notifications.delete_many({"user_id": user["user_id"]})
+    return {"ok": True}
+
+
+@api.post("/cron/cleanup-notifications")
+async def cron_cleanup_notifications():
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    res = await db.notifications.delete_many({"read": True, "created_at": {"$lt": cutoff}})
+    return {"ok": True, "deleted": res.deleted_count}
 
 
 @api.get("/")

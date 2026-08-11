@@ -97,5 +97,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Notifications cliquables + profils** : `GET /api/notifications` enrichi (actor_name/actor_picture du concerné). Clic → routage ciblé (admin : messages/candidate, applications/profile, suggestions/job ; candidat : /jobs/:id, section interviews/applications, ouverture du chat support). Avatar affiché dans chaque item (repli icône par type).
 - **Hero landing redesign** : image du duo pro en arrière-plan (droite) fondue par dégradé, carte statut flottante en glass — vérifié light/dark.
 
+## Implemented (2026-06, itération 18 — Chat complet + Notifications + Listes)
+- **Chat enrichi (2 côtés)** : envoi image/document, message vocal (MediaRecorder), édition et suppression de message. Bulle réutilisable `ChatMessageBubble.jsx`. Backend : `POST /chat/attachments`, `PUT/DELETE /chat/messages/{id}`, accès fichier élargi aux participants de la conversation. Côté admin : heure du dernier message dans la liste des conversations.
+- **Notifications** : plus de notification in-app par message (anti-débordement, seul le badge du chat + email hors-ligne). Auto-purge des notifications lues > 7 jours (opportuniste + cron `cleanup-notifications`). Suppression manuelle (✕ par item + « Tout effacer »).
+- **Candidatures** : recherche (candidat/email/poste) + filtre par offre + suppression par ligne.
+- **Suppression généralisée** : toutes les listes admin disposent d'un delete.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

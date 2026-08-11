@@ -13,3 +13,10 @@ crons:
     endpoint: "{{BASE_URL}}/api/cron/cleanup-recordings"
     method: POST
     enabled: true
+
+  - name: cleanup-notifications
+    description: "Supprime chaque jour les notifications déjà lues et vieilles de plus d'une semaine"
+    cron: "0 4 * * *"
+    endpoint: "{{BASE_URL}}/api/cron/cleanup-notifications"
+    method: POST
+    enabled: true

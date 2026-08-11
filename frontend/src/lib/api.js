@@ -14,6 +14,14 @@ api.interceptors.request.use((config) => {
 export const fileUrl = (fileId) =>
   `${API}/files/${fileId}?auth=${encodeURIComponent(localStorage.getItem("token") || "")}`;
 
+export const sendChatAttachment = ({ file, filename, candidateId, text }) => {
+  const fd = new FormData();
+  fd.append("file", file, filename || file.name || "fichier");
+  if (candidateId) fd.append("candidate_id", candidateId);
+  if (text) fd.append("text", text);
+  return api.post("/chat/attachments", fd, { headers: { "Content-Type": "multipart/form-data" } });
+};
+
 export function formatApiError(detail) {
   if (detail == null) return "Une erreur est survenue.";
   if (typeof detail === "string") return detail;

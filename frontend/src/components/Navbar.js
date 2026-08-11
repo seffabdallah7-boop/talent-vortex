@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Avatar } from "@/components/Avatar";
-import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell, Sparkles, CalendarDays, FileText, MessageSquare } from "lucide-react";
+import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell, Sparkles, CalendarDays, FileText, MessageSquare, X, Trash2 } from "lucide-react";
 
 function notifRoute(n, role) {
   if (role === "admin") {
@@ -52,6 +52,8 @@ export function NotificationBell() {
       setTimeout(() => window.dispatchEvent(new CustomEvent("open-support-chat")), 400);
     }
   };
+  const delOne = async (e, id) => { e.stopPropagation(); await api.delete(`/notifications/${id}`).catch(() => {}); load(); };
+  const clearAll = async () => { await api.delete("/notifications").catch(() => {}); load(); };
   return (
     <div className="relative">
       <button onClick={toggle} data-testid="notif-bell" aria-label="Notifications" className="relative h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
@@ -60,16 +62,23 @@ export function NotificationBell() {
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-border bg-card shadow-xl z-50 p-2" data-testid="notif-panel">
+          <div className="flex items-center justify-between px-1 pb-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">Notifications</span>
+            {data.items.length > 0 && <button onClick={clearAll} data-testid="notif-clear-all" className="text-xs text-muted-foreground hover:text-destructive transition-colors">Tout effacer</button>}
+          </div>
           {data.items.length === 0 ? (
             <p className="text-sm text-muted-foreground p-3 text-center">{t("nav.noNotifications")}</p>
           ) : data.items.map((n) => (
-            <button key={n.id} onClick={() => openNotif(n)} data-testid={`notif-item-${n.id}`} className="w-full text-left p-2.5 rounded-lg hover:bg-secondary transition-colors flex items-start gap-3">
-              <NotifIcon n={n} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{n.actor_name ? n.actor_name : n.title}</p>
-                <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>
-              </div>
-            </button>
+            <div key={n.id} className="group flex items-start gap-2 p-2 rounded-lg hover:bg-secondary transition-colors">
+              <button onClick={() => openNotif(n)} data-testid={`notif-item-${n.id}`} className="flex items-start gap-3 text-left flex-1 min-w-0">
+                <NotifIcon n={n} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{n.actor_name ? n.actor_name : n.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>
+                </div>
+              </button>
+              <button onClick={(e) => delOne(e, n.id)} data-testid={`notif-delete-${n.id}`} title="Supprimer" className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity mt-1 shrink-0"><X className="h-3.5 w-3.5" /></button>
+            </div>
           ))}
         </div>
       )}

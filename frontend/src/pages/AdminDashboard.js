@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { fileUrl, formatApiError, API } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -20,12 +20,13 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon, Menu, Film, PhoneCall,
-  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight, Link2, Check,
+  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight, Link2, Check, Paperclip, Mic, Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
 import { Avatar } from "@/components/Avatar";
 import CandidateProfileDialog from "@/components/CandidateProfileDialog";
+import ChatMessageBubble from "@/components/ChatMessageBubble";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -413,15 +414,20 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
   const [del, setDel] = useState(null);
   const [note, setNote] = useState("");
   const [rating, setRating] = useState(0);
+  const [search, setSearch] = useState("");
+  const [jobs, setJobs] = useState([]);
+  const [jobSel, setJobSel] = useState("all");
 
   useEffect(() => { setFilter(initialStatus || "all"); }, [initialStatus]);
+  useEffect(() => { api.get("/jobs/all").then(({ data }) => setJobs(data)).catch(() => {}); }, []);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
     params.set("status", filter);
-    if (jobFilter?.id) params.set("job_id", jobFilter.id);
+    const jid = jobFilter?.id || (jobSel !== "all" ? jobSel : null);
+    if (jid) params.set("job_id", jid);
     return api.get(`/applications?${params.toString()}`).then(({ data }) => setApps(data)).catch(() => {});
-  }, [filter, jobFilter]);
+  }, [filter, jobFilter, jobSel]);
   useEffect(() => { load(); }, [load]);
 
   const [schedule, setSchedule] = useState(null);
@@ -469,7 +475,17 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
     <div>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="font-display text-3xl font-semibold">Candidatures</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un candidat, poste..." className="w-56 rounded-full" data-testid="app-search-input" />
+          {!jobFilter && (
+            <Select value={jobSel} onValueChange={setJobSel}>
+              <SelectTrigger className="w-52 rounded-full" data-testid="app-job-filter"><SelectValue placeholder="Toutes les offres" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les offres</SelectItem>
+                {jobs.map((j) => <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Button asChild variant="outline" className="rounded-full" data-testid="export-applications-btn">
             <a href={`${API}/export/applications?auth=${encodeURIComponent(localStorage.getItem("token") || "")}`}><Download className="h-4 w-4 mr-2" /> Export CSV</a>
           </Button>
@@ -492,14 +508,14 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
         </div>
       )}
 
-      {apps.length === 0 ? (
+      {apps.filter((a) => { const q = search.trim().toLowerCase(); return !q || (a.candidate_name || "").toLowerCase().includes(q) || (a.candidate_email || "").toLowerCase().includes(q) || (a.job_title || "").toLowerCase().includes(q); }).length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucune candidature.</div>
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader><TableRow><TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
-              {apps.map((a) => (
+              {apps.filter((a) => { const q = search.trim().toLowerCase(); return !q || (a.candidate_name || "").toLowerCase().includes(q) || (a.candidate_email || "").toLowerCase().includes(q) || (a.job_title || "").toLowerCase().includes(q); }).map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -518,7 +534,12 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                   </TableCell>
                   <TableCell>{a.job_title}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
-                  <TableCell className="text-right"><Button variant="outline" size="sm" className="rounded-full">Examiner</Button></TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="outline" size="sm" className="rounded-full">Examiner</Button>
+                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDel(a); }} data-testid={`delete-app-row-${a.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -788,6 +809,11 @@ function Messages({ onOpenProfile, focus }) {
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [call, setCall] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const fileInputRef = useRef(null);
+  const recRef = useRef(null);
+  const chunksRef = useRef([]);
 
   useEffect(() => { if (focus?.candidate_id) setActive(focus); }, [focus]);
 
@@ -813,6 +839,43 @@ function Messages({ onOpenProfile, focus }) {
     setText("");
   };
 
+  const reload = () => active && api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => setMsgs(data)).catch(() => {});
+
+  const onPickFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !active) return;
+    setUploading(true);
+    try { const { data } = await sendChatAttachment({ file, candidateId: active.candidate_id, text: "" }); setMsgs((m) => [...m, data]); }
+    catch { toast.error("Échec de l'envoi du fichier"); }
+    finally { setUploading(false); }
+  };
+
+  const startRec = async () => {
+    if (!active) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setUploading(true);
+        try { const { data } = await sendChatAttachment({ file: blob, filename: "vocal.webm", candidateId: active.candidate_id, text: "" }); setMsgs((m) => [...m, data]); }
+        catch { toast.error("Échec de l'envoi du vocal"); }
+        finally { setUploading(false); }
+      };
+      recRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch { toast.error("Micro inaccessible."); }
+  };
+  const stopRec = () => { if (recRef.current?.state !== "inactive") recRef.current.stop(); setRecording(false); };
+
+  const editMsg = async (m, t) => { try { await api.put(`/chat/messages/${m.id}`, { text: t }); reload(); } catch { toast.error("Échec de la modification"); } };
+  const deleteMsg = async (m) => { try { await api.delete(`/chat/messages/${m.id}`); reload(); } catch { toast.error("Échec de la suppression"); } };
+
   const activeConv = active ? (convs.find((c) => c.candidate_id === active.candidate_id) || active) : null;
 
   return (
@@ -831,9 +894,12 @@ function Messages({ onOpenProfile, focus }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm truncate">{c.candidate_name || "Candidat"}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0" data-testid={`conv-time-${c.candidate_id}`}>{c.last_at ? chatTime(c.last_at) : ""}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground truncate">{c.last_text || "Pièce jointe"}</p>
                     {c.unread > 0 && <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0">{c.unread}</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{c.last_text}</p>
                 </div>
               </div>
             </button>
@@ -862,18 +928,17 @@ function Messages({ onOpenProfile, focus }) {
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {msgs.map((m) => (
-                  <div key={m.id} className={`flex ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
-                    <div className="max-w-[75%]">
-                      <div className={`rounded-2xl px-3.5 py-2 text-sm ${m.sender_role === "admin" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>{m.text}</div>
-                      <div className={`mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${m.sender_role === "admin" ? "justify-end" : "justify-start"}`}>
-                        <span>{chatTime(m.created_at)}</span>
-                        {m.sender_role === "admin" && <span>{m.read ? "✓✓ Vu" : "✓ Envoyé"}</span>}
-                      </div>
-                    </div>
-                  </div>
+                  <ChatMessageBubble key={m.id} m={m} mine={m.sender_role === "admin"} editable onEdit={editMsg} onDelete={deleteMsg} />
                 ))}
               </div>
-              <div className="p-3 border-t border-border flex gap-2">
+              <div className="p-3 border-t border-border flex items-center gap-2">
+                <input ref={fileInputRef} type="file" accept="image/*,application/pdf,.doc,.docx,.txt,.xls,.xlsx" onChange={onPickFile} className="hidden" data-testid="admin-chat-file-input" />
+                <button onClick={() => fileInputRef.current?.click()} disabled={uploading} data-testid="admin-attach-btn" title="Joindre un fichier" className="h-10 w-10 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </button>
+                <button onClick={recording ? stopRec : startRec} data-testid="admin-voice-btn" title="Message vocal" className={`h-10 w-10 shrink-0 rounded-full border flex items-center justify-center transition-colors ${recording ? "bg-red-500 text-white border-red-500 animate-pulse" : "border-border hover:bg-secondary"}`}>
+                  {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
                 <Input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Répondre..." className="rounded-full" data-testid="admin-chat-input" />
                 <Button size="icon" onClick={send} className="rounded-full shrink-0" data-testid="admin-chat-send"><Send className="h-4 w-4" /></Button>
               </div>

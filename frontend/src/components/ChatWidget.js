@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Headset, Loader2, Video, Phone } from "lucide-react";
-import api from "@/lib/api";
+import { MessageCircle, X, Send, Bot, Headset, Loader2, Video, Phone, Paperclip, Mic, Square } from "lucide-react";
+import api, { sendChatAttachment } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import VideoCall from "@/components/VideoCall";
+import ChatMessageBubble from "@/components/ChatMessageBubble";
+import { toast } from "sonner";
 
 const fmtTime = (iso) => { try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
 const relTime = (iso) => {
@@ -39,6 +41,11 @@ export default function ChatWidget() {
   const [adminPresence, setAdminPresence] = useState(null);
   const [chatMeta, setChatMeta] = useState({ has_admin: false, unread: 0 });
   const scrollRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const recRef = useRef(null);
+  const chunksRef = useRef([]);
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
   const sessionId = user?.user_id || anonId();
 
   const scrollDown = () => setTimeout(() => scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight), 50);
@@ -49,11 +56,12 @@ export default function ChatWidget() {
     }
   }, [open, tab, sessionId]);
 
+  const loadSupport = () => api.get("/chat/messages").then(({ data }) => setSupMsgs(data)).catch(() => {});
+
   useEffect(() => {
     if (!open || tab !== "support" || !user) return;
-    const load = () => api.get("/chat/messages").then(({ data }) => setSupMsgs(data)).catch(() => {});
-    load();
-    const int = setInterval(load, 4000);
+    loadSupport();
+    const int = setInterval(loadSupport, 4000);
     return () => clearInterval(int);
   }, [open, tab, user]);
 
@@ -116,6 +124,44 @@ export default function ChatWidget() {
     } catch (e) {}
     setSending(false);
   };
+
+  const onPickFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { data } = await sendChatAttachment({ file, text: "" });
+      setSupMsgs((m) => [...m, data]);
+    } catch { toast.error("Échec de l'envoi du fichier"); }
+    finally { setUploading(false); }
+  };
+
+  const startRec = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setUploading(true);
+        try {
+          const { data } = await sendChatAttachment({ file: blob, filename: "message-vocal.webm", text: "" });
+          setSupMsgs((m) => [...m, data]);
+        } catch { toast.error("Échec de l'envoi du vocal"); }
+        finally { setUploading(false); }
+      };
+      recRef.current = mr;
+      mr.start();
+      setRecording(true);
+    } catch { toast.error("Micro inaccessible."); }
+  };
+  const stopRec = () => { if (recRef.current?.state !== "inactive") recRef.current.stop(); setRecording(false); };
+
+  const editMsg = async (m, newText) => { try { await api.put(`/chat/messages/${m.id}`, { text: newText }); loadSupport(); } catch { toast.error("Échec de la modification"); } };
+  const deleteMsg = async (m) => { try { await api.delete(`/chat/messages/${m.id}`); loadSupport(); } catch { toast.error("Échec de la suppression"); } };
 
   const onSend = () => (tab === "ai" ? sendAi() : sendSupport());
   const isCandidate = user && user.role === "candidate";
@@ -197,7 +243,7 @@ export default function ChatWidget() {
                   )}
                   {!chatLocked && supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez à l'administrateur, il vous répondra ici.</p>}
                   {supMsgs.map((m) => (
-                    <Bubble key={m.id} mine={m.sender_role === "candidate"} text={m.text} time={m.created_at} read={m.read} />
+                    <ChatMessageBubble key={m.id} m={m} mine={m.sender_role === "candidate"} editable onEdit={editMsg} onDelete={deleteMsg} />
                   ))}
                 </>
               )}
@@ -210,7 +256,18 @@ export default function ChatWidget() {
               </div>
             )}
             {(tab === "ai" || isCandidate) && (
-              <div className="p-3 border-t border-border flex gap-2 bg-background">
+              <div className="p-3 border-t border-border flex items-center gap-2 bg-background">
+                {tab === "support" && isCandidate && !chatLocked && (
+                  <>
+                    <input ref={fileInputRef} type="file" accept="image/*,application/pdf,.doc,.docx,.txt,.xls,.xlsx" onChange={onPickFile} className="hidden" data-testid="chat-file-input" />
+                    <button onClick={() => fileInputRef.current?.click()} disabled={uploading} data-testid="chat-attach-btn" title="Joindre un fichier" className="h-9 w-9 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
+                      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                    </button>
+                    <button onClick={recording ? stopRec : startRec} data-testid="chat-voice-btn" title="Message vocal" className={`h-9 w-9 shrink-0 rounded-full border flex items-center justify-center transition-colors ${recording ? "bg-red-500 text-white border-red-500 animate-pulse" : "border-border hover:bg-secondary"}`}>
+                      {recording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </button>
+                  </>
+                )}
                 <Input
                   data-testid="chat-input"
                   value={text}
