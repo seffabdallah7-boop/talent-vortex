@@ -1,0 +1,35 @@
+{
+  "summary": "Phase H (FR/EN auto-translator) verified end-to-end via Playwright. All 6 scenarios from the review request PASS. (1) Admin dashboard EN: after login as seffabdallah7@gmail.com and setting localStorage.lang='en' + reload, the sidebar renders 'Dashboard','Job offers','Applications','Contracts','Interview agenda','Users','Messages','Meeting room','Recordings','Appearance','Log out' and the stat cards render 'Active offers','Candidates','Pending','Active contracts','Upcoming interviews','Accepted','Rejected' (100% of expected labels found; 0 residual FR labels among the requested set). (2) Reverse to FR (localStorage.lang='fr' + reload) fully restores every French label; zero EN leakage. (3) Candidate dashboard EN: after fresh registration and switch to EN, sidebar shows 'Home','My applications','My interviews','Contracts obtained','My profile' and the 'New application' button; the offers page heading shows 'AVAILABLE OFFERS' (uppercase via CSS of the mapped 'Available offers'), search placeholder is 'Search an offer...', and every card CTA reads 'Apply'. (4) Public/regression: navbar shows 'Jobs' and 'Sign in' in EN via i18next, no double-translation glitches (also toggled 4x FR<->EN rapidly on Landing, zero console errors, layout stable). (5) Dynamic data integrity: job titles 'Développeur React Senior', 'Data Analyst', 'Designer UI/UX', 'Téléconseiller(ère) Anglophone', 'Enseignant(e)', company names (ACME, InsightLab, PixelForge) and candidate names are preserved unchanged in EN. (6) Stability: no console errors, no flicker; MutationObserver correctly re-translates new nodes when navigating between admin sections (Applications, Contracts, Messages, Meeting room, Recordings all show EN sidebar+headings after nav).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Extend uiDict.js with residual French strings surfaced during EN sweep (all optional, exact-match candidates):",
+    "  Candidate profile banner: 'Complétez votre profil' -> 'Complete your profile'; 'Renseignez vos infos et domaines d''expertise : l''IA vous proposera en priorité les offres de votre domaine.' -> 'Fill in your info and areas of expertise: the AI will prioritise offers in your domain.'; 'Compléter' -> 'Complete'.",
+    "  Candidate profile form: 'Informations personnelles','Nom complet *','Téléphone *','Nationalité *','Ville','Pays','Années d''expérience','Poste actuel','Domaines d''expertise * (séparés par des virgules)','Outils maîtrisés (séparés par des virgules)','Titre / accroche','Enregistrer mon profil','Ces informations aident notre IA à vous proposer les offres les plus pertinentes.'",
+    "  Job card badges (appear on Landing and Candidate Home): 'Temps plein' -> 'Full-time', 'Télétravail' -> 'Remote', 'CDI' -> 'Permanent contract' (or keep), 'Freelance' -> 'Freelance', 'Ingenierie' (typo in seed, should be 'Ingénierie') -> 'Engineering'.",
+    "  Admin Contracts toolbar: filter 'Tous' -> 'All' (already mapped for Applications as 'Toutes' but 'Tous' masculine is missing), 'Nouveau' -> 'New'.",
+    "  Admin Applications action button on rows: 'Examiner' -> 'Review'.",
+    "  Admin Meeting room subtitle: 'Démarrez une salle vidéo instantanée, partagez le lien d''invitation, et enregistrez la session pour générer automatiquement un résumé IA (visible dans « Enregistrements »).' -> EN.",
+    "  Admin Recordings subtitle: 'Vidéos d''entretiens enregistrées, avec transcription et résumé IA automatiques.' -> EN.",
+    "Consider exposing the FR/EN switcher inside the admin/candidate dashboard layouts (currently only present in the public Navbar) so users don''t need to navigate back to the landing page or use localStorage to change language while inside the app."
+  ],
+  "critical_code_review_comments": [
+    "useAutoTranslate: MutationObserver only re-translates when lang==='en'; if a user is in EN and switches to FR without a reload the runFull() handler on languageChanged does the reverse walk, which works — but subsequent added nodes in FR mode won''t be re-touched (that is correct, since native strings are French). Good.",
+    "The FR->EN dictionary is only exact whole-text-node match. Any FR label wrapped by icons/spans that split the text across multiple text nodes (e.g. '<span>Nouveau</span>' inside a button with an icon) will still match; but a label rendered as '{count} publications' or '{count} offres' will not — this is expected but should be documented so E1 doesn''t chase phantom misses.",
+    "There is no data-testid on the FR/EN switcher''s parent when placed inside a non-public layout — currently only rendered by the public Navbar (LanguageSwitcher.jsx), so admin/candidate cannot toggle from within their dashboards without a reload trick.",
+    "uiDict.js has both 'Acceptée'/'Refusée' (feminine singular, candidate) and 'Acceptées'/'Refusées' (feminine plural, admin) — good; but a stray 'En attente' is reused twice with same mapping which is fine, just noting duplicate stat semantics between candidate and admin.",
+    "AdminDashboard.js remains >1200 lines — carry-over from iteration 13, still recommended to split."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only per request)", "frontend": "100% (6/6 scenarios)"},
+  "test_credentials": "Admin: seffabdallah7@gmail.com / Admin@2026! (captcha only). Candidate created during test: cand_i14_1786419449@test.com / Test@2026!",
+  "seed_data_creation": "One new candidate registered (cand_i14_1786419449@test.com) with no applications. No other seed data added.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase H auto-translator is functional and reversible. To switch language in internal dashboards use: `await page.evaluate(\"localStorage.setItem('lang','en')\"); await page.reload()` — there is NO LanguageSwitcher inside /admin or /dashboard layouts (only in public Navbar). Login form testids are auth-email / auth-password / captcha-input / auth-submit-btn (NOT login-email). Register uses register-name + auth-email + auth-password. Candidate sidebar testids not scanned in this run; the auto-translator mutates innerText not React children, so use `page.evaluate(() => document.body.innerText)` to assert labels. CSS text-transform:uppercase (used on 'CANDIDATE SPACE') means substring checks should use uppercase form when needed. Job card badges (Temps plein/Télétravail/etc.) are not in uiDict — that is a known dictionary gap, not a bug."
+}

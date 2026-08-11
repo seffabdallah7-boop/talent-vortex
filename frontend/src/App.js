@@ -11,8 +11,10 @@ import AuthCallback from "@/pages/AuthCallback";
 import JobDetail from "@/pages/JobDetail";
 import CandidateDashboard from "@/pages/CandidateDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
+import useAutoTranslate from "@/hooks/useAutoTranslate";
 
 function AppInner() {
+  useAutoTranslate();
   const location = useLocation();
   if (location.hash?.includes("session_id=")) return <AuthCallback />;
   return (

@@ -28,6 +28,7 @@ import { Avatar } from "@/components/Avatar";
 import CandidateProfileDialog from "@/components/CandidateProfileDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/Navbar";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const NAV = [
   { key: "overview", label: "Tableau de bord", Icon: LayoutGrid },
@@ -140,6 +141,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between px-1">
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             <div className="flex items-center gap-2 shrink-0">
+              <LanguageSwitcher />
               <NotificationBell />
               <button
                 onClick={toggle}
@@ -186,7 +188,7 @@ export default function AdminDashboard() {
             <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
             Talent Vortex
           </span>
-          <div className="ml-auto"><NotificationBell /></div>
+          <div className="ml-auto flex items-center gap-2"><LanguageSwitcher /><NotificationBell /></div>
         </div>
         <div className="p-6 md:p-8 max-w-6xl">
           {section === "overview" && <Overview onNavigate={goto} />}

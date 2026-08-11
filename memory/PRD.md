@@ -79,4 +79,7 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - 🟠 **Phase F — Auth** ✅ FAIT & vérifié : plus d'OTP email à la connexion (POST /auth/login renvoie directement token+user, captcha conservé) ; token JWT 14 jours + POST /auth/refresh au chargement (session glissante 2 semaines).
 - 🟠 **Phase G — IA de pré-qualification par chat** ✅ FAIT & vérifié : à la candidature, l'IA (Claude) génère 4 questions selon la fiche de poste ; le candidat y répond (quiz auto-ouvert + bouton dans « Mes postulations ») ; l'IA évalue (verdict + score/100 + analyse) ; l'admin est notifié et consulte via le bouton « Voir l'examen IA » (confidentiel — champs IA non exposés au candidat).
 - ✅ **Nettoyage auto des vidéos** : cron hebdo `POST /api/cron/cleanup-recordings` supprime les enregistrements > `RECORDING_RETENTION_MONTHS` (défaut 6 mois).
-- 🔵 **Phase H — Traduction complète FR/EN (tout à la fin)**.
+- 🔵 **Phase H — Traduction complète FR/EN** ✅ FAIT & testé (6/6) : traducteur automatique réversible (`useAutoTranslate` + dictionnaire `uiDict.js`) monté à la racine → bascule tout le site (pages publiques via i18next + tableaux de bord internes) sans altérer les données dynamiques (noms, intitulés d'offres). Sélecteur FR/EN ajouté dans le dashboard admin (le candidat l'a déjà via la Navbar).
+
+## ✅ Roadmap A→H terminée
+Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.
