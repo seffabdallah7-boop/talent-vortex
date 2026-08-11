@@ -964,6 +964,7 @@ function Contracts({ initialFilter }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_CONTRACT);
   const [del, setDel] = useState(null);
+  const [search, setSearch] = useState("");
   const load = useCallback(() => api.get(`/contracts?status=${filter}`).then(({ data }) => setList(data)).catch(() => {}), [filter]);
   useEffect(() => { load(); }, [load]);
   const openNew = () => { setEditing(null); setForm(EMPTY_CONTRACT); setOpen(true); };
@@ -977,6 +978,7 @@ function Contracts({ initialFilter }) {
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const remove = async () => { await api.delete(`/contracts/${del.id}`); toast.success("Contrat supprimé"); setDel(null); load(); };
+  const shown = list.filter((c) => { const q = search.trim().toLowerCase(); return !q || [c.title, c.client, c.candidate_name, c.job_title].some((v) => (v || "").toLowerCase().includes(q)); });
 
   return (
     <div>
@@ -999,14 +1001,14 @@ function Contracts({ initialFilter }) {
         </div>
       </div>
 
-      {list.length === 0 ? (
+      {shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun contrat.</div>
       ) : (
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader><TableRow><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {list.map((c) => (
+              {shown.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => openEdit(c)} data-testid={`contract-row-${c.id}`}>
                   <TableCell className="font-medium">{c.title}</TableCell>
                   <TableCell className="text-muted-foreground">{c.client}</TableCell>
@@ -1135,6 +1137,7 @@ function Interviews() {
   const [candidates, setCandidates] = useState([]);
   const [view, setView] = useState("week");
   const [weekOffset, setWeekOffset] = useState(0);
+  const [search, setSearch] = useState("");
   const load = useCallback(() => api.get(`/interviews`).then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get(`/candidates`).then(({ data }) => setCandidates(data)).catch(() => {}); }, []);
@@ -1150,7 +1153,8 @@ function Interviews() {
   };
   const remove = async () => { await api.delete(`/interviews/${del.id}`); toast.success("Entretien supprimé"); setDel(null); load(); };
 
-  const groups = list.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {});
+  const filtered = list.filter((i) => { const q = search.trim().toLowerCase(); return !q || [i.title, i.candidate_name, i.location].some((v) => (v || "").toLowerCase().includes(q)); });
+  const groups = filtered.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {});
   const dates = Object.keys(groups).sort();
   const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
 
@@ -1163,6 +1167,7 @@ function Interviews() {
           <p className="text-muted-foreground text-sm">{list.length} entretien{list.length > 1 ? "s" : ""} planifié{list.length > 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher (intitulé, candidat, lieu...)" className="w-56 rounded-full" data-testid="interview-search-input" />
           <div className="inline-flex rounded-full border border-border p-0.5">
             <button onClick={() => setView("week")} data-testid="agenda-view-week" className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === "week" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Semaine</button>
             <button onClick={() => setView("list")} data-testid="agenda-view-list" className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Liste</button>
@@ -1172,7 +1177,7 @@ function Interviews() {
       </div>
 
       {view === "week" ? (
-        <WeekAgenda list={list} offset={weekOffset} setOffset={setWeekOffset} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} onEdit={openEdit} />
+        <WeekAgenda list={filtered} offset={weekOffset} setOffset={setWeekOffset} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} onEdit={openEdit} />
       ) : dates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">
           <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
