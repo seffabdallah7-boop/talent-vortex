@@ -164,9 +164,7 @@ export default function Auth() {
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div onClick={() => navigate("/")} className="flex items-center gap-2.5 mb-8 cursor-pointer" data-testid="auth-logo">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
             <span className="font-display text-xl font-semibold">Talent Vortex</span>
           </div>
 

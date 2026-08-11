@@ -158,7 +158,8 @@ export default function Landing() {
             {t("landing.noJobs")}
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden pr-1.5 -mr-1.5 rounded-xl scroll-smooth" data-testid="offers-scroll">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 pb-1">
             {filtered.map((job, i) => {
               const featured = i === 0;
               return (
@@ -196,6 +197,7 @@ export default function Landing() {
                 </motion.div>
               );
             })}
+            </div>
           </div>
         )}
       </section>
@@ -204,9 +206,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-5 py-14 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2.5 mb-2">
-              <div className="h-9 w-9 bg-primary flex items-center justify-center">
-                <Briefcase className="h-5 w-5 text-primary-foreground" />
-              </div>
+              <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
               <span className="font-display text-xl font-semibold">Talent Vortex</span>
             </div>
             <p className="text-sm text-muted-foreground">{t("landing.footerTagline")}</p>

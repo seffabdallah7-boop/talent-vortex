@@ -157,9 +157,7 @@ export default function AdminDashboard() {
       <aside className="w-64 shrink-0 border-r border-border bg-card hidden md:flex flex-col">
         <div className="h-16 flex items-center px-5 border-b border-border">
           <button onClick={() => navigate("/")} className="flex items-center gap-2.5" data-testid="admin-logo">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
             <span className="font-display text-lg font-semibold">Talent Vortex</span>
           </button>
         </div>
@@ -197,7 +195,7 @@ export default function AdminDashboard() {
             <SheetContent side="left" className="p-0 w-72 flex flex-col">
               <SheetHeader className="p-4 border-b border-border text-left">
                 <SheetTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
+                  <img src="/logo.png" alt="Talent Vortex" className="h-8 w-8 rounded-lg object-contain bg-white p-0.5" />
                   Talent Vortex
                 </SheetTitle>
               </SheetHeader>
@@ -212,7 +210,7 @@ export default function AdminDashboard() {
             </SheetContent>
           </Sheet>
           <button onClick={() => navigate("/")} className="font-display text-lg font-semibold flex items-center gap-2" data-testid="mobile-logo">
-            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary-foreground" /></div>
+            <img src="/logo.png" alt="Talent Vortex" className="h-7 w-7 rounded-md object-contain bg-white p-0.5" />
             Talent Vortex
           </button>
           <div className="ml-auto flex items-center gap-2"><LanguageSwitcher /><NotificationBell /></div>
@@ -919,6 +917,11 @@ function Messages({ onOpenProfile, focus }) {
     try { await api.put(`/chat/conversations/${candId}/active`, { active: true }); toast.success("Discussion activée"); loadConvs(); setActive({ candidate_id: candId, candidate_name: c.name, picture: c.picture }); }
     catch { toast.error("Impossible de démarrer la discussion"); }
   };
+  const deleteConv = async (candId) => {
+    if (!window.confirm("Supprimer définitivement cette conversation et tous ses messages ?")) return;
+    try { await api.delete(`/chat/conversations/${candId}`); toast.success("Conversation supprimée"); if (active?.candidate_id === candId) setActive(null); loadConvs(); }
+    catch { toast.error("Suppression impossible"); }
+  };
 
   const activeConv = active ? (convs.find((c) => c.candidate_id === active.candidate_id) || active) : null;
 
@@ -926,7 +929,7 @@ function Messages({ onOpenProfile, focus }) {
     <div>
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
-      <div className="grid md:grid-cols-3 gap-4 h-[560px]">
+      <div className="grid md:grid-cols-3 gap-4 h-[calc(100vh-11rem)] min-h-[420px]">
         <div className="rounded-2xl border border-border bg-card overflow-y-auto">
           <div className="p-2 border-b border-border space-y-2">
             <Select value="" onValueChange={startConv}>
@@ -942,7 +945,8 @@ function Messages({ onOpenProfile, focus }) {
             </div>
           </div>
           {(() => { const shownConvs = convs.filter((c) => convFilter === "all" || (convFilter === "active" ? c.active : !c.active)); return shownConvs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : shownConvs.map((c) => (
-            <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className={`w-full text-left p-4 border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
+            <div key={c.candidate_id} className={`group relative border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
+              <button onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className="w-full text-left p-4">
               <div className="flex items-center gap-3">
                 <div className="relative shrink-0">
                   <Avatar name={c.candidate_name} src={c.picture} size={40} />
@@ -962,7 +966,11 @@ function Messages({ onOpenProfile, focus }) {
                   </div>
                 </div>
               </div>
-            </button>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); deleteConv(c.candidate_id); }} data-testid={`conv-delete-${c.candidate_id}`} title="Supprimer la conversation" className="absolute bottom-2 right-2 h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )); })()}
         </div>
         <div className="md:col-span-2 rounded-2xl border border-border bg-card flex flex-col">

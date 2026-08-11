@@ -123,5 +123,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Séparation IA / recruteur** : suppression des onglets du widget ; l'assistant IA reste le widget flottant, la messagerie recruteur s'ouvre via la carte du dashboard (event `open-support-chat`). Verrou basé sur `active` (au lieu de has_admin).
 - **Premier message non lu** : `GET /chat/messages` renvoie `{messages, first_unread}` ; séparateur « Nouveaux messages » affiché côté candidat et admin avant le 1er non-lu.
 
+## Implemented (2026-06, itération 23 — Refactoring backend + UX)
+- **Refactoring backend (server.py 2160→75 lignes)** : découpage modulaire en `core.py` (config, db, storage, sécurité, dépendances auth, templates email, notifications, transcribe_audio) + `routers/` (`auth`, `jobs`, `applications`, `users`, `chat`, `calls`, `interviews`, `contracts`, `misc`). `server.py` ne fait plus que câbler les routers + startup/shutdown. Comportement préservé (aucun chemin d'API modifié). Régression testée 24/24 backend.
+- **Landing — offres scrollables** : la liste des offres est désormais dans un conteneur borné (`data-testid=offers-scroll`, `max-h-[72vh] overflow-y-auto`) ; affichage limité, le reste se déroule dans le conteneur.
+- **Messagerie admin — scroll interne** : panneau Messages en hauteur relative au viewport (`h-[calc(100vh-11rem)]`) ; seul l'intérieur (liste de messages + liste de conversations) défile, header/input fixes.
+- **Suppression de conversation** : nouveau `DELETE /api/chat/conversations/{candidate_id}` (admin) → supprime messages + doc conversation + marque les pièces jointes supprimées. Bouton corbeille (`conv-delete-<id>`) au survol de chaque conversation dans la liste admin. Testé 3/3 frontend.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

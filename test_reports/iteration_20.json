@@ -1,0 +1,22 @@
+{
+  "summary": "Post-refactor full regression (backend + frontend). Backend: 24/24 pytest cases pass across all modular routers (auth, jobs, applications, users, chat, calls, interviews, contracts, misc). NEW DELETE /api/chat/conversations/{candidate_id} verified: 401/403 for unauthenticated/candidate, 200 {ok:true} for admin, messages+conversation actually removed from DB. Frontend: (1) Landing offers-scroll is a bounded scroll container (overflowY=auto, maxHeight=777.6px, scrollHeight=864 > clientHeight=778). (2) Admin > Messages grid uses h-[calc(100vh-11rem)] and fits viewport; inner list scrolls independently. (3) conv-delete-<candidateId> buttons render (4 present on hover); clicking with window.confirm auto-accepted removes conversation from list (verified: conv-item[user_edfafbeb0789] disappeared). '+ Nouvelle discussion' entry point is present as a button/dropdown. No console errors, no page errors during the flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_refactor_regression.py",
+    "/app/test_reports/pytest/refactor_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py cleanly wires routers — no residual endpoint definitions; refactor is behavior-preserving.",
+    "routers/chat.py delete_conversation is idempotent (delete_many + delete_one) and returns {ok:true}. Consider also cleaning up related db.files docs for the conversation to avoid orphan storage entries when a conversation is deleted (currently files/chat/<conv>/... remain in object storage).",
+    "AdminDashboard.js is still 1500+ lines — extracting Messages/Interviews/Candidates into separate files would reduce risk (already flagged in iter_19)."
+  ],
+  "updated_files": ["/app/backend/tests/test_refactor_regression.py (new)"],
+  "success_rate": {"backend": "100% (24/24)", "frontend": "100% (3/3 features)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! OK; candidate registered inline via /api/auth/register (TEST_cand_*).",
+  "seed_data_creation": "Created and then deleted a test conversation via UI (user_edfafbeb0789 -> 'Cand I14'). Backend test creates+deletes its own TEST candidate conversation.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Refactor is green. Reusable regression file: /app/backend/tests/test_refactor_regression.py (run with `REACT_APP_BACKEND_URL=<url> pytest -o addopts=` because backend/pytest.ini enables xdist). Only lingering nit: deleting a conversation does not purge stored attachments in object storage."
+}
