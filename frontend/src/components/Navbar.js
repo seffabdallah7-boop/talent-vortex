@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Avatar } from "@/components/Avatar";
-import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell, Sparkles, CalendarDays, FileText, MessageSquare, X, Trash2 } from "lucide-react";
+import { Briefcase, LogOut, LayoutDashboard, Sun, Moon, Bell, Sparkles, CalendarDays, FileText, MessageSquare, X, Trash2, Menu } from "lucide-react";
 
 function notifRoute(n, role) {
   if (role === "admin") {
@@ -91,6 +91,7 @@ export default function Navbar() {
   const { dark, toggle } = useDarkMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 glass border-b border-border">
@@ -99,40 +100,75 @@ export default function Navbar() {
           <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
           <span className="font-display text-xl font-semibold">Talent Vortex</span>
         </Link>
-        <nav className="flex items-center gap-3">
+        <nav className="flex items-center gap-2 sm:gap-3">
           <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
             {t("nav.offers")}
           </Link>
-          <LanguageSwitcher />
-          <button
-            onClick={toggle}
-            data-testid="dark-toggle-btn"
-            aria-label="Basculer le thème"
-            className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
-          >
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
           {user && <NotificationBell />}
-          {user ? (
-            <>
-              <Button
-                variant="ghost"
-                onClick={() => navigate(user.role === "admin" ? "/admin" : "/dashboard")}
-                data-testid="nav-dashboard-btn"
-                className="rounded-full"
-              >
-                <LayoutDashboard className="h-4 w-4 mr-2" />
-                {user.role === "admin" ? t("nav.admin") : t("nav.mySpace")}
+
+          <div className="hidden sm:flex items-center gap-3">
+            <LanguageSwitcher />
+            <button
+              onClick={toggle}
+              data-testid="dark-toggle-btn"
+              aria-label="Basculer le thème"
+              className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            {user ? (
+              <>
+                <Button variant="ghost" onClick={() => navigate(user.role === "admin" ? "/admin" : "/dashboard")} data-testid="nav-dashboard-btn" className="rounded-full">
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  {user.role === "admin" ? t("nav.admin") : t("nav.mySpace")}
+                </Button>
+                <Button variant="outline" onClick={() => { logout(); navigate("/"); }} data-testid="nav-logout-btn" className="rounded-full">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => navigate("/login")} data-testid="nav-login-btn" className="rounded-full">
+                {t("nav.login")}
               </Button>
-              <Button variant="outline" onClick={() => { logout(); navigate("/"); }} data-testid="nav-logout-btn" className="rounded-full">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <Button onClick={() => navigate("/login")} data-testid="nav-login-btn" className="rounded-full">
-              {t("nav.login")}
-            </Button>
-          )}
+            )}
+          </div>
+
+          <div className="sm:hidden relative">
+            <button onClick={() => setMenuOpen((o) => !o)} data-testid="nav-hamburger-btn" aria-label="Menu" className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-card shadow-xl z-50 p-3 flex flex-col gap-1.5" data-testid="nav-mobile-menu">
+                {user ? (
+                  <Button variant="default" onClick={() => { setMenuOpen(false); navigate(user.role === "admin" ? "/admin" : "/dashboard"); }} data-testid="mobile-dashboard-btn" className="rounded-full justify-start w-full">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />{user.role === "admin" ? t("nav.admin") : t("nav.mySpace")}
+                  </Button>
+                ) : (
+                  <Button onClick={() => { setMenuOpen(false); navigate("/login"); }} data-testid="mobile-login-btn" className="rounded-full w-full">
+                    {t("nav.login")}
+                  </Button>
+                )}
+                <div className="h-px bg-border my-1" />
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <span className="text-sm text-muted-foreground">Langue</span>
+                  <LanguageSwitcher />
+                </div>
+                <button onClick={toggle} data-testid="mobile-dark-toggle-btn" className="flex items-center justify-between px-2 py-2 rounded-lg hover:bg-secondary transition-colors text-sm">
+                  <span className="text-muted-foreground">{dark ? "Mode clair" : "Mode sombre"}</span>
+                  {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+                <Link to="/" onClick={() => setMenuOpen(false)} className="text-sm font-medium px-2 py-2 rounded-lg hover:bg-secondary transition-colors">{t("nav.offers")}</Link>
+                {user && (
+                  <>
+                    <div className="h-px bg-border my-1" />
+                    <Button variant="outline" onClick={() => { setMenuOpen(false); logout(); navigate("/"); }} data-testid="mobile-logout-btn" className="rounded-full justify-start w-full">
+                      <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </nav>
       </div>
     </header>

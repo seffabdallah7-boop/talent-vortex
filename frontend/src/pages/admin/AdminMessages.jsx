@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import VideoCall from "@/components/VideoCall";
 import { Avatar } from "@/components/Avatar";
 import ChatMessageBubble from "@/components/ChatMessageBubble";
-import { Video, Phone, Loader2, Paperclip, Mic, Square, Send, Trash2, Search, Archive, X, ArrowLeft } from "lucide-react";
+import { Video, Phone, Loader2, Paperclip, Mic, Square, Send, Trash2, Search, Archive, X, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 const chatTime = (iso) => { try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
@@ -129,6 +129,10 @@ export default function Messages({ onOpenProfile, focus }) {
     try { await api.delete(`/chat/conversations/${candId}`); toast.success("Conversation supprimée"); if (active?.candidate_id === candId) setActive(null); loadConvs(); }
     catch { toast.error("Suppression impossible"); }
   };
+  const toggleConvActive = async (candidateId, currentActive) => {
+    try { await api.put(`/chat/conversations/${candidateId}/active`, { active: !currentActive }); toast.success(!currentActive ? "Conversation activée — le candidat peut y accéder." : "Conversation désactivée."); loadConvs(); }
+    catch { toast.error("Échec de mise à jour"); }
+  };
 
   // Sélection multiple
   const toggleSelect = (candId) => setSelected((prev) => { const n = new Set(prev); n.has(candId) ? n.delete(candId) : n.add(candId); return n; });
@@ -163,7 +167,7 @@ export default function Messages({ onOpenProfile, focus }) {
     <div>
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} onClose={() => setCall(null)} />}
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
-      <div className="grid md:grid-cols-3 gap-4 h-[calc(100vh-11rem)] min-h-[420px]">
+      <div className="grid md:grid-cols-3 gap-4 h-[calc(100vh-8rem)] min-h-[70vh]">
         <div className={`rounded-2xl border border-border bg-card flex-col overflow-hidden ${active ? "hidden md:flex" : "flex"}`}>
           <div className="p-2 border-b border-border space-y-2 shrink-0">
             <Select value="" onValueChange={startConv}>
@@ -220,9 +224,14 @@ export default function Messages({ onOpenProfile, focus }) {
                   </div>
                 </button>
                 {!selectMode && (
-                  <button onClick={(e) => { e.stopPropagation(); deleteConv(c.candidate_id); }} data-testid={`conv-delete-${c.candidate_id}`} title="Supprimer la conversation" className="absolute bottom-2 right-2 h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="absolute bottom-2 right-2 flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); toggleConvActive(c.candidate_id, c.active); }} data-testid={`conv-toggle-active-${c.candidate_id}`} title={c.active ? "Désactiver la conversation" : "Activer la conversation"} className={`h-7 w-7 rounded-full bg-card border flex items-center justify-center transition-colors ${c.active ? "border-green-500/50 text-green-600 hover:bg-green-500/10" : "border-border text-muted-foreground hover:text-primary hover:border-primary"}`}>
+                      {c.active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteConv(c.candidate_id); }} data-testid={`conv-delete-${c.candidate_id}`} title="Supprimer la conversation" className="h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive transition-colors">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
@@ -234,6 +243,7 @@ export default function Messages({ onOpenProfile, focus }) {
           ) : (
             <>
               <div className="md:hidden flex items-center gap-2.5 overflow-x-auto px-3 py-2 border-b border-border shrink-0" data-testid="mobile-conv-strip">
+                <button onClick={() => setActive(null)} data-testid="mobile-back-btn" title="Retour" className="shrink-0 h-10 w-10 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"><ArrowLeft className="h-4 w-4" /></button>
                 {shownConvs.map((c) => (
                   <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`strip-conv-${c.candidate_id}`} className="shrink-0 relative" title={c.candidate_name}>
                     <span className={`block rounded-full ${active?.candidate_id === c.candidate_id ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""}`}>
@@ -245,7 +255,6 @@ export default function Messages({ onOpenProfile, focus }) {
               </div>
               <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
-                <button onClick={() => setActive(null)} data-testid="mobile-back-btn" className="md:hidden shrink-0 h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors"><ArrowLeft className="h-4 w-4" /></button>
                 <button className="flex items-center gap-3 hover:opacity-80 text-left min-w-0" onClick={() => onOpenProfile(active.candidate_id)} data-testid="chat-open-profile">
                   <Avatar name={active.candidate_name} src={activeConv?.picture} size={40} />
                   <div>
@@ -258,7 +267,6 @@ export default function Messages({ onOpenProfile, focus }) {
                 </button>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant={activeConv?.active ? "default" : "outline"} className="rounded-full" onClick={toggleActive} data-testid="toggle-conv-active">{activeConv?.active ? "Désactiver" : "Activer"}</Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: false })} data-testid="admin-video-call-btn"><Video className="h-4 w-4" /></Button>
                   <Button size="sm" variant="outline" className="rounded-full" onClick={() => setCall({ room: `recrutai-chat-${active.candidate_id}`, audioOnly: true })} data-testid="admin-audio-call-btn"><Phone className="h-4 w-4" /></Button>
                 </div>

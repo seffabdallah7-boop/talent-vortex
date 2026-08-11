@@ -61,6 +61,14 @@ async def update_interview(interview_id: str, body: InterviewInput, admin: dict 
     return await db.interviews.find_one({"id": interview_id}, {"_id": 0})
 
 
+@router.delete("/interviews/me/{interview_id}")
+async def delete_my_interview(interview_id: str, user: dict = Depends(get_current_user)):
+    res = await db.interviews.delete_one({"id": interview_id, "candidate_id": user["user_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entretien introuvable")
+    return {"ok": True}
+
+
 @router.delete("/interviews/{interview_id}")
 async def delete_interview(interview_id: str, admin: dict = Depends(require_admin)):
     await db.interviews.delete_one({"id": interview_id})

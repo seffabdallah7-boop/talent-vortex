@@ -127,6 +127,8 @@ def public_user(u: dict) -> dict:
         "headline": u.get("headline", ""),
         "bio": u.get("bio", ""),
         "ai_domains": u.get("ai_domains", []),
+        "cv_file_id": u.get("cv_file_id"),
+        "cv_filename": u.get("cv_filename"),
         "profile_completed": u.get("profile_completed", False),
     }
 

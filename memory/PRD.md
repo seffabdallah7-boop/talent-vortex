@@ -139,5 +139,14 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Admin Messages responsive** (`AdminMessages.jsx`) : filtre par défaut = **Actives**. Sur téléphone, clic sur une discussion → la liste disparaît et une bande horizontale de profils (avatars + points de présence, `mobile-conv-strip`) apparaît en haut avec un bouton retour (`mobile-back-btn`). Desktop inchangé (2 colonnes).
 - **ChatWidget candidat responsive** (`ChatWidget.js`) : sur **téléphone** le chat s'ouvre en plein écran (90vh hauteur, 100% largeur, ancré en bas) avec bouton **retour** (`chat-back-btn`) ; sur **ordinateur/tablette** (`sm:`) boîte flottante en bas à droite avec bouton **fermer** (`chat-close-btn`). Le bouton flottant est masqué sur mobile quand le chat est ouvert. Valeurs desktop identiques à avant (aucune régression).
 
+## Implemented (2026-06, itération 26 — CV candidat, entretiens, hamburger, œil)
+- **Menu hamburger (Navbar)** : sur mobile, un bouton hamburger regroupe désormais Connexion/Espace, Langue, Thème et Offres. Ordre : bouton **Admin/MySpace (ou Connexion) en haut**, puis Langue, thème, offres, et Déconnexion en bas. Desktop inchangé.
+- **Activation via œil (Messages admin)** : le bouton Activer/Désactiver a été retiré de l'en-tête du chat et placé dans la **liste des conversations** sous forme d'icône **œil** (Eye/EyeOff) par ligne. Bug `toggleConvActive` corrigé.
+- **CV candidat** : nouvel encart « CV / Curriculum Vitae » dans le profil candidat (ajout/modification). Backend `POST /api/profile/cv` (object storage) ; `public_user` expose `cv_file_id`/`cv_filename`.
+- **Entretiens candidat** : bouton « Rejoindre » supprimé ; clic sur un entretien → panneau de détails (date, heure, lieu, notes, statut) + bouton **Supprimer** (`DELETE /api/interviews/me/{id}`).
+- **Dashboard candidat** : bouton « Nouvelle candidature » retiré de la barre latérale.
+- **Chat responsive** : ChatWidget plein écran + retour sur mobile / flottant + fermer sur desktop ; vue Messages admin ~90 % de l'écran, bouton retour placé en tête de la bande horizontale de profils.
+- Vérifié frontend **100 % (5/5)** — testing agent iter 23. Aucun fichier corrompu.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

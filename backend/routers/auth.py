@@ -6,11 +6,11 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 import requests
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File
 from pydantic import BaseModel, EmailStr
 
 from core import (
-    db, logger, EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    db, logger, APP_NAME, EMERGENT_LLM_KEY, LlmChat, UserMessage, put_object,
     hash_password, verify_password, create_jwt, public_user,
     get_current_user, send_email, validate_password, ensure_not_locked,
     register_failed, clear_attempts, verify_captcha, reset_email_html,
@@ -281,3 +281,23 @@ async def update_profile(body: ProfileInput, background: BackgroundTasks, user: 
     background.add_task(refresh_user_domains, user["user_id"])
     fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
     return public_user(fresh)
+
+
+@router.post("/profile/cv")
+async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    data = await cv.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 15 Mo)")
+    ext = cv.filename.split(".")[-1] if cv.filename and "." in cv.filename else "pdf"
+    path = f"{APP_NAME}/cv/{user['user_id']}/{uuid.uuid4()}.{ext}"
+    put_object(path, data, cv.content_type or "application/pdf")
+    file_id = str(uuid.uuid4())
+    await db.files.insert_one({
+        "id": file_id, "storage_path": path, "original_filename": cv.filename or "cv.pdf",
+        "content_type": cv.content_type or "application/pdf", "owner_id": user["user_id"],
+        "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}})
+    return {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}

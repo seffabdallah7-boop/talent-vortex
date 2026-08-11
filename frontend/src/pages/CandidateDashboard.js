@@ -148,9 +148,6 @@ export default function CandidateDashboard() {
           </button>
         ))}
       </nav>
-      <Button className="rounded-full w-full mt-6" onClick={() => selectSection("home")} data-testid="browse-jobs-btn">
-        <Plus className="h-4 w-4 mr-2" /> Nouvelle candidature
-      </Button>
     </>
   );
 
@@ -215,7 +212,7 @@ export default function CandidateDashboard() {
 
           {section === "home" && <JobsHome jobs={jobs} apps={apps} />}
           {section === "applications" && <Applications apps={apps} onBrowse={() => setSection("home")} onReload={loadAll} />}
-          {section === "interviews" && <InterviewsView interviews={interviews} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} />}
+          {section === "interviews" && <InterviewsView interviews={interviews} onReload={loadAll} />}
           {section === "contracts" && <ContractsView contracts={contracts} />}
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
         </main>
@@ -412,7 +409,13 @@ function Applications({ apps, onBrowse, onReload }) {
   );
 }
 
-function InterviewsView({ interviews, onJoin }) {
+function InterviewsView({ interviews, onReload }) {
+  const [openId, setOpenId] = useState(null);
+  const removeItw = async (id) => {
+    if (!window.confirm("Supprimer cet entretien de votre agenda ?")) return;
+    try { await api.delete(`/interviews/me/${id}`); toast.success("Entretien supprimé"); setOpenId(null); onReload?.(); }
+    catch { toast.error("Suppression impossible"); }
+  };
   if (interviews.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-interviews">
@@ -421,23 +424,39 @@ function InterviewsView({ interviews, onJoin }) {
       </div>
     );
   }
+  const STATUS_LABEL = { scheduled: "Planifié", done: "Terminé", cancelled: "Annulé" };
   return (
     <div className="space-y-4" data-testid="candidate-interviews">
       <h2 className="font-display text-2xl font-semibold">Mes entretiens</h2>
       {interviews.map((i) => (
-        <div key={i.id} className="rounded-2xl border border-border bg-card p-5 flex flex-wrap items-center justify-between gap-4" data-testid={`candidate-interview-${i.id}`}>
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+        <div key={i.id} className="rounded-2xl border border-border bg-card overflow-hidden" data-testid={`candidate-interview-${i.id}`}>
+          <button className="w-full text-left p-5 flex items-center gap-4 hover:bg-secondary/40 transition-colors" onClick={() => setOpenId(openId === i.id ? null : i.id)} data-testid={`candidate-interview-toggle-${i.id}`}>
+            <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <span className="font-mono text-sm font-bold">{i.time}</span>
             </div>
-            <div>
-              <p className="font-medium">{i.title}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium truncate">{i.title}</p>
               <p className="text-xs text-muted-foreground capitalize">{fmtDate(i.date)}{i.location ? ` • ${i.location}` : ""}</p>
             </div>
-          </div>
-          <Button size="sm" className="rounded-full" onClick={() => onJoin(i)} data-testid={`candidate-join-interview-${i.id}`}>
-            <Video className="h-4 w-4 mr-1.5" /> Rejoindre
-          </Button>
+            <ArrowRight className={`h-4 w-4 text-muted-foreground transition-transform ${openId === i.id ? "rotate-90" : ""}`} />
+          </button>
+          {openId === i.id && (
+            <div className="px-5 pb-5 pt-1 border-t border-border space-y-3" data-testid={`interview-details-${i.id}`}>
+              <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm pt-3">
+                <div><dt className="text-muted-foreground">Intitulé</dt><dd className="font-medium">{i.title}</dd></div>
+                <div><dt className="text-muted-foreground">Statut</dt><dd className="font-medium">{STATUS_LABEL[i.status] || i.status || "Planifié"}</dd></div>
+                <div><dt className="text-muted-foreground">Date</dt><dd className="font-medium capitalize">{fmtDate(i.date)}</dd></div>
+                <div><dt className="text-muted-foreground">Heure</dt><dd className="font-medium">{i.time}</dd></div>
+                {i.location && <div className="sm:col-span-2"><dt className="text-muted-foreground">Lieu / Lien</dt><dd className="font-medium break-words">{i.location}</dd></div>}
+                {i.notes && <div className="sm:col-span-2"><dt className="text-muted-foreground">Notes</dt><dd className="font-medium whitespace-pre-wrap">{i.notes}</dd></div>}
+              </dl>
+              <div className="flex justify-end pt-1">
+                <Button size="sm" variant="outline" className="rounded-full text-destructive border-destructive/40 hover:bg-destructive/10" onClick={() => removeItw(i.id)} data-testid={`candidate-delete-interview-${i.id}`}>
+                  <XCircle className="h-4 w-4 mr-1.5" /> Supprimer
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -480,6 +499,8 @@ function ContractsView({ contracts }) {
 function ProfileForm({ profile, onSaved }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const cvRef = useRef(null);
+  const [cvUploading, setCvUploading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -529,6 +550,24 @@ function ProfileForm({ profile, onSaved }) {
 
   const field = (k) => ({ value: form[k], onChange: (e) => setForm({ ...form, [k]: e.target.value }) });
 
+  const uploadCv = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCvUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("cv", file);
+      await api.post("/profile/cv", fd);
+      toast.success("CV mis à jour");
+      onSaved?.();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Échec de l'envoi du CV");
+    } finally {
+      setCvUploading(false);
+    }
+  };
+
   return (
     <form onSubmit={save} className="space-y-6" data-testid="profile-form">
       <div>
@@ -545,6 +584,24 @@ function ProfileForm({ profile, onSaved }) {
           <div><Label>Ville</Label><Input className="mt-1.5" data-testid="profile-city" {...field("city")} /></div>
           <div><Label>Pays</Label><Input className="mt-1.5" data-testid="profile-country" {...field("country")} /></div>
           <div><Label>Années d'expérience</Label><Input type="number" min="0" className="mt-1.5" data-testid="profile-years" {...field("years_experience")} /></div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-3" data-testid="cv-card">
+        <p className="font-medium">CV / Curriculum Vitae</p>
+        {profile.cv_file_id ? (
+          <a href={fileUrl(profile.cv_file_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-primary hover:underline" data-testid="current-cv-link">
+            <FileText className="h-4 w-4" /> {profile.cv_filename || "Voir mon CV"}
+          </a>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucun CV enregistré pour le moment.</p>
+        )}
+        <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={uploadCv} data-testid="cv-file-input" />
+        <div>
+          <Button type="button" variant="outline" className="rounded-full" disabled={cvUploading} onClick={() => cvRef.current?.click()} data-testid="upload-cv-btn">
+            {cvUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            {profile.cv_file_id ? "Modifier mon CV" : "Ajouter mon CV"}
+          </Button>
         </div>
       </div>
 
