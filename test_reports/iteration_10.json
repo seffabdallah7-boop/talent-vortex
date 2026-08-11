@@ -1,0 +1,39 @@
+{
+  "summary": "Phase E backend fully verified (12/12 pytest PASS in /app/backend/tests/test_phase_e_calls_recordings.py): call signaling start→incoming→accept→incoming empty; invalid callee 404; invalid status 400; recordings upload creates status='processing', /api/files/<video_file_id> serves the video, background task transitions status to 'done' within ~10s (transcript+summary empty for stub webm as expected), delete removes the record, admin-only enforced. HOWEVER the frontend admin dashboard has a critical runtime crash — see below — preventing any UI verification of Phase E from the admin side.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard (main function)",
+        "issue": "ReferenceError: activeCall is not defined — thrown on mount, blanks the entire /admin page. The JSX at line 202 references `activeCall`/`setActiveCall`, line 200 references `callCandidate`, line 189 & 199 reference `chatFocus`/`setChatFocus`; none of these are declared as useState/function in the AdminDashboard() body (only defined in inner sub-components Applications/Interviews/Meetings). Every Phase E flow (nav-meeting, nav-recordings, candidate-profile-dialog opening, profile-*-btn actions, activeCall VideoCall render) is unreachable because the whole dashboard fails to render.",
+        "selector": "/admin",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_e_calls_recordings.py",
+    "/app/test_reports/pytest/phase_e_results.xml"
+  ],
+  "action_items": [
+    "In /app/frontend/src/pages/AdminDashboard.js AdminDashboard() top (near line 96), add missing state + handler: `const [activeCall, setActiveCall] = useState(null); const [chatFocus, setChatFocus] = useState(null); const callCandidate = async (user_id, name, mode) => { try { const { data } = await api.post('/calls', { callee_id: user_id, mode: mode==='audio' ? 'audio' : 'video' }); setActiveCall({ room: data.room, audioOnly: mode==='audio', recordCtx: { title: `Entretien — ${name||''}`.trim(), candidate_id: user_id, candidate_name: name } }); } catch (e) { toast.error(e?.response?.data?.detail || 'Impossible de démarrer l\\u2019appel'); } };`",
+    "After the fix, retest UI: nav-meeting → start-meeting-btn → video-call-modal + copy-invite-link; nav-recordings → no-recordings or recording-<id> card; open candidate profile from Utilisateurs → candidate-profile-dialog → profile-chat-btn / profile-audio-btn / profile-video-btn."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.js still ~1242 lines; the missing-symbol crash would have been caught by an ESLint no-undef rule — recommend enabling it in CI.",
+    "process_recording() in server.py always uses videoBytes when audio absent — fine as fallback, but Whisper expects audio codec; a webm-video-only blob may make transcription fail silently (returns '') which is acceptable per spec, but consider logging that path.",
+    "GET /api/calls/incoming uses a 45s ringing cutoff based on created_at — if network jitter delays candidate poll, ringing modal may miss short calls; consider raising to 60s or checking status transitions instead of time.",
+    "No auth check on GET /api/calls/{id} (any authenticated user can read any call by id). Low risk since id is a uuid, but consider restricting to caller_id/callee_id.",
+    "Iter_9 comments about file size (>700 lines) and rating-* testid namespace overlap still stand."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_e_calls_recordings.py"],
+  "success_rate": {"backend": "100% (12/12 phase E)", "frontend": "0% (admin dashboard crashes on load — activeCall undefined)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha + OTP from backend.err.log). Fresh candidate registered per-run via /auth/register.",
+  "seed_data_creation": "Backend test registers a throwaway TEST_E candidate per module and uploads+deletes one recording. No residual data.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend Phase E pipeline is confirmed working end-to-end at the API level; do not re-run unless server.py changes. The remaining work is purely a frontend crash fix in AdminDashboard.js (missing activeCall/setActiveCall/callCandidate/chatFocus/setChatFocus). Once fixed, run the Playwright flow: login admin (captcha + OTP from /var/log/supervisor/backend.err.log grep 'OTP seffabdallah7'), goto /admin, verify nav-meeting + nav-recordings, click start-meeting-btn → assert video-call-modal + copy-invite-link, then open a candidate profile (Utilisateurs → open-profile-<uid> or user-row-<uid>) and assert profile-chat-btn/profile-audio-btn/profile-video-btn. To verify a recording appears on the page, POST one via API first then reload nav-recordings.",
+  "rca of the issue": "AdminDashboard.js JSX (lines 189, 199-202) references identifiers (activeCall, setActiveCall, callCandidate, chatFocus, setChatFocus) that were never declared inside the AdminDashboard() function scope during the Phase E integration. React throws 'activeCall is not defined' at render, no error boundary is in place, so the whole /admin route renders blank. Repro: login as admin, land on /admin — the page is white. Console shows PAGE ERROR: activeCall is not defined. Mitigation: declare the missing useState hooks and callCandidate handler in AdminDashboard() as described in action_items."
+}

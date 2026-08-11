@@ -75,7 +75,7 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - ✅ **Phase B — Appréciation admin** : colonne ★ (moyenne des ratings de candidatures) dans Utilisateurs + filtre `rating-filter` (min_rating). Backend `/users?min_rating=N`. Testé 100%.
 - ✅ **Phase C — Flux entretien** : bouton « Accepter » → dialogue « Planifier l'entretien » pré-rempli → POST /interviews → apparaît dans l'espace candidat (Mes entretiens) + notification. Testé 100%.
 - ✅ **Phase D — Notifications auto d'offres** : à la création d'une offre, `notify_matching_candidates` notifie (type "job") chaque candidat dont domains/ai_domains correspondent. Vérifié via curl.
-- 🟠 **Phase E — Appels audio/vidéo intégrés (Jitsi)** : boutons chat/audio/vidéo dans la fiche candidat ; appel entrant côté candidat (sonnerie + décrocher via polling) ; salle de réunion admin. (Fathom/Google Meet non intégrables — Jitsi retenu.)
+- 🟠 **Phase E — Appels audio/vidéo intégrés (Jitsi)** ✅ FAIT & testé : boutons Discuter/Appel audio/Appel vidéo dans la fiche candidat ; appel entrant côté candidat (sonnerie Web Audio + décrocher, polling /calls/incoming) ; salle de réunion admin (`nav-meeting`) ; **enregistrement navigateur → stockage objet → transcription Whisper → résumé IA Claude** affiché dans la page admin « Enregistrements » (`nav-recordings`). Backend 12/12, frontend 100%.
 - 🟠 **Phase F — Auth** : supprimer l'OTP email à la connexion (garder captcha) ; session persistante 2 semaines. ⚠️ passer par integration_expert.
 - 🟠 **Phase G — IA de pré-qualification par chat** : après candidature, l'IA pose des questions selon la fiche de poste ; l'admin est notifié des réponses.
 - 🔵 **Phase H — Traduction complète FR/EN (tout à la fin)**.

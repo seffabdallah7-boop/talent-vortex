@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
-  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon, Menu,
+  LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon, Menu, Film, PhoneCall,
   CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +37,8 @@ const NAV = [
   { key: "interviews", label: "Agenda entretiens", Icon: CalendarDays },
   { key: "candidates", label: "Utilisateurs", Icon: Users },
   { key: "messages", label: "Messages", Icon: MessageSquare },
+  { key: "meeting", label: "Salle de réunion", Icon: PhoneCall },
+  { key: "recordings", label: "Enregistrements", Icon: Film },
   { key: "theme", label: "Apparence", Icon: Palette },
 ];
 
@@ -92,6 +94,15 @@ export default function AdminDashboard() {
   const [mobileNav, setMobileNav] = useState(false);
   const [appStatus, setAppStatus] = useState("all");
   const [contractStatus, setContractStatus] = useState("all");
+  const [activeCall, setActiveCall] = useState(null);
+  const [chatFocus, setChatFocus] = useState(null);
+
+  const callCandidate = async (candidate_id, candidate_name, mode) => {
+    try {
+      const { data } = await api.post("/calls", { callee_id: candidate_id, mode: mode === "audio" ? "audio" : "video" });
+      setActiveCall({ room: data.room, audioOnly: mode === "audio", recordCtx: { candidate_id, candidate_name, title: `Entretien — ${candidate_name || ""}`.trim() } });
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Impossible de démarrer l'appel"); }
+  };
 
   const selectSection = (key) => {
     setSection(key);
@@ -184,11 +195,20 @@ export default function AdminDashboard() {
           {section === "contracts" && <Contracts initialFilter={contractStatus} />}
           {section === "interviews" && <Interviews />}
           {section === "candidates" && <Candidates onOpenProfile={setProfileId} />}
-          {section === "messages" && <Messages onOpenProfile={setProfileId} />}
+          {section === "messages" && <Messages onOpenProfile={setProfileId} focus={chatFocus} />}
+          {section === "meeting" && <Meetings />}
+          {section === "recordings" && <Recordings />}
           {section === "theme" && <ThemeSection />}
         </div>
       </main>
-      <CandidateProfileDialog userId={profileId} open={!!profileId} onClose={() => setProfileId(null)} />
+      <CandidateProfileDialog
+        userId={profileId}
+        open={!!profileId}
+        onClose={() => setProfileId(null)}
+        onChat={(u) => { setProfileId(null); setChatFocus({ candidate_id: u.user_id, candidate_name: u.name }); setSection("messages"); }}
+        onCall={(u, mode) => { setProfileId(null); callCandidate(u.user_id, u.name, mode); }}
+      />
+      {activeCall && <VideoCall room={activeCall.room} audioOnly={activeCall.audioOnly} title={activeCall.recordCtx?.title} recordCtx={activeCall.recordCtx} onClose={() => setActiveCall(null)} />}
     </div>
   );
 }
@@ -714,12 +734,14 @@ const relSeen = (iso) => {
   } catch { return ""; }
 };
 
-function Messages({ onOpenProfile }) {
+function Messages({ onOpenProfile, focus }) {
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [call, setCall] = useState(null);
+
+  useEffect(() => { if (focus?.candidate_id) setActive(focus); }, [focus]);
 
   useEffect(() => {
     const load = () => api.get("/chat/conversations").then(({ data }) => setConvs(data)).catch(() => {});
@@ -1101,6 +1123,86 @@ function Interviews() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Supprimer cet entretien ?</AlertDialogTitle><AlertDialogDescription>Action irréversible.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-interview">Supprimer</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function Meetings() {
+  const [call, setCall] = useState(null);
+  const start = () => setCall({ room: `recrutai-room-${Math.random().toString(36).slice(2, 10)}` });
+  return (
+    <div>
+      {call && <VideoCall room={call.room} title="Salle de réunion" recordCtx={{ title: "Réunion" }} onClose={() => setCall(null)} />}
+      <h1 className="font-display text-3xl font-semibold mb-2">Salle de réunion</h1>
+      <p className="text-muted-foreground mb-6 max-w-xl">Démarrez une salle vidéo instantanée, partagez le lien d'invitation, et enregistrez la session pour générer automatiquement un résumé IA (visible dans « Enregistrements »).</p>
+      <Button onClick={start} className="rounded-full h-11 px-6" data-testid="start-meeting-btn"><Video className="h-4 w-4 mr-2" /> Démarrer une salle</Button>
+    </div>
+  );
+}
+
+function Recordings() {
+  const [list, setList] = useState([]);
+  const [del, setDel] = useState(null);
+  const load = useCallback(() => api.get("/recordings").then(({ data }) => setList(data)).catch(() => {}), []);
+  useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
+  const remove = async () => { await api.delete(`/recordings/${del.id}`); toast.success("Enregistrement supprimé"); setDel(null); load(); };
+
+  return (
+    <div>
+      <h1 className="font-display text-3xl font-semibold mb-2">Enregistrements</h1>
+      <p className="text-muted-foreground mb-6">Vidéos d'entretiens enregistrées, avec transcription et résumé IA automatiques.</p>
+      {list.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-recordings">
+          <Film className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+          Aucun enregistrement. Lancez un appel ou une réunion et cliquez sur « Enregistrer ».
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {list.map((r) => (
+            <div key={r.id} className="rounded-2xl border border-border bg-card p-5" data-testid={`recording-${r.id}`}>
+              <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
+                <div>
+                  <h3 className="font-display text-lg font-semibold">{r.title}</h3>
+                  <p className="text-xs text-muted-foreground">{r.candidate_name ? `${r.candidate_name} • ` : ""}{new Date(r.created_at).toLocaleString("fr-FR")}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {r.status === "processing"
+                    ? <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium" data-testid={`rec-status-${r.id}`}><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analyse IA…</span>
+                    : <span className="inline-flex items-center gap-1.5 rounded-full status-accepted px-3 py-1 text-xs font-semibold" data-testid={`rec-status-${r.id}`}><CheckCircle2 className="h-3.5 w-3.5" /> Prêt</span>}
+                  <Button variant="ghost" size="icon" onClick={() => setDel(r)} data-testid={`delete-recording-${r.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <video src={fileUrl(r.video_file_id)} controls className="w-full rounded-xl bg-black max-h-64" data-testid={`rec-video-${r.id}`} />
+                <div className="space-y-3">
+                  {r.summary ? (
+                    <div className="rounded-xl bg-primary/5 border border-primary/20 p-3">
+                      <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Résumé IA</p>
+                      <p className="text-sm whitespace-pre-wrap" data-testid={`rec-summary-${r.id}`}>{r.summary}</p>
+                    </div>
+                  ) : r.status === "processing" ? (
+                    <p className="text-sm text-muted-foreground">Le résumé IA sera disponible dans quelques instants…</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucune transcription disponible (audio manquant).</p>
+                  )}
+                  {r.transcript && (
+                    <details className="rounded-xl bg-secondary/40 p-3">
+                      <summary className="text-xs font-semibold cursor-pointer">Transcription complète</summary>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">{r.transcript}</p>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Supprimer cet enregistrement ?</AlertDialogTitle><AlertDialogDescription>La vidéo et son résumé seront supprimés définitivement.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-recording">Supprimer</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

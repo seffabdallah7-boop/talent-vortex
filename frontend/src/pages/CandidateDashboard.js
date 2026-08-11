@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
 import StatusBadge from "@/components/StatusBadge";
 import VideoCall from "@/components/VideoCall";
+import IncomingCall from "@/components/IncomingCall";
 import AudioPlayer from "@/components/AudioPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ export default function CandidateDashboard() {
   const [section, setSection] = useState("home");
   const [mobileNav, setMobileNav] = useState(false);
   const [call, setCall] = useState(null);
+  const [incoming, setIncoming] = useState(null);
   const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
   const alerted = useRef(new Set());
@@ -54,6 +56,26 @@ export default function CandidateDashboard() {
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  useEffect(() => {
+    const poll = () => api.get("/calls/incoming").then(({ data }) => {
+      if (data && data.id) setIncoming((prev) => (prev && prev.id === data.id ? prev : data));
+      else setIncoming(null);
+    }).catch(() => {});
+    poll();
+    const t = setInterval(poll, 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  const acceptCall = async () => {
+    try { await api.put(`/calls/${incoming.id}/status`, { status: "accepted" }); } catch { /* noop */ }
+    setCall({ room: incoming.room, audioOnly: incoming.mode === "audio" });
+    setIncoming(null);
+  };
+  const declineCall = async () => {
+    try { await api.put(`/calls/${incoming.id}/status`, { status: "declined" }); } catch { /* noop */ }
+    setIncoming(null);
+  };
 
   useEffect(() => {
     const check = () => {
@@ -119,6 +141,7 @@ export default function CandidateDashboard() {
   return (
     <div className="App">
       <Navbar />
+      {incoming && <IncomingCall call={incoming} onAccept={acceptCall} onDecline={declineCall} />}
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title="Entretien" onClose={() => setCall(null)} />}
       <div className="max-w-7xl mx-auto px-5 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
         {/* Sidebar */}

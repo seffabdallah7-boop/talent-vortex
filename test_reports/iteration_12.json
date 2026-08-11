@@ -1,0 +1,22 @@
+{
+  "summary": "Phase E frontend closeout PASSED. CandidateProfileDialog now correctly renders the three action buttons (profile-chat-btn 'Discuter', profile-audio-btn 'Appel audio', profile-video-btn 'Appel vidéo') in the dialog header when u.role !== 'admin' and onChat/onCall are provided. All four scenarios from the review request verified end-to-end via Playwright as admin (captcha + OTP): (1) opening a candidate profile shows the 3 buttons; (2) clicking profile-video-btn triggers POST /api/calls and opens the video-call-modal (Jitsi iframe) which closes cleanly via video-call-close; (3) clicking profile-chat-btn closes the dialog and navigates to the Messages section focused on that candidate (Messages nav active, right-pane opens the conversation with 'TEST E Cand'); (4) sanity — opening an admin user's profile (Alex Salvador, badge 'Administrateur') renders ZERO action buttons as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Six console errors 'net::ERR_UNKNOWN_URL_SCHEME' still logged on the Utilisateurs page (likely stale/invalid picture URL scheme in Avatar src). Harmless functionally but should be sanitized — filter out blob:/data:/empty srcs or fall back to initials when the URL scheme is unsupported.",
+    "AdminDashboard.js file size (>700 lines noted in prior iterations) is still worth splitting into smaller feature modules for maintainability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not re-run (skipped per request; iter_10 was 12/12)", "frontend": "100% (4/4 scenarios pass)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha math + OTP from /var/log/supervisor/backend.err.log). Confirmed working.",
+  "seed_data_creation": "None. Verified with existing candidate 'TEST E Cand' (test_e_3f42c52f@test.com) and admin 'Alex Salvador'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase E is fully green. CandidateProfileDialog.jsx now shows profile-chat-btn / profile-audio-btn / profile-video-btn in the header block (only when u.role !== 'admin' and handlers provided). Video call correctly hits POST /api/calls and opens video-call-modal. Chat button closes dialog and switches to Messages section. Admin's own profile hides all three buttons. Only cosmetic follow-up: ERR_UNKNOWN_URL_SCHEME in Avatar images."
+}

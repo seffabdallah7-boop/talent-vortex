@@ -1,0 +1,39 @@
+{
+  "summary": "Phase E frontend retest after AdminDashboard crash fix. The critical blocker is RESOLVED — /admin renders normally after admin login (captcha + OTP). Salle de réunion and Enregistrements flows work end-to-end: start-meeting-btn opens the Jitsi video-call-modal with copy-invite-link, start-recording-btn ('Enregistrer') and video-call-close visible; Enregistrements shows the no-recordings empty state. Regression sanity (stat-En attente, mobile-menu-btn) also passes. HOWEVER: the candidate-profile-dialog does NOT render the promised profile-chat-btn / profile-audio-btn / profile-video-btn — they are absent from CandidateProfileDialog.jsx even though AdminDashboard now correctly passes onChat/onCall props. This is the last remaining Phase E frontend gap.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CandidateProfileDialog.jsx",
+        "issue": "Dialog opens (candidate-profile-dialog present) but the three action buttons profile-chat-btn, profile-audio-btn, profile-video-btn are NOT rendered anywhere in the JSX. onChat/onCall props are received but unused. Result: admin cannot start a call or open Messages from a candidate profile.",
+        "selector": "[data-testid=candidate-profile-dialog]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Admin → candidate profile → start call / start chat",
+        "issue": "Cannot be triggered from UI because the buttons are missing (see above). AdminDashboard wiring (callCandidate + setChatFocus + setSection('messages')) is correct and ready — only the CandidateProfileDialog buttons are missing.",
+        "affected_selectors": ["profile-chat-btn", "profile-audio-btn", "profile-video-btn"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "In /app/frontend/src/components/CandidateProfileDialog.jsx, add an action bar in the header (near the profile-name-heading, only when u.role !== 'admin' and onChat/onCall are truthy) with three buttons: <Button data-testid='profile-chat-btn' onClick={() => onChat?.(u)}>Message</Button>, <Button data-testid='profile-audio-btn' onClick={() => onCall?.(u, 'audio')}>Appel audio</Button>, <Button data-testid='profile-video-btn' onClick={() => onCall?.(u, 'video')}>Appel vidéo</Button>. AdminDashboard already wires callCandidate/setChatFocus correctly."
+  ],
+  "critical_code_review_comments": [
+    "CandidateProfileDialog receives onChat/onCall but never uses them — dead props / silent contract break. Add ESLint react/no-unused-prop-types or PropTypes to catch this.",
+    "The initial dashboard load logs 6× 'ERR_UNKNOWN_URL_SCHEME' (likely from an <img src> or link with a non-http scheme, e.g. blob: revoked or a data: URI malformed). Harmless functionally but should be cleaned up.",
+    "Iter_10 code-review comments (file size >700 lines for AdminDashboard.js, no auth check on GET /calls/{id}, ringing cutoff 45→60s) — the last two are noted as fixed in this iteration's context."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (not re-run, per iter_10)", "frontend": "80% (5/6 flows pass; profile action buttons missing)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha + OTP from /var/log/supervisor/backend.err.log). Verified end-to-end this iteration.",
+  "seed_data_creation": "None. Did not POST a recording since the empty-state (no-recordings) already renders correctly and confirms page functions.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The AdminDashboard 'activeCall is not defined' crash is fixed — dashboard now renders. Meetings + Recordings admin flows verified via Playwright. Only remaining Phase E frontend gap: add profile-chat-btn / profile-audio-btn / profile-video-btn buttons inside CandidateProfileDialog.jsx (onChat/onCall handlers already plumbed from AdminDashboard). Once added, retest by opening any candidate from Utilisateurs → open-profile-<id>, then click profile-video-btn (should open video-call-modal via POST /api/calls) and profile-chat-btn (should close dialog and land on Messages section).",
+  "rca of the issue": "CandidateProfileDialog.jsx was updated (or never updated) so its function signature accepts onChat/onCall props, but the JSX body was never enriched with the three action buttons that the review_request and AdminDashboard integration expect. The buttons simply don't exist in the DOM — grep for 'profile-chat-btn' in the component returns zero hits. AdminDashboard side is fully wired (callCandidate + setChatFocus). Fix is a small additive JSX change in CandidateProfileDialog.jsx (see action_items)."
+}

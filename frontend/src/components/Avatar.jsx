@@ -16,8 +16,9 @@ export function Avatar({ name = "", src, size = 40, className = "", onClick, tes
   const style = { width: size, height: size };
   const clickable = onClick ? "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow" : "";
   const common = `shrink-0 rounded-full overflow-hidden flex items-center justify-center ${clickable} ${className}`;
+  const validSrc = typeof src === "string" && /^(https?:\/\/|data:image\/)/.test(src);
 
-  if (src) {
+  if (validSrc) {
     return (
       <img
         src={src}

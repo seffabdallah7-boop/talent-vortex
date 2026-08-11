@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import api, { fileUrl } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
 import StatusBadge from "@/components/StatusBadge";
 import {
   Loader2, Mail, Phone, MapPin, Briefcase, Globe, Star, CalendarDays,
-  FileText, ScrollText, Sparkles, Clock,
+  FileText, ScrollText, Sparkles, Clock, MessageSquare, Video,
 } from "lucide-react";
 
 const fmtDate = (d) => {
@@ -25,7 +26,7 @@ function Chips({ items, variant = "secondary" }) {
   );
 }
 
-export default function CandidateProfileDialog({ userId, open, onClose }) {
+export default function CandidateProfileDialog({ userId, open, onClose, onChat, onCall }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -76,6 +77,13 @@ export default function CandidateProfileDialog({ userId, open, onClose }) {
                   {u.nationality && <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> {u.nationality}</span>}
                   {(u.city || u.country) && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {[u.city, u.country].filter(Boolean).join(", ")}</span>}
                 </div>
+                {u.role !== "admin" && (onChat || onCall) && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {onChat && <Button size="sm" variant="outline" className="rounded-full" onClick={() => onChat(u)} data-testid="profile-chat-btn"><MessageSquare className="h-4 w-4 mr-1.5" /> Discuter</Button>}
+                    {onCall && <Button size="sm" variant="outline" className="rounded-full" onClick={() => onCall(u, "audio")} data-testid="profile-audio-btn"><Phone className="h-4 w-4 mr-1.5" /> Appel audio</Button>}
+                    {onCall && <Button size="sm" className="rounded-full" onClick={() => onCall(u, "video")} data-testid="profile-video-btn"><Video className="h-4 w-4 mr-1.5" /> Appel vidéo</Button>}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -180,3 +188,4 @@ export default function CandidateProfileDialog({ userId, open, onClose }) {
     </Dialog>
   );
 }
+
