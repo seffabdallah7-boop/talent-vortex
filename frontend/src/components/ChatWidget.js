@@ -37,6 +37,7 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false);
   const [call, setCall] = useState(null);
   const [adminPresence, setAdminPresence] = useState(null);
+  const [chatMeta, setChatMeta] = useState({ has_admin: false, unread: 0 });
   const scrollRef = useRef(null);
   const sessionId = user?.user_id || anonId();
 
@@ -74,6 +75,14 @@ export default function ChatWidget() {
 
   useEffect(() => { scrollDown(); }, [aiMsgs, supMsgs]);
 
+  useEffect(() => {
+    if (!user || user.role !== "candidate") return;
+    const load = () => api.get("/chat/unread").then(({ data }) => setChatMeta(data)).catch(() => {});
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [user, open, tab, supMsgs.length]);
+
   const sendAi = async () => {
     if (!text.trim() || sending) return;
     const msg = text.trim();
@@ -91,7 +100,7 @@ export default function ChatWidget() {
   };
 
   const sendSupport = async () => {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sending || chatLocked) return;
     const msg = text.trim();
     setText("");
     setSending(true);
@@ -104,6 +113,7 @@ export default function ChatWidget() {
 
   const onSend = () => (tab === "ai" ? sendAi() : sendSupport());
   const isCandidate = user && user.role === "candidate";
+  const chatLocked = isCandidate && !chatMeta.has_admin;
 
   return (
     <>
@@ -116,6 +126,9 @@ export default function ChatWidget() {
         className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {!open && isCandidate && chatMeta.unread > 0 && (
+          <span data-testid="chat-unread-badge" className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">{chatMeta.unread}</span>
+        )}
       </motion.button>
 
       <AnimatePresence>
@@ -171,7 +184,12 @@ export default function ChatWidget() {
                 <p className="text-sm text-muted-foreground text-center mt-8">Le support en direct est destiné aux candidats. Utilisez la messagerie de l'administration.</p>
               ) : (
                 <>
-                  {supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez à l'administrateur, il vous répondra ici.</p>}
+                  {chatLocked && (
+                    <div className="rounded-xl bg-secondary/60 border border-border p-4 text-center text-sm text-muted-foreground" data-testid="chat-locked-notice">
+                      La conversation sera activée dès que l'administrateur vous écrira. Vous recevrez une notification à ce moment-là.
+                    </div>
+                  )}
+                  {!chatLocked && supMsgs.length === 0 && <p className="text-sm text-muted-foreground text-center mt-8">Écrivez à l'administrateur, il vous répondra ici.</p>}
                   {supMsgs.map((m) => (
                     <Bubble key={m.id} mine={m.sender_role === "candidate"} text={m.text} time={m.created_at} read={m.read} />
                   ))}
@@ -192,10 +210,11 @@ export default function ChatWidget() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && onSend()}
-                  placeholder="Votre message..."
+                  placeholder={tab === "support" && chatLocked ? "En attente de l'administrateur…" : "Votre message..."}
+                  disabled={tab === "support" && chatLocked}
                   className="rounded-full"
                 />
-                <Button size="icon" onClick={onSend} disabled={sending} data-testid="chat-send-btn" className="rounded-full shrink-0">
+                <Button size="icon" onClick={onSend} disabled={sending || (tab === "support" && chatLocked)} data-testid="chat-send-btn" className="rounded-full shrink-0">
                   <Send className="h-4 w-4" />
                 </Button>
               </div>

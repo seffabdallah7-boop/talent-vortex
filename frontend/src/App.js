@@ -11,6 +11,7 @@ import AuthCallback from "@/pages/AuthCallback";
 import JobDetail from "@/pages/JobDetail";
 import CandidateDashboard from "@/pages/CandidateDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
+import RecordingShare from "@/pages/RecordingShare";
 import useAutoTranslate from "@/hooks/useAutoTranslate";
 
 function AppInner() {
@@ -24,6 +25,7 @@ function AppInner() {
       <Route path="/jobs/:id" element={<JobDetail />} />
       <Route path="/dashboard" element={<ProtectedRoute role="candidate"><CandidateDashboard /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/recordings/shared/:token" element={<ProtectedRoute role="admin"><RecordingShare /></ProtectedRoute>} />
     </Routes>
   );
 }

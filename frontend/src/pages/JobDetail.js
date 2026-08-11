@@ -48,9 +48,13 @@ export default function JobDetail() {
     fd.append("cv", cv);
     if (voice) fd.append("voice", voice, "message-vocal.webm");
     try {
-      await api.post("/applications", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setDone(true);
+      const { data } = await api.post("/applications", fd, { headers: { "Content-Type": "multipart/form-data" } });
       toast.success("Candidature envoyée !");
+      if (data?.screening?.questions?.length) {
+        navigate("/dashboard?section=applications");
+        return;
+      }
+      setDone(true);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Erreur lors de l'envoi");
     } finally {

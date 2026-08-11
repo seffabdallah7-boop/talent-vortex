@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 16 — Regression test of 6 new features (points 1/2/4/5/6/7/8). Backend: 8 passed + 1 skipped (no recordings in DB). Frontend UI verified via Playwright with real candidate + admin logins (captcha). Points 7 (chat lock), 2 (apply → redirect + ScreeningQuiz auto-open), and 6 (protected shared route + candidate redirect) all PASS. Point 8 (Suggestions IA) is BROKEN AT THE UI LEVEL: the sidebar NAV array in AdminDashboard.js is missing the 'suggestions' entry, so the section is completely inaccessible from the admin UI (backend endpoint and Suggestions component both work fine). Points 5/6 share+download buttons couldn't be exercised end-to-end because there are 0 recordings in the DB (data-testid='no-recordings' is displayed).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard.js NAV array (lines 33-43)",
+        "issue": "Missing 'suggestions' nav entry. The <Suggestions/> section renders only when section==='suggestions' (line 203) but no sidebar button ever sets it. Admin cannot reach the 'Suggestions IA' feature (Point 8) via UI. Expected: add { key: 'suggestions', label: 'Suggestions IA', Icon: Sparkles } to NAV, which will automatically expose data-testid='nav-suggestions'.",
+        "selector": "[data-testid='nav-suggestions']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Candidate ChatWidget locked state", "issues": ["Non-blocking: DialogContent has missing aria-describedby warning (from Radix) — cosmetic React warning only."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features_iteration16.py",
+    "/app/test_reports/pytest/iter16.xml"
+  ],
+  "action_items": [
+    "AdminDashboard.js: add nav entry { key: 'suggestions', label: 'Suggestions IA', Icon: Sparkles } (import Sparkles already present) in NAV so admin can navigate to the Suggestions IA section (Point 8 currently completely inaccessible via UI).",
+    "Optional: seed at least one Recording to fully validate points 5 (download) and 6 (share) end-to-end — right now only protection of /recordings/shared/:token is validated, not the share button flow."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.js — NAV array missing 'suggestions' entry. The <Suggestions/> component (line 1180) is implemented and wired to setSection but there is no button to switch section to 'suggestions'. This is why Point 8 is invisible to the user.",
+    "server.py POST /api/auth/login — captcha_answer is typed as string in Pydantic, but the frontend sends string (from Input). Backend rejects int with 422. OK, just note for tests.",
+    "ChatWidget.js line 116 — chatLocked is defined AFTER sendSupport uses it (line 103) via closure; works because JS hoisting of const... actually it's a closure re-read at call time. Correct but a bit confusing; consider moving the definition above sendSupport for readability.",
+    "RecordingShare.js — no error UI distinguishes 401/403 (forbidden) from 404; a non-admin logged in would still be redirected by ProtectedRoute before the API call, so acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_features_iteration16.py"],
+  "success_rate": {
+    "backend": "100% (8/8 executed, 1 skipped due to no recordings)",
+    "frontend": "75% — Points 7, 2, 6-protection PASS; Point 8 FAIL (nav item missing); Points 5/6 share/download not testable (no recordings)"
+  },
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026!; Candidate cand_1786303173@test.com / Test@2026!. Captcha login: captcha_answer MUST be string (Pydantic rejects int with 422).",
+  "seed_data_creation": "Created 1 TEST application (candidate applied to job 6eab3ae5-fbfc-4a31-97bc-01cc86784f6f) to validate the redirect+screening flow.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After main agent adds nav-suggestions in NAV array, re-run frontend test to click nav-suggestions → click suggestion-toggle-<jobId> → wait ~15s for Claude → verify suggested-candidate-* rendered and suggested-score-* sorted descending. Backend GET /api/jobs/{id}/suggestions already returns 200 with correctly sorted list (validated in test_new_features_iteration16.py::TestSuggestions::test_admin_suggestions_sorted_by_score).",
+  "rca of the issue": "Point 8 root cause: /app/frontend/src/pages/AdminDashboard.js has the section handler `{section === 'suggestions' && <Suggestions/>}` (line 203) and the full <Suggestions> component (line 1180+), but the NAV constant (lines 33-43) does NOT contain a 'suggestions' entry. The <NavButtons> sidebar iterates NAV to render buttons, so with no entry there's no way for the user to setSection('suggestions'). Fix: append `{ key: 'suggestions', label: 'Suggestions IA', Icon: Sparkles }` (Sparkles already imported line 23) to NAV — this will automatically generate the [data-testid='nav-suggestions'] button expected by the spec."
+}

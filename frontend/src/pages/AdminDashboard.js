@@ -20,7 +20,7 @@ import {
 import {
   LayoutGrid, Briefcase, Users, FileText, MessageSquare, Palette, Plus, Trash2, Pencil,
   LogOut, Volume2, Send, Loader2, Building2, CheckCircle2, Sun, Moon, Menu, Film, PhoneCall,
-  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight,
+  CalendarDays, ScrollText, Download, Star, Video, Phone, Sparkles, ChevronLeft, ChevronRight, Link2, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import VideoCall from "@/components/VideoCall";
@@ -40,6 +40,7 @@ const NAV = [
   { key: "messages", label: "Messages", Icon: MessageSquare },
   { key: "meeting", label: "Salle de réunion", Icon: PhoneCall },
   { key: "recordings", label: "Enregistrements", Icon: Film },
+  { key: "suggestions", label: "Suggestions IA", Icon: Sparkles },
   { key: "theme", label: "Apparence", Icon: Palette },
 ];
 
@@ -200,6 +201,7 @@ export default function AdminDashboard() {
           {section === "messages" && <Messages onOpenProfile={setProfileId} focus={chatFocus} />}
           {section === "meeting" && <Meetings />}
           {section === "recordings" && <Recordings />}
+          {section === "suggestions" && <Suggestions onOpenProfile={setProfileId} />}
           {section === "theme" && <ThemeSection />}
         </div>
       </main>
@@ -1176,12 +1178,97 @@ function Meetings() {
   );
 }
 
+function Suggestions({ onOpenProfile }) {
+  const [jobs, setJobs] = useState([]);
+  const [openJob, setOpenJob] = useState(null);
+  const [sugg, setSugg] = useState({});
+  const [loadingId, setLoadingId] = useState(null);
+
+  useEffect(() => { api.get("/jobs/all").then(({ data }) => setJobs(data)).catch(() => {}); }, []);
+
+  const toggle = async (job) => {
+    if (openJob === job.id) { setOpenJob(null); return; }
+    setOpenJob(job.id);
+    if (!sugg[job.id]) {
+      setLoadingId(job.id);
+      try {
+        const { data } = await api.get(`/jobs/${job.id}/suggestions`);
+        setSugg((s) => ({ ...s, [job.id]: data }));
+      } catch { toast.error("Impossible de charger les suggestions."); }
+      finally { setLoadingId(null); }
+    }
+  };
+
+  return (
+    <div data-testid="suggestions-section">
+      <h1 className="font-display text-3xl font-semibold mb-2">Suggestions IA</h1>
+      <p className="text-muted-foreground mb-6">Pour chaque offre, l'IA analyse les profils des candidats et propose les plus pertinents, classés par score de compatibilité.</p>
+      {jobs.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-suggestions-jobs">
+          <Sparkles className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" /> Publiez une offre pour obtenir des suggestions de candidats.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {jobs.map((job) => (
+            <div key={job.id} className="rounded-2xl border border-border bg-card overflow-hidden" data-testid={`suggestion-job-${job.id}`}>
+              <button onClick={() => toggle(job)} className="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-secondary/40 transition-colors" data-testid={`suggestion-toggle-${job.id}`}>
+                <div className="min-w-0">
+                  <h3 className="font-display text-lg font-semibold truncate">{job.title}</h3>
+                  <p className="text-xs text-muted-foreground">{job.company || "—"} • {job.location}{!job.is_active ? " • (masquée)" : ""}</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 text-sm text-primary font-medium shrink-0"><Sparkles className="h-4 w-4" /> {openJob === job.id ? "Masquer" : "Voir les profils"}</span>
+              </button>
+              {openJob === job.id && (
+                <div className="border-t border-border p-5 space-y-3">
+                  {loadingId === job.id ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Analyse IA des profils…</div>
+                  ) : (sugg[job.id] || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun profil correspondant pour le moment.</p>
+                  ) : (
+                    sugg[job.id].map((c) => (
+                      <div key={c.candidate_id} className="flex items-start gap-4 rounded-xl border border-border p-4" data-testid={`suggested-candidate-${c.candidate_id}`}>
+                        <Avatar name={c.name} src={c.picture} size={44} onClick={() => onOpenProfile(c.candidate_id)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button onClick={() => onOpenProfile(c.candidate_id)} className="font-medium hover:text-primary transition-colors" data-testid={`suggested-name-${c.candidate_id}`}>{c.name || "Candidat"}</button>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold" data-testid={`suggested-score-${c.candidate_id}`}>{c.score}% compatible</span>
+                          </div>
+                          {c.current_position && <p className="text-xs text-muted-foreground">{c.current_position}</p>}
+                          <p className="text-sm mt-1">{c.reason}</p>
+                        </div>
+                        <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={() => onOpenProfile(c.candidate_id)} data-testid={`suggested-view-${c.candidate_id}`}>Profil</Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Recordings() {
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const load = useCallback(() => api.get("/recordings").then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
   const remove = async () => { await api.delete(`/recordings/${del.id}`); toast.success("Enregistrement supprimé"); setDel(null); load(); };
+  const shareLink = async (r) => {
+    try {
+      const { data } = await api.post(`/recordings/${r.id}/share`);
+      const url = `${window.location.origin}/recordings/shared/${data.token}`;
+      try { await navigator.clipboard.writeText(url); } catch { window.prompt("Copiez le lien :", url); }
+      setCopiedId(r.id);
+      setTimeout(() => setCopiedId(null), 2500);
+      toast.success("Lien protégé copié (accès admin requis).");
+    } catch {
+      toast.error("Impossible de générer le lien.");
+    }
+  };
 
   return (
     <div>
@@ -1205,6 +1292,12 @@ function Recordings() {
                   {r.status === "processing"
                     ? <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-medium" data-testid={`rec-status-${r.id}`}><Loader2 className="h-3.5 w-3.5 animate-spin" /> Analyse IA…</span>
                     : <span className="inline-flex items-center gap-1.5 rounded-full status-accepted px-3 py-1 text-xs font-semibold" data-testid={`rec-status-${r.id}`}><CheckCircle2 className="h-3.5 w-3.5" /> Prêt</span>}
+                  <Button variant="outline" size="sm" className="rounded-full" onClick={() => shareLink(r)} data-testid={`share-recording-${r.id}`}>
+                    {copiedId === r.id ? <><Check className="h-4 w-4 mr-1.5 text-green-500" /> Copié</> : <><Link2 className="h-4 w-4 mr-1.5" /> Lien</>}
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="rounded-full" data-testid={`download-recording-${r.id}`}>
+                    <a href={fileUrl(r.video_file_id)} download={`${(r.title || "entretien").replace(/[^a-z0-9]+/gi, "_")}.webm`}><Download className="h-4 w-4 mr-1.5" /> Vidéo</a>
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => setDel(r)} data-testid={`delete-recording-${r.id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div>
               </div>

@@ -81,5 +81,15 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - ✅ **Nettoyage auto des vidéos** : cron hebdo `POST /api/cron/cleanup-recordings` supprime les enregistrements > `RECORDING_RETENTION_MONTHS` (défaut 6 mois).
 - 🔵 **Phase H — Traduction complète FR/EN** ✅ FAIT & testé (6/6) : traducteur automatique réversible (`useAutoTranslate` + dictionnaire `uiDict.js`) monté à la racine → bascule tout le site (pages publiques via i18next + tableaux de bord internes) sans altérer les données dynamiques (noms, intitulés d'offres). Sélecteur FR/EN ajouté dans le dashboard admin (le candidat l'a déjà via la Navbar).
 
+## Implemented (2026-06, itération 16 — Messagerie/Vidéo + Suggestions IA)
+- **Chat candidat verrouillé** (point 7) : la saisie du support reste inactive tant que l'admin n'a pas initié la conversation (`GET /api/chat/unread` → has_admin). Notice `chat-locked-notice`.
+- **Notifications de messages** (points 1&4) : pastille de non-lus `chat-unread-badge` sur le bouton flottant du chat candidat + emails hors-ligne (déjà backend).
+- **Redirection quiz IA** (point 2) : après candidature, redirection immédiate vers `/dashboard?section=applications` avec ouverture auto du ScreeningQuiz.
+- **Lien vidéo partageable protégé** (point 6) : `POST /api/recordings/{id}/share` + page `/recordings/shared/:token` (ProtectedRoute admin) ; bouton « Lien » dans Admin > Enregistrements.
+- **Téléchargement vidéo** (point 5) : bouton « Vidéo » (download .webm) dans Admin > Enregistrements.
+- **Suggestions IA de candidats par offre** (point 8) : `GET /api/jobs/{id}/suggestions` (Claude classe les profils candidats par score de compatibilité + raison, fallback heuristique). Nouvelle section admin « Suggestions IA » (nav-suggestions), offres dépliables → candidats classés cliquables (ouvre le profil).
+- Testé itération 16 : backend 100% (8/8), frontend points 7/2/6 OK ; nav Suggestions ré-ajouté après correctif.
+- **Design** : image hero de la landing remplacée par un visuel professionnel généré (femme noire + homme en costume, bureau moderne avec skyline).
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

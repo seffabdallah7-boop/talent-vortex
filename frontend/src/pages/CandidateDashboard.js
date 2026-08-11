@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -43,6 +43,12 @@ export default function CandidateDashboard() {
   const [reminder, setReminder] = useState(null);
   const didAutoNav = useRef(false);
   const alerted = useRef(new Set());
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const s = searchParams.get("section");
+    if (s) { setSection(s); didAutoNav.current = true; }
+  }, [searchParams]);
 
   const loadAll = useCallback(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});

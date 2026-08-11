@@ -732,6 +732,85 @@ async def notify_matching_candidates(job: dict):
             )
 
 
+async def ai_rank_candidates(job: dict, candidates: list) -> dict:
+    """Return {candidate_id: {"score": int, "reason": str}} ranked by AI."""
+    if not EMERGENT_LLM_KEY or not candidates:
+        return {}
+    lines = []
+    for c in candidates:
+        tags = (c.get("domains") or []) + (c.get("ai_domains") or [])
+        lines.append(
+            f"- id={c['user_id']} | nom={c.get('name','')} | poste={c.get('current_position','')} "
+            f"| domaines={', '.join(tags)} | outils={', '.join(c.get('tools') or [])} "
+            f"| experience={c.get('years_experience','?')} ans | bio={(c.get('bio') or '')[:200]}"
+        )
+    prompt = (
+        f"OFFRE:\nTitre: {job.get('title','')}\nCategorie: {job.get('category','')}\n"
+        f"Description: {(job.get('description') or '')[:1500]}\n"
+        f"Profil recherche: {(job.get('requirements') or '')[:1000]}\n\n"
+        f"CANDIDATS:\n" + "\n".join(lines) +
+        "\n\nClasse les candidats du plus pertinent au moins pertinent pour cette offre."
+    )
+    system = (
+        "Tu es un expert RH. On te donne une offre d'emploi et une liste de candidats. "
+        "Reponds UNIQUEMENT par un tableau JSON valide, sans aucun texte autour. "
+        "Chaque element du tableau: {\"candidate_id\": \"<id>\", \"score\": <entier 0-100 de pertinence>, "
+        "\"reason\": \"<justification concise en francais, 1 phrase>\"}. "
+        "Inclure uniquement les candidats avec un score >= 40, tries par score decroissant."
+    )
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"suggest-{uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=prompt))
+        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        raw = (raw or "").strip()
+        arr = []
+        try:
+            arr = json.loads(raw)
+        except Exception:
+            m = re.search(r"\[.*\]", raw, re.DOTALL)
+            if m:
+                arr = json.loads(m.group(0))
+        out = {}
+        for x in arr if isinstance(arr, list) else []:
+            cid = x.get("candidate_id")
+            if cid:
+                out[str(cid)] = {"score": int(x.get("score", 0)), "reason": x.get("reason", "")}
+        return out
+    except Exception as e:
+        logger.error(f"ai_rank_candidates: {e}")
+        return {}
+
+
+@api.get("/jobs/{job_id}/suggestions")
+async def job_suggestions(job_id: str, admin: dict = Depends(require_admin)):
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Offre introuvable")
+    candidates = await db.users.find({"role": "candidate"}, {"_id": 0}).to_list(5000)
+    ranking = await ai_rank_candidates(job, candidates)
+    result = []
+    for c in candidates:
+        tags = (c.get("ai_domains") or []) + (c.get("domains") or [])
+        heuristic = _job_match_score(job, tags)
+        ai = ranking.get(c["user_id"])
+        if ai and ai["score"] > 0:
+            score, reason = ai["score"], ai["reason"] or "Profil pertinent selon l'IA."
+        elif heuristic > 0:
+            score, reason = min(90, 45 + heuristic * 10), "Correspondance sur les domaines d'expertise."
+        else:
+            continue
+        result.append({
+            "candidate_id": c["user_id"], "name": c.get("name", ""), "email": c.get("email", ""),
+            "picture": c.get("picture"), "current_position": c.get("current_position", ""),
+            "domains": tags, "score": score, "reason": reason,
+        })
+    result.sort(key=lambda r: r["score"], reverse=True)
+    return result[:20]
+
+
 class JobDraftInput(BaseModel):
     brief: str
 
@@ -1274,6 +1353,17 @@ async def get_messages(candidate_id: Optional[str] = Query(None), user: dict = D
     return msgs
 
 
+def _msg_email_html(sender_name: str, text: str) -> str:
+    safe = (text or "").strip()[:500]
+    return (
+        f'<div style="font-family:Arial,sans-serif;color:#222">'
+        f'<h2 style="color:#4f46e5">Nouveau message sur Talent Vortex</h2>'
+        f'<p><b>{sender_name}</b> vous a envoyé un message :</p>'
+        f'<blockquote style="border-left:3px solid #4f46e5;padding-left:12px;color:#444">{safe}</blockquote>'
+        f'<p>Connectez-vous à Talent Vortex pour répondre.</p></div>'
+    )
+
+
 @api.post("/chat/messages")
 async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_user)):
     if user.get("role") == "admin":
@@ -1287,6 +1377,7 @@ async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_
         conv = user["user_id"]
         candidate_name = user.get("name", "")
         sender_role = "candidate"
+        cand = None
     doc = {
         "id": str(uuid.uuid4()),
         "conversation_id": conv,
@@ -1300,12 +1391,28 @@ async def send_message(body: ChatMessageInput, user: dict = Depends(get_current_
     await db.messages.insert_one(doc)
     doc.pop("_id", None)
     if sender_role == "candidate":
-        await notify_admins("message", "Nouveau message",
-                            f"{candidate_name or 'Un candidat'} vous a envoyé un message.")
+        admins = await notify_admins("message", "Nouveau message",
+                                     f"{candidate_name or 'Un candidat'} vous a envoyé un message.",
+                                     {"candidate_id": conv})
+        for a in admins:
+            if not _is_online(a.get("last_seen")) and a.get("email"):
+                await send_email(a["email"], "Nouveau message — Talent Vortex",
+                                 _msg_email_html(candidate_name or "Un candidat", body.text))
     else:
         await notify_user(conv, "message", "Nouveau message",
-                          "L'équipe de recrutement vous a répondu.")
+                          "L'équipe de recrutement vous a répondu.", {"candidate_id": conv})
+        if cand and not _is_online(cand.get("last_seen")) and cand.get("email"):
+            await send_email(cand["email"], "Nouveau message du recruteur — Talent Vortex",
+                             _msg_email_html("Le recruteur", body.text))
     return doc
+
+
+@api.get("/chat/unread")
+async def chat_unread(user: dict = Depends(get_current_user)):
+    conv = user["user_id"]
+    total_admin = await db.messages.count_documents({"conversation_id": conv, "sender_role": "admin"})
+    unread = await db.messages.count_documents({"conversation_id": conv, "sender_role": "admin", "read": False})
+    return {"has_admin": total_admin > 0, "unread": unread}
 
 
 # ---------------------------------------------------------------------------
@@ -1441,6 +1548,26 @@ async def list_recordings(admin: dict = Depends(require_admin)):
 async def delete_recording(rec_id: str, admin: dict = Depends(require_admin)):
     await db.recordings.delete_one({"id": rec_id})
     return {"ok": True}
+
+
+@api.post("/recordings/{rec_id}/share")
+async def share_recording(rec_id: str, admin: dict = Depends(require_admin)):
+    rec = await db.recordings.find_one({"id": rec_id}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Enregistrement introuvable")
+    token = rec.get("share_token")
+    if not token:
+        token = uuid.uuid4().hex
+        await db.recordings.update_one({"id": rec_id}, {"$set": {"share_token": token}})
+    return {"token": token}
+
+
+@api.get("/recordings/shared/{token}")
+async def get_shared_recording(token: str, admin: dict = Depends(require_admin)):
+    rec = await db.recordings.find_one({"share_token": token}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Lien invalide")
+    return rec
 
 
 # ---------------------------------------------------------------------------

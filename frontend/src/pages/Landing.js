@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Briefcase, Search, ArrowRight, FileAudio, ShieldCheck, Bot, MoveUpRight, Star } from "lucide-react";
 
-const HERO = "https://images.unsplash.com/photo-1716703373229-b0e43de7dd5c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBzcGFjZSUyMGludGVyaW9yfGVufDB8fHx8MTc4NjIxNjU3OHww&ixlib=rb-4.1.0&q=85";
+const HERO = "https://static.prod-images.emergentagent.com/jobs/ad379664-d6fd-49f5-b212-fa711498c483/images/6bc31ddeaa313c25d4aee1947a88998081e440a294a8caf731d47fa77e9c22d9.jpeg";
 const AV1 = "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjB3b3JrZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODYyMTY1Nzh8MA&ixlib=rb-4.1.0&q=85";
 const AV2 = "https://images.pexels.com/photos/8101982/pexels-photo-8101982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 const CATS = ["Tech", "Ressources Humaines", "Design", "Data", "Marketing", "Finance"];
@@ -79,7 +79,7 @@ export default function Landing() {
           <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-5 relative">
             <div className="absolute -right-3 -bottom-3 w-full h-full bg-primary hidden sm:block" />
             <div className="relative border-2 border-foreground/15 bg-card overflow-hidden">
-              <img src={HERO} alt="" className="w-full h-64 md:h-72 object-cover" />
+              <img src={HERO} alt="Recruteurs professionnels" className="w-full h-64 md:h-80 object-cover object-top" />
               <div className="p-5">
                 <p className="label-caps text-muted-foreground mb-3">Statut de candidature</p>
                 <div className="space-y-2.5">
