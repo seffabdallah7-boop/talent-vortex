@@ -1,0 +1,25 @@
+{
+  "summary": "Phase F (simplified login) and Phase G (AI pre-qualification exam) FRONTEND flows fully verified end-to-end via Playwright. All 5 scenarios from the review request PASS. (1) Phase F login: admin seffabdallah7@gmail.com + Admin@2026! + captcha through auth-submit-btn redirects DIRECTLY to /admin; otp-input never renders. (2) Session persistence: hard reload on /admin keeps the user logged in (POST /auth/refresh is called on load and re-issues token). (3) Phase G candidate: fresh candidate registered (captcha only, immediate token), applied to a job on JobDetail (CV file upload via set_input_files on the hidden cv-input, cover-note-input filled, submit-application-btn -> apply-success). On 'Mes postulations' the screening quiz auto-opens (data-testid screening-quiz) with 4 AI-generated questions; screening-answer-0..3 filled, screening-submit-btn -> screening-done shown; after closing, the card displays screening-completed-<appId>. (4) Phase G admin: after re-login as admin, in Candidatures the corresponding app-row-<id> was clicked and 'Voir l'examen IA' (view-exam-btn) opened the dialog which correctly renders exam-verdict ('Verdict : A verifier'), exam-score ('10/100'), exam-analysis (full Claude analysis text) and exam-qa-0..3 with each question + its answer. (5) Confidentiality: candidate-side GET /api/applications/me returns screening with only ['questions','answers','completed','completed_at'] — NO ai_* fields; and no exam-verdict/exam-score/exam-analysis test-ids render on the candidate dashboard.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDashboard.js is 1283 lines — should still be split into feature-scoped modules (Applications table + detail dialog + exam dialog + schedule dialog) for maintainability.",
+    "CandidateDashboard.js exceeds 500 lines and mixes 5 sub-components — consider splitting Applications / InterviewsView / ContractsView / ProfileForm into separate files.",
+    "The auto-open effect in Applications (autoRef.current) only picks the first pending screening once per mount; if the candidate has multiple pending screenings and dismisses the first without answering, the second won't auto-open until reload. Consider iterating on pending screenings sequentially after onDone.",
+    "Auth.js still contains the legacy 'step === otp' branch (verifyOtp + otp-input UI) even though the login flow now returns {token,user} directly and never sets step to 'otp'. Dead code — safe to remove to keep the file clean and avoid confusion for future testers/devs.",
+    "Login/register error handling calls refreshCaptcha() on failure — good. But the captcha ID is single-use server-side; if refresh fails silently (empty catch), user is stuck with the old captcha_id. Consider surfacing a toast on refresh failure."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not re-run (curl-verified per request note)", "frontend": "100% (5/5 scenarios)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (captcha only, no OTP). Test candidates created during run: cand_ph1786418503@test.com / Test@2026! (successfully completed screening).",
+  "seed_data_creation": "Registered one fresh candidate (cand_ph1786418503@test.com), submitted one application to job 'Développeur React Senior' (id 3556e29a-4f8d-4274-89c9-eec1bf450044) at ACME, answered the 4 AI screening questions. AI verdict: 'A verifier', score 10/100 (as expected since answers were placeholders).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phases F & G are green. Notes for next agent: (a) cv-input on JobDetail has class='hidden' — Playwright needs state='attached' (not the default 'visible') when waiting for it, then use set_input_files. (b) Admin sidebar nav test-id for Candidatures is 'nav-applications' (not 'sidebar-applications', which is candidate-side). (c) Screening quiz auto-opens once per mount; if dismissed, use the 'answer-screening-<appId>' button visible on the application card. (d) AI generation on POST /applications takes ~2-4s; wait after navigating to 'Mes postulations' before checking for the quiz. (e) assess_screening takes ~5-15s (Claude); wait up to 60s after screening-submit-btn for screening-done."
+}

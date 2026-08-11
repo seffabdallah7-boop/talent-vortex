@@ -8,6 +8,7 @@ import ChatWidget from "@/components/ChatWidget";
 import StatusBadge from "@/components/StatusBadge";
 import VideoCall from "@/components/VideoCall";
 import IncomingCall from "@/components/IncomingCall";
+import ScreeningQuiz from "@/components/ScreeningQuiz";
 import AudioPlayer from "@/components/AudioPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -198,7 +199,7 @@ export default function CandidateDashboard() {
           )}
 
           {section === "home" && <JobsHome jobs={jobs} apps={apps} />}
-          {section === "applications" && <Applications apps={apps} onBrowse={() => setSection("home")} />}
+          {section === "applications" && <Applications apps={apps} onBrowse={() => setSection("home")} onReload={loadAll} />}
           {section === "interviews" && <InterviewsView interviews={interviews} onJoin={(i) => setCall({ room: `recrutai-itw-${i.id}`, audioOnly: false })} />}
           {section === "contracts" && <ContractsView contracts={contracts} />}
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
@@ -292,7 +293,16 @@ function JobsHome({ jobs, apps }) {
   );
 }
 
-function Applications({ apps, onBrowse }) {
+function Applications({ apps, onBrowse, onReload }) {
+  const [quizApp, setQuizApp] = useState(null);
+  const autoRef = useRef(false);
+  useEffect(() => {
+    if (!autoRef.current) {
+      const pend = apps.find((a) => a.screening?.questions?.length && !a.screening?.completed);
+      if (pend) { setQuizApp(pend); autoRef.current = true; }
+    }
+  }, [apps]);
+
   if (apps.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border p-16 text-center" data-testid="no-applications">
@@ -333,6 +343,16 @@ function Applications({ apps, onBrowse }) {
             )}
           </div>
           {a.cover_note && <p className="text-sm text-muted-foreground mb-4 italic">"{a.cover_note}"</p>}
+          {a.screening?.questions?.length > 0 && (
+            a.screening.completed ? (
+              <div className="flex items-center gap-2 text-sm text-primary mb-4" data-testid={`screening-completed-${a.id}`}><CheckCircle2 className="h-4 w-4" /> Examen de pré-qualification complété</div>
+            ) : (
+              <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4 flex flex-wrap items-center justify-between gap-3" data-testid={`screening-pending-${a.id}`}>
+                <div className="flex items-center gap-2 text-sm"><Sparkles className="h-4 w-4 text-primary" /> Un court examen vous attend pour finaliser cette candidature.</div>
+                <Button size="sm" className="rounded-full" onClick={() => setQuizApp(a)} data-testid={`answer-screening-${a.id}`}>Répondre à l'examen</Button>
+              </div>
+            )
+          )}
           {a.transcription && (
             <div className="rounded-lg bg-secondary/50 p-3 mb-4">
               <p className="text-xs font-semibold text-muted-foreground mb-1">Transcription de votre message vocal</p>
@@ -349,6 +369,7 @@ function Applications({ apps, onBrowse }) {
           </div>
         </motion.div>
       ))}
+      <ScreeningQuiz app={quizApp} open={!!quizApp} onClose={() => setQuizApp(null)} onDone={() => onReload && onReload()} />
     </div>
   );
 }

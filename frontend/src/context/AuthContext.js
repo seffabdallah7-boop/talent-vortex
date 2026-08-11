@@ -15,8 +15,9 @@ export function AuthProvider({ children }) {
       return;
     }
     try {
-      const { data } = await api.get("/auth/me");
-      setUser(data);
+      const { data } = await api.post("/auth/refresh");
+      localStorage.setItem("token", data.token);
+      setUser(data.user);
     } catch (e) {
       localStorage.removeItem("token");
       setUser(null);

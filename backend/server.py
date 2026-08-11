@@ -115,7 +115,7 @@ def create_jwt(user_id: str, email: str) -> str:
         "sub": user_id,
         "email": email,
         "type": "access",
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "exp": datetime.now(timezone.utc) + timedelta(days=14),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
@@ -434,16 +434,8 @@ async def login(body: LoginInput):
         await register_failed(email)
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     await clear_attempts(email)
-    otp = f"{random.randint(0, 999999):06d}"
-    await db.otp_codes.update_one(
-        {"email": email},
-        {"$set": {"email": email, "code_hash": hash_password(otp),
-                  "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(), "attempts": 0}},
-        upsert=True,
-    )
-    logger.info(f"OTP {email} = {otp}")
-    await send_email(email, "Votre code de connexion Talent Vortex", otp_email_html(otp, user.get("name", "")))
-    return {"otp_required": True, "email": email}
+    token = create_jwt(user["user_id"], email)
+    return {"token": token, "user": public_user(user)}
 
 
 @api.post("/auth/verify-otp")
@@ -493,6 +485,12 @@ class ResetInput(BaseModel):
     email: EmailStr
     code: str
     new_password: str
+
+
+@api.post("/auth/refresh")
+async def refresh_token(user: dict = Depends(get_current_user)):
+    token = create_jwt(user["user_id"], user["email"])
+    return {"token": token, "user": public_user(user)}
 
 
 @api.post("/auth/forgot-password")
@@ -892,6 +890,11 @@ async def create_application(
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
+        "screening": {
+            "questions": await generate_screening_questions(job),
+            "answers": [], "completed": False,
+            "ai_assessment": "", "ai_verdict": "", "ai_score": None,
+        },
     }
     await db.applications.insert_one(app_doc)
     app_doc.pop("_id", None)
@@ -909,7 +912,107 @@ async def create_application(
 @api.get("/applications/me")
 async def my_applications(user: dict = Depends(get_current_user)):
     apps = await db.applications.find({"candidate_id": user["user_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    for a in apps:
+        sc = a.get("screening")
+        if sc:
+            sc.pop("ai_assessment", None)
+            sc.pop("ai_verdict", None)
+            sc.pop("ai_score", None)
     return apps
+
+
+SCREEN_DEFAULTS = [
+    "Décrivez votre expérience la plus pertinente pour ce poste.",
+    "Quels outils ou technologies maîtrisez-vous en lien avec cette offre ?",
+    "Quelle est votre disponibilité pour débuter ?",
+    "Pourquoi ce poste vous intéresse-t-il ?",
+]
+
+
+async def generate_screening_questions(job: dict) -> list:
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"screen-{uuid.uuid4().hex[:8]}",
+            system_message=(
+                "Tu es recruteur. Genere EXACTEMENT 4 questions courtes de pre-qualification en francais "
+                "permettant de verifier si un candidat correspond a l'offre. Reponds uniquement par les 4 "
+                "questions, une par ligne, sans numerotation ni autre texte."
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=f"Titre: {job.get('title','')}\nDescription: {job.get('description','')}\nExigences: {job.get('requirements','')}"))
+        text = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        qs = [l.strip(" -•\t.") for l in text.splitlines() if l.strip()]
+        qs = [q for q in qs if len(q) > 5][:4]
+        return qs if len(qs) >= 2 else SCREEN_DEFAULTS
+    except Exception as e:
+        logger.error(f"generate_screening_questions: {e}")
+        return SCREEN_DEFAULTS
+
+
+async def assess_screening(job: dict, questions: list, answers: list):
+    qa = "\n\n".join(f"Q{i+1}: {q}\nRéponse: {answers[i] if i < len(answers) else ''}" for i, q in enumerate(questions))
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"assess-{uuid.uuid4().hex[:8]}",
+            system_message=(
+                "Tu es recruteur senior. Evalue les reponses du candidat au regard de l'offre. "
+                'Reponds STRICTEMENT en JSON valide: {"score": <entier 0-100>, '
+                '"verdict": "Correspond" | "A verifier" | "Ne correspond pas", '
+                '"analyse": "3-4 phrases en francais"}.'
+            ),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=f"OFFRE\nTitre: {job.get('title','')}\nExigences: {job.get('requirements','')}\n\nREPONSES DU CANDIDAT\n{qa}"))
+        text = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        data = json.loads(m.group(0)) if m else {}
+        try:
+            score = int(data.get("score"))
+        except (TypeError, ValueError):
+            score = None
+        return data.get("analyse", text[:500]), data.get("verdict", "A verifier"), score
+    except Exception as e:
+        logger.error(f"assess_screening: {e}")
+        return "", "A verifier", None
+
+
+class ScreeningAnswers(BaseModel):
+    answers: list
+
+
+@api.post("/applications/{app_id}/screening")
+async def submit_screening(app_id: str, body: ScreeningAnswers, user: dict = Depends(get_current_user)):
+    app = await db.applications.find_one({"id": app_id})
+    if not app:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    if app["candidate_id"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    sc = app.get("screening") or {}
+    if sc.get("completed"):
+        raise HTTPException(status_code=400, detail="Examen déjà complété")
+    questions = sc.get("questions", [])
+    answers = [str(a) for a in body.answers][:len(questions)]
+    job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0}) or {}
+    assessment, verdict, score = await assess_screening(job, questions, answers)
+    await db.applications.update_one({"id": app_id}, {"$set": {
+        "screening.answers": answers, "screening.completed": True,
+        "screening.ai_assessment": assessment, "screening.ai_verdict": verdict, "screening.ai_score": score,
+        "screening.completed_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    await notify_admins("screening", "Examen de pré-qualification complété",
+                        f"{app.get('candidate_name','')} a répondu à l'examen pour « {app.get('job_title','')} ».")
+    return {"ok": True}
+
+
+@api.post("/cron/cleanup-recordings")
+async def cleanup_recordings_cron():
+    months = int(os.environ.get("RECORDING_RETENTION_MONTHS", "6"))
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=months * 30)).isoformat()
+    old = await db.recordings.find({"created_at": {"$lt": cutoff}}, {"_id": 0, "id": 1, "video_file_id": 1}).to_list(2000)
+    for r in old:
+        if r.get("video_file_id"):
+            await db.files.update_one({"id": r["video_file_id"]}, {"$set": {"is_deleted": True}})
+        await db.recordings.delete_one({"id": r["id"]})
+    return {"deleted": len(old)}
 
 
 @api.get("/contracts/me")

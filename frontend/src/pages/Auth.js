@@ -62,11 +62,9 @@ export default function Auth() {
           email: form.email, password: form.password,
           captcha_id: captcha.captcha_id, captcha_answer: captchaAns,
         });
-        if (data.otp_required) {
-          setPendingEmail(data.email);
-          setStep("otp");
-          toast.success("Un code de connexion vous a été envoyé par email.");
-        }
+        setSession(data.token, data.user);
+        toast.success("Bienvenue " + data.user.name + " !");
+        go(data.user);
       } else {
         const { data } = await api.post("/auth/register", {
           name: form.name, email: form.email, password: form.password,

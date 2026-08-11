@@ -409,6 +409,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
   useEffect(() => { load(); }, [load]);
 
   const [schedule, setSchedule] = useState(null);
+  const [examApp, setExamApp] = useState(null);
   const [itwForm, setItwForm] = useState({ title: "", date: "", time: "", location: "", notes: "" });
   const [scheduling, setScheduling] = useState(false);
 
@@ -525,6 +526,9 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                   <span className="text-sm text-muted-foreground">• {detail.job_title}</span>
                   <Button variant="outline" size="sm" className="rounded-full ml-auto" onClick={() => onOpenProfile(detail.candidate_id)} data-testid="view-full-profile-btn">Voir le profil complet</Button>
                 </div>
+                {detail.screening?.completed && (
+                  <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={() => setExamApp(detail)} data-testid="view-exam-btn"><Sparkles className="h-4 w-4 mr-2" /> Voir l'examen IA</Button>
+                )}
                 <p className="text-sm text-muted-foreground">{detail.candidate_email}</p>
                 {detail.cover_note && <div className="rounded-lg bg-secondary/50 p-3"><p className="text-xs font-semibold mb-1">Note de motivation</p><p className="text-sm italic">"{detail.cover_note}"</p></div>}
                 {detail.transcription && <div className="rounded-lg bg-secondary/50 p-3"><p className="text-xs font-semibold mb-1">Transcription du message vocal</p><p className="text-sm">{detail.transcription}</p></div>}
@@ -552,6 +556,34 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "pending")} className="rounded-full">En attente</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDel(detail)} className="rounded-full ml-auto text-destructive" data-testid="delete-app-btn"><Trash2 className="h-4 w-4" /></Button>
                   </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!examApp} onOpenChange={(v) => !v && setExamApp(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          {examApp && (
+            <>
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Examen de pré-qualification (confidentiel)</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-semibold text-primary flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Avis de l'IA</p>
+                    {typeof examApp.screening?.ai_score === "number" && <span className="text-sm font-bold text-primary" data-testid="exam-score">{examApp.screening.ai_score}/100</span>}
+                  </div>
+                  {examApp.screening?.ai_verdict && <p className="text-sm font-semibold mb-1" data-testid="exam-verdict">Verdict : {examApp.screening.ai_verdict}</p>}
+                  <p className="text-sm whitespace-pre-wrap" data-testid="exam-analysis">{examApp.screening?.ai_assessment || "Analyse indisponible."}</p>
+                </div>
+                <div className="space-y-3">
+                  {(examApp.screening?.questions || []).map((q, i) => (
+                    <div key={i} className="rounded-lg border border-border p-3" data-testid={`exam-qa-${i}`}>
+                      <p className="text-sm font-medium">{i + 1}. {q}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{examApp.screening?.answers?.[i] || "—"}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </>
