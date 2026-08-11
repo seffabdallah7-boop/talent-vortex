@@ -1,0 +1,52 @@
+{
+  "summary": "Frontend regression on new messaging flow (admin activate/deactivate conversation, candidate conditional access, AI vs recruiter separation, unread dividers). CRITICAL BLOCKER: Admin > Messages page is completely broken due to multiple undefined references inside the Messages() component of /app/frontend/src/pages/AdminDashboard.js. The page renders a full-screen CRA runtime error overlay and NONE of the admin messaging flows (new-conv-select, toggle-conv-active, admin-chat-input, admin-chat-send, admin-unread-divider) can be exercised. Because admin cannot activate the conversation, the candidate-side flows (recruiter-chat-card visibility, chat-locked-notice, unread-divider) cannot be validated either. Testing agent identified and patched ONE of the missing pieces (firstUnread state + destructure of {messages, first_unread} in the messages loader), but the remaining bugs are business-logic implementation gaps that the main agent must fix.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard.js — Messages() component (lines ~806-960)",
+        "issue": "CRITICAL — Multiple undefined references throw ReferenceError on render, producing a full-screen 'Uncaught runtime errors' overlay as soon as nav-messages is clicked. Confirmed by testing agent in two consecutive runs:\n  1) `firstUnread is not defined` — PATCHED by testing agent (added `const [firstUnread, setFirstUnread] = useState(null);` and updated the /chat/messages loader to destructure `data.messages` and `data.first_unread`).\n  2) `startConv is not defined` — STILL BROKEN. Line 897 uses `<Select onValueChange={startConv}>` but there is NO `startConv` function anywhere in the file. Needed to start a new conversation with a candidate (should POST to backend to create/activate the conv and setActive(newConv)).\n  3) `candidates is not defined` — STILL BROKEN (will throw once startConv is fixed). Line 900 iterates `candidates.map(...)` but `candidates` is only declared inside another component (Interviews, line 1167). Messages() needs its own `const [candidates, setCandidates] = useState([]); useEffect(() => api.get('/candidates').then(...))` block.\n  4) `toggleActive` variable-shadow bug — Line 945 wires `onClick={toggleActive}` inside Messages(), but the ONLY toggleActive in scope is the OUTER-file function defined at line 304 for jobs: `const toggleActive = async (j) => { ... /api/jobs/{id}/toggle }`. Clicking the header button will therefore try to toggle a job, NOT hit `PUT /api/chat/conversations/{candidate_id}/active`. A local `toggleActive` (or renamed `toggleConvActive`) must be defined inside Messages() that calls the correct endpoint and refreshes convs/active.",
+        "selector": "[data-testid='nav-messages'], [data-testid='new-conv-select'], [data-testid='toggle-conv-active']",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Admin activates/deactivates conversation (PUT /api/chat/conversations/{candidate_id}/active)",
+        "issue": "Not exercised — cannot even reach the toggle button because Messages() crashes before render. Even after visual patches, the click handler is wired to the wrong toggleActive (jobs) — see ui_bugs #4.",
+        "affected_selectors": ["[data-testid='toggle-conv-active']", "[data-testid='new-conv-select']"]
+      },
+      {
+        "flow": "Candidate conditional access (recruiter-chat-card / chat-locked-notice)",
+        "issue": "Blocked — cannot verify because admin flow to ACTIVATE the conversation is unreachable. Candidate login itself works (redirects to /dashboard).",
+        "affected_selectors": ["[data-testid='recruiter-chat-card']", "[data-testid='open-recruiter-chat-btn']", "[data-testid='chat-locked-notice']"]
+      },
+      {
+        "flow": "Unread dividers + auto-scroll",
+        "issue": "Blocked (candidate side unread-divider and admin-unread-divider cannot be validated end-to-end until admin Messages() renders). Code paths look correct on inspection (ChatWidget unread-divider + AdminDashboard admin-unread-divider present).",
+        "affected_selectors": ["[data-testid='unread-divider']", "[data-testid='admin-unread-divider']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "MAIN AGENT: In /app/frontend/src/pages/AdminDashboard.js Messages() component, add the missing implementations:\n  (a) Declare `const [candidates, setCandidates] = useState([]);` and load with `useEffect(() => api.get('/candidates').then(({data}) => setCandidates(data)).catch(()=>{}), [])`.\n  (b) Add `const startConv = async (candidate_id) => { await api.put(`/chat/conversations/${candidate_id}/active`, { active: true }); const c = candidates.find(x=>x.user_id===candidate_id); const { data } = await api.get('/chat/conversations'); setConvs(data); const conv = data.find(k=>k.candidate_id===candidate_id) || { candidate_id, candidate_name: c?.name, active: true }; setActive(conv); };`  (or align with the actual backend contract).\n  (c) Rename the button handler to avoid the OUTER `toggleActive` shadow — define a local `const toggleConvActive = async () => { if(!active) return; const newVal = !activeConv?.active; await api.put(`/chat/conversations/${active.candidate_id}/active`, { active: newVal }); const { data } = await api.get('/chat/conversations'); setConvs(data); };` and update the Button `onClick={toggleConvActive}`.\n  (d) Keep the firstUnread patch already applied by testing agent (state + destructure of {messages, first_unread}).",
+    "MAIN AGENT: After fixing, re-run the full flow — admin new-conv-select 'Dev Test' → toggle-conv-active shows 'Désactiver' → send text/attach/edit/delete; candidate sees recruiter-chat-card → open shows Messagerie recruteur + unread-divider; admin deactivates → candidate loses card & chat-locked-notice appears if forced; candidate sends message → admin sees admin-unread-divider.",
+    "Verify chat-toggle-btn (floating) opens Assistant IA only, and chat-tab-ai / chat-tab-support are absent (initial ChatWidget inspection shows no tabs — LGTM)."
+  ],
+  "critical_code_review_comments": [
+    "AdminDashboard.js Messages() has FOUR broken references (firstUnread PATCHED; startConv, candidates, toggleActive-scope-collision STILL BROKEN). This indicates the component was refactored/reintroduced without ESLint 'no-undef' being enforced. Enable/verify ESLint no-undef and react/no-undef rules in the CRA config.",
+    "Function-scope shadowing risk: two `toggleActive` functions in the same file (one at line 304 for jobs, none needed at line 945 for chat). Recommend distinct names (toggleJobActive, toggleConvActive) to prevent future re-occurrences.",
+    "AdminDashboard.js is now 1499 lines. Should be split (Messages, Interviews, Candidates as separate files) — the current size is the direct cause of these scope-collision bugs.",
+    "The /chat/messages loader must ALWAYS handle the new shape {messages, first_unread} — the testing agent added Array.isArray() guard but backend already returns the object shape per the review request, so eventually the array-branch can be dropped."
+  ],
+  "updated_files": ["/app/frontend/src/pages/AdminDashboard.js (added firstUnread state + updated loader destructure only; did NOT fix startConv/candidates/toggleActive)"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "0% for admin messaging flows (crashes); candidate login OK; ChatWidget code inspection OK but not exercised end-to-end because admin cannot activate."},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (OK); Candidate cand_1786303173@test.com / Test@2026! (OK, resolves to user_cf3379e8cc6f 'Dev Test'). Captcha auto-solved via body regex.",
+  "seed_data_creation": "None — could not send any admin messages because Messages() crashed.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "1) The current blocker is a set of undefined names inside AdminDashboard.js Messages() — startConv, candidates, and toggleActive-scope-collision. firstUnread was patched by iteration_18. 2) Candidate cand_1786303173@test.com maps to candidate_id 'user_cf3379e8cc6f' (name 'Dev Test'). 3) Login route is /login. 4) After main agent fixes, retest full flow per action_items #2. 5) Consider seeding the target conversation via curl PUT /api/chat/conversations/user_cf3379e8cc6f/active to activate before UI test if admin toggle still flaky.",
+  "rca of the issue": "Root cause: The Messages() component of AdminDashboard.js was extended for the new messaging features (activate/deactivate, unread divider, new-conv-select) but only PARTIALLY wired: JSX references `startConv`, `candidates`, `firstUnread` and `toggleActive` (as a conv-toggle) without declaring/importing them inside the component's scope. React renders → JS evaluates the JSX → ReferenceError thrown → CRA overlay covers the entire page → all downstream data-testids for admin messaging are unmountable. Reproduction: log in as admin → click [data-testid='nav-messages'] → overlay: 'firstUnread is not defined' (before patch) / 'startConv is not defined' (after firstUnread patch). Mitigation: implement startConv, add local candidates state+fetch, rename inner conv-toggle to avoid shadowing the outer toggleActive(job). Keep firstUnread patch already applied. Enable ESLint no-undef in CI."
+}

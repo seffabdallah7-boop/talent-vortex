@@ -42,6 +42,7 @@ export default function ChatWidget() {
   const [chatMeta, setChatMeta] = useState({ active: false, unread: 0 });
   const [firstUnread, setFirstUnread] = useState(null);
   const scrollRef = useRef(null);
+  const unreadRef = useRef(null);
   const fileInputRef = useRef(null);
   const recRef = useRef(null);
   const chunksRef = useRef([]);
@@ -82,7 +83,13 @@ export default function ChatWidget() {
     return () => clearInterval(int);
   }, [open, tab, user]);
 
-  useEffect(() => { scrollDown(); }, [aiMsgs, supMsgs]);
+  useEffect(() => {
+    if (tab === "support" && firstUnread && unreadRef.current) {
+      setTimeout(() => unreadRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
+    } else {
+      scrollDown();
+    }
+  }, [aiMsgs, supMsgs, firstUnread, tab]);
 
   useEffect(() => {
     if (!user || user.role !== "candidate") return;
@@ -237,7 +244,7 @@ export default function ChatWidget() {
                   {supMsgs.map((m) => (
                     <div key={m.id}>
                       {firstUnread === m.id && (
-                        <div className="flex items-center gap-2 my-2" data-testid="unread-divider">
+                        <div ref={unreadRef} className="flex items-center gap-2 my-2" data-testid="unread-divider">
                           <div className="flex-1 h-px bg-primary/40" />
                           <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Nouveaux messages</span>
                           <div className="flex-1 h-px bg-primary/40" />

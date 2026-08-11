@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only regression of the messaging flow after fix from iteration_18. All 4 features PASS end-to-end: (1) Admin > Messages page now renders (no runtime overlay); startConv, candidates, firstUnread, toggleActive are all defined inside Messages(). new-conv-select lists 44 candidates; selecting 'Dev Test' calls PUT /api/chat/conversations/user_cf3379e8cc6f/active and shows 'Discussion activée' toast. toggle-conv-active toggles Activer/Désactiver correctly (verified activate->deactivate->reactivate cycle). admin-chat-input + admin-chat-send send text OK. admin-attach-btn and admin voice-btn are present. (2) Candidate: recruiter-chat-card is visible on dashboard when active, open-recruiter-chat-btn opens widget with chat-header-title='Messagerie recruteur' and unread-divider ('NOUVEAUX MESSAGES') displayed above the first unread message. When admin deactivates the conversation, the card disappears from the candidate dashboard on next reload. (3) AI separation: floating chat-toggle-btn opens Assistant IA (chat-header-title='Assistant IA'); chat-tab-ai and chat-tab-support are absent (no tabs). (4) unread-divider / admin-unread-divider selectors are present in the code and unread-divider was visually confirmed for the candidate. No runtime errors, no page errors, no console errors during the flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminDashboard.js is 1514 lines — Messages/Interviews/Candidates should be extracted into their own files to avoid scope-collision recurrences (there are still two functions named 'toggleActive' in the same file — the jobs one at line 304 and the chat one at line 890 inside Messages(); currently OK because of function-scope shadowing, but recommend renaming the chat one to toggleConvActive for clarity).",
+    "The /chat/messages loader still keeps the legacy Array.isArray(data) branch — since backend now returns {messages, first_unread}, the array branch can be removed for cleanliness."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% for all 4 messaging features tested"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (OK); Candidate cand_1786303173@test.com / Test@2026! (OK, user_cf3379e8cc6f 'Dev Test'). Captcha auto-solved via body regex.",
+  "seed_data_creation": "Sent one admin message 'Hello from testing agent' to Dev Test conversation. Conversation re-activated at the end for a clean state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iteration_18 blocker fully resolved. All 4 messaging features validated end-to-end. Only remaining cleanup items are code-review comments (file split + toggleActive rename) — non-blocking."
+}

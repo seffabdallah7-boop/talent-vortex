@@ -807,6 +807,7 @@ function Messages({ onOpenProfile, focus }) {
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
   const [msgs, setMsgs] = useState([]);
+  const [firstUnread, setFirstUnread] = useState(null);
   const [text, setText] = useState("");
   const [call, setCall] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -814,23 +815,33 @@ function Messages({ onOpenProfile, focus }) {
   const fileInputRef = useRef(null);
   const recRef = useRef(null);
   const chunksRef = useRef([]);
+  const unreadRef = useRef(null);
+  const [candidates, setCandidates] = useState([]);
 
   useEffect(() => { if (focus?.candidate_id) setActive(focus); }, [focus]);
+  useEffect(() => { api.get("/candidates").then(({ data }) => setCandidates(data)).catch(() => {}); }, []);
 
+  const loadConvs = useCallback(() => api.get("/chat/conversations").then(({ data }) => setConvs(data)).catch(() => {}), []);
   useEffect(() => {
-    const load = () => api.get("/chat/conversations").then(({ data }) => setConvs(data)).catch(() => {});
-    load();
-    const int = setInterval(load, 5000);
+    loadConvs();
+    const int = setInterval(loadConvs, 5000);
     return () => clearInterval(int);
-  }, []);
+  }, [loadConvs]);
 
   useEffect(() => {
     if (!active) return;
-    const load = () => api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => setMsgs(data)).catch(() => {});
+    const load = () => api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => {
+      if (Array.isArray(data)) { setMsgs(data); }
+      else { setMsgs(data.messages || []); setFirstUnread(data.first_unread || null); }
+    }).catch(() => {});
     load();
     const int = setInterval(load, 4000);
     return () => clearInterval(int);
   }, [active]);
+
+  useEffect(() => {
+    if (firstUnread && unreadRef.current) setTimeout(() => unreadRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }), 100);
+  }, [firstUnread, msgs]);
 
   const send = async () => {
     if (!text.trim() || !active) return;
@@ -839,7 +850,7 @@ function Messages({ onOpenProfile, focus }) {
     setText("");
   };
 
-  const reload = () => active && api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => setMsgs(data)).catch(() => {});
+  const reload = () => active && api.get(`/chat/messages?candidate_id=${active.candidate_id}`).then(({ data }) => { setMsgs(Array.isArray(data) ? data : (data.messages || [])); setFirstUnread(Array.isArray(data) ? null : (data.first_unread || null)); }).catch(() => {});
 
   const onPickFile = async (e) => {
     const file = e.target.files?.[0];
@@ -875,6 +886,19 @@ function Messages({ onOpenProfile, focus }) {
 
   const editMsg = async (m, t) => { try { await api.put(`/chat/messages/${m.id}`, { text: t }); reload(); } catch { toast.error("Échec de la modification"); } };
   const deleteMsg = async (m) => { try { await api.delete(`/chat/messages/${m.id}`); reload(); } catch { toast.error("Échec de la suppression"); } };
+
+  const toggleActive = async () => {
+    if (!active) return;
+    const na = !(convs.find((c) => c.candidate_id === active.candidate_id)?.active);
+    try { await api.put(`/chat/conversations/${active.candidate_id}/active`, { active: na }); toast.success(na ? "Conversation activée — le candidat peut y accéder." : "Conversation désactivée."); loadConvs(); }
+    catch { toast.error("Action impossible"); }
+  };
+  const startConv = async (candId) => {
+    const c = candidates.find((x) => x.user_id === candId);
+    if (!c) return;
+    try { await api.put(`/chat/conversations/${candId}/active`, { active: true }); toast.success("Discussion activée"); loadConvs(); setActive({ candidate_id: candId, candidate_name: c.name, picture: c.picture }); }
+    catch { toast.error("Impossible de démarrer la discussion"); }
+  };
 
   const activeConv = active ? (convs.find((c) => c.candidate_id === active.candidate_id) || active) : null;
 
@@ -942,7 +966,7 @@ function Messages({ onOpenProfile, focus }) {
                 {msgs.map((m) => (
                   <div key={m.id}>
                     {firstUnread === m.id && (
-                      <div className="flex items-center gap-2 my-2" data-testid="admin-unread-divider">
+                      <div ref={unreadRef} className="flex items-center gap-2 my-2" data-testid="admin-unread-divider">
                         <div className="flex-1 h-px bg-primary/40" />
                         <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Nouveaux messages</span>
                         <div className="flex-1 h-px bg-primary/40" />
