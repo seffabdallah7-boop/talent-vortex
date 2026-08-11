@@ -103,6 +103,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Candidatures** : recherche (candidat/email/poste) + filtre par offre + suppression par ligne.
 - **Suppression généralisée** : toutes les listes admin disposent d'un delete.
 
+## Implemented (2026-06, itération 22 — Filtre conversations + frappe rapide + accusés de lecture)
+- **Filtre conversations admin** : segmenté Toutes/Actives/Inactives.
+- **Frappe plus réactive** : polling messages à 2 s quand le chat est ouvert (candidat + admin).
+- **Accusés de lecture enrichis** : `read_at` stocké au marquage lu ; infobulle « Lu à HH:MM » au survol du statut du message.
+
 ## Implemented (2026-06, itération 21 — Badges de messages non lus)
 - **Badge menu admin** : nombre total de messages non lus affiché sur l'item « Messages » (somme des conversations, poll 10 s).
 - **Badge menu candidat** : item « Messagerie recruteur » (visible si conversation active) avec compteur de messages recruteur non lus ; clic ouvre le chat. Validé par curl (admin=3, candidat=1).

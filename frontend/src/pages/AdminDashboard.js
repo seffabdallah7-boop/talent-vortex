@@ -831,6 +831,7 @@ function Messages({ onOpenProfile, focus }) {
   const chunksRef = useRef([]);
   const unreadRef = useRef(null);
   const [candidates, setCandidates] = useState([]);
+  const [convFilter, setConvFilter] = useState("all");
   const [otherTyping, setOtherTyping] = useState(false);
   const typingRef = useRef(0);
   const pingTyping = () => { const n = Date.now(); if (active && n - typingRef.current > 2500) { typingRef.current = n; api.post("/chat/typing", { candidate_id: active.candidate_id }).catch(() => {}); } };
@@ -852,7 +853,7 @@ function Messages({ onOpenProfile, focus }) {
       else { setMsgs(data.messages || []); setFirstUnread(data.first_unread || null); setOtherTyping(!!data.other_typing); }
     }).catch(() => {});
     load();
-    const int = setInterval(load, 4000);
+    const int = setInterval(load, 2000);
     return () => clearInterval(int);
   }, [active]);
 
@@ -925,15 +926,20 @@ function Messages({ onOpenProfile, focus }) {
       <h1 className="font-display text-3xl font-semibold mb-6">Messages</h1>
       <div className="grid md:grid-cols-3 gap-4 h-[560px]">
         <div className="rounded-2xl border border-border bg-card overflow-y-auto">
-          <div className="p-2 border-b border-border">
+          <div className="p-2 border-b border-border space-y-2">
             <Select value="" onValueChange={startConv}>
               <SelectTrigger className="w-full rounded-full" data-testid="new-conv-select"><SelectValue placeholder="+ Nouvelle discussion" /></SelectTrigger>
               <SelectContent>
                 {candidates.map((c) => <SelectItem key={c.user_id} value={c.user_id}>{c.name} — {c.email}</SelectItem>)}
               </SelectContent>
             </Select>
+            <div className="inline-flex rounded-full border border-border p-0.5 w-full">
+              {[["all", "Toutes"], ["active", "Actives"], ["inactive", "Inactives"]].map(([k, lbl]) => (
+                <button key={k} onClick={() => setConvFilter(k)} data-testid={`conv-filter-${k}`} className={`flex-1 rounded-full px-2 py-1 text-xs font-medium transition-colors ${convFilter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{lbl}</button>
+              ))}
+            </div>
           </div>
-          {convs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : convs.map((c) => (
+          {(() => { const shownConvs = convs.filter((c) => convFilter === "all" || (convFilter === "active" ? c.active : !c.active)); return shownConvs.length === 0 ? <p className="p-6 text-sm text-muted-foreground">Aucune conversation.</p> : shownConvs.map((c) => (
             <button key={c.candidate_id} onClick={() => setActive(c)} data-testid={`conv-${c.candidate_id}`} className={`w-full text-left p-4 border-b border-border hover:bg-secondary transition-colors ${active?.candidate_id === c.candidate_id ? "bg-secondary" : ""}`}>
               <div className="flex items-center gap-3">
                 <div className="relative shrink-0">
@@ -955,7 +961,7 @@ function Messages({ onOpenProfile, focus }) {
                 </div>
               </div>
             </button>
-          ))}
+          )); })()}
         </div>
         <div className="md:col-span-2 rounded-2xl border border-border bg-card flex flex-col">
           {!active ? (

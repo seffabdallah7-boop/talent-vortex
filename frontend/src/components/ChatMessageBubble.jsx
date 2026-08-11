@@ -50,7 +50,7 @@ export default function ChatMessageBubble({ m, mine, editable, onEdit, onDelete 
         <div className={`mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground ${mine ? "justify-end" : "justify-start"}`}>
           <span>{fmtTime(m.created_at)}</span>
           {m.edited && !m.deleted && <span>· modifié</span>}
-          {mine && m.read !== undefined && <span data-testid={`msg-read-status-${m.id}`}>{m.read ? "✓✓ Vu" : "✓ Envoyé"}</span>}
+          {mine && m.read !== undefined && <span data-testid={`msg-read-status-${m.id}`} title={m.read ? (m.read_at ? `Lu à ${fmtTime(m.read_at)}` : "Lu") : "Envoyé, non lu"} className="cursor-default">{m.read ? "✓✓ Vu" : "✓ Envoyé"}</span>}
           {editable && mine && !m.deleted && (
             <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 transition-opacity">
               {!att && <button onClick={() => setEditing(true)} data-testid={`edit-btn-${m.id}`} title="Modifier"><Pencil className="h-3 w-3" /></button>}

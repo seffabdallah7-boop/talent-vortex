@@ -66,7 +66,7 @@ export default function ChatWidget() {
   useEffect(() => {
     if (!open || tab !== "support" || !user) return;
     loadSupport();
-    const int = setInterval(loadSupport, 4000);
+    const int = setInterval(loadSupport, 2000);
     return () => clearInterval(int);
   }, [open, tab, user]);
 

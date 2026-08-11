@@ -1465,7 +1465,7 @@ async def get_messages(candidate_id: Optional[str] = Query(None), user: dict = D
         {"_id": 0, "id": 1}, sort=[("created_at", 1)],
     )
     first_unread = first["id"] if first else None
-    await db.messages.update_many({"conversation_id": conv, "sender_role": other_role, "read": False}, {"$set": {"read": True}})
+    await db.messages.update_many({"conversation_id": conv, "sender_role": other_role, "read": False}, {"$set": {"read": True, "read_at": datetime.now(timezone.utc).isoformat()}})
     msgs = await db.messages.find({"conversation_id": conv}, {"_id": 0}).sort("created_at", 1).to_list(2000)
     # Indicateur de frappe : l'autre partie tape si son timestamp est récent (< 6 s)
     other_typing = False
