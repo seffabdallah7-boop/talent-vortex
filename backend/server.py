@@ -60,6 +60,9 @@ async def startup():
             if not existing.get("password_hash") or not verify_password(admin_password, existing["password_hash"]):
                 updates["password_hash"] = hash_password(admin_password)
             await db.users.update_one({"email": admin_email}, {"$set": updates})
+    super_email = (os.environ.get("SUPER_ADMIN_EMAIL") or admin_email).lower().strip()
+    if super_email:
+        await db.users.update_one({"email": super_email}, {"$set": {"is_super": True, "role": "admin"}})
 
 
 @app.on_event("shutdown")

@@ -16,12 +16,14 @@ export function Avatar({ name = "", src, size = 40, className = "", onClick, tes
   const style = { width: size, height: size };
   const clickable = onClick ? "cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow" : "";
   const common = `shrink-0 rounded-full overflow-hidden flex items-center justify-center ${clickable} ${className}`;
-  const validSrc = typeof src === "string" && /^(https?:\/\/|data:image\/)/.test(src);
+  const backend = process.env.REACT_APP_BACKEND_URL || "";
+  const resolved = typeof src === "string" && src.startsWith("/") ? `${backend}${src}` : src;
+  const validSrc = typeof resolved === "string" && /^(https?:\/\/|data:image\/)/.test(resolved);
 
   if (validSrc) {
     return (
       <img
-        src={src}
+        src={resolved}
         alt={name}
         style={style}
         onClick={onClick}

@@ -10,13 +10,15 @@ import VideoCall from "@/components/VideoCall";
 import IncomingCall from "@/components/IncomingCall";
 import ScreeningQuiz from "@/components/ScreeningQuiz";
 import AudioPlayer from "@/components/AudioPlayer";
+import { Avatar } from "@/components/Avatar";
+import ImageLightbox from "@/components/ImageLightbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle, Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -501,6 +503,9 @@ function ProfileForm({ profile, onSaved }) {
   const [saving, setSaving] = useState(false);
   const cvRef = useRef(null);
   const [cvUploading, setCvUploading] = useState(false);
+  const photoRef = useRef(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -568,6 +573,24 @@ function ProfileForm({ profile, onSaved }) {
     }
   };
 
+  const uploadPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      await api.post("/profile/photo", fd);
+      toast.success("Photo mise à jour");
+      onSaved?.();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Échec de l'envoi de la photo");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   return (
     <form onSubmit={save} className="space-y-6" data-testid="profile-form">
       <div>
@@ -586,6 +609,21 @@ function ProfileForm({ profile, onSaved }) {
           <div><Label>Années d'expérience</Label><Input type="number" min="0" className="mt-1.5" data-testid="profile-years" {...field("years_experience")} /></div>
         </div>
       </div>
+
+      <div className="rounded-2xl border border-border bg-card p-6 space-y-3" data-testid="photo-card">
+        <p className="font-medium">Photo de profil</p>
+        <div className="flex items-center gap-4">
+          <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
+            <Avatar name={profile.name} src={profile.picture} size={72} />
+          </button>
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
+          <Button type="button" variant="outline" className="rounded-full" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
+            {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
+            {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
+          </Button>
+        </div>
+      </div>
+      <ImageLightbox src={profile.picture} alt={profile.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
 
       <div className="rounded-2xl border border-border bg-card p-6 space-y-3" data-testid="cv-card">
         <p className="font-medium">CV / Curriculum Vitae</p>

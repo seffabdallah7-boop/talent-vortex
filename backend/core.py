@@ -129,6 +129,8 @@ def public_user(u: dict) -> dict:
         "ai_domains": u.get("ai_domains", []),
         "cv_file_id": u.get("cv_file_id"),
         "cv_filename": u.get("cv_filename"),
+        "picture_file_id": u.get("picture_file_id"),
+        "is_super": u.get("is_super", False),
         "profile_completed": u.get("profile_completed", False),
     }
 
@@ -177,6 +179,12 @@ async def get_current_user(
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Acces reserve a l'administrateur")
+    return user
+
+
+async def require_super(user: dict = Depends(get_current_user)) -> dict:
+    if not user.get("is_super"):
+        raise HTTPException(status_code=403, detail="Action non autorisee")
     return user
 
 

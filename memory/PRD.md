@@ -154,5 +154,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Clés React (code review #7)** : clés composites pour le marquee des catégories (Landing) et les puces (Chips) au lieu de l'index.
 - Faux positifs écartés : les `is None`/`is not None` (code review #6) sont corrects ; `i18n.js` ne contient que des traductions (pas de secrets, #1) ; localStorage/httpOnly (#3) = choix d'archi Emergent conservé.
 
+## Implemented (2026-06, itération 28 — Photo de profil, mot de passe visible, super admin)
+- **Photo de profil** : upload/modification dans le profil candidat (`POST /api/profile/photo`, servie publiquement via `GET /api/files/public/{id}`). Affichée dans le profil admin ; clic → agrandissement plein écran (`ImageLightbox`, façon Facebook). `Avatar` résout les URLs relatives `/api/...` via `REACT_APP_BACKEND_URL`.
+- **Mot de passe visible** : composant `PasswordInput` avec bouton œil (afficher/masquer) sur tous les champs mot de passe (connexion, réinitialisation).
+- **Super admin** : statut caché `is_super`. Non supprimable (delete → 404), invisible/inconnu des admins simples (`is_super` retiré des réponses liste/détail sauf pour un super admin), et seul un super admin peut nommer un autre super admin (`PUT /api/users/{id}/super`, dépendance `require_super`). Bootstrap : `SUPER_ADMIN_EMAIL` (défaut = `ADMIN_EMAIL`). UI (badge + bouton « Super admin ») visible uniquement pour un super admin.
+- Vérifié frontend **100 %** (iter 24) + backend par curl. Aucun fichier corrompu.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

@@ -3,6 +3,7 @@ import api, { fileUrl } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
+import ImageLightbox from "@/components/ImageLightbox";
 import StatusBadge from "@/components/StatusBadge";
 import {
   Loader2, Mail, Phone, MapPin, Briefcase, Globe, Star, CalendarDays,
@@ -30,6 +31,7 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   useEffect(() => {
     if (open && userId) {
@@ -60,7 +62,8 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
           <div className="space-y-6">
             {/* Header */}
             <div className="flex items-start gap-4">
-              <Avatar name={u.name} src={u.picture} size={72} testId="profile-avatar" />
+              <Avatar name={u.name} src={u.picture} size={72} testId="profile-avatar" onClick={u.picture ? () => setPhotoOpen(true) : undefined} />
+              <ImageLightbox src={u.picture} alt={u.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-display text-2xl font-semibold" data-testid="profile-name-heading">{u.name || "Sans nom"}</h2>

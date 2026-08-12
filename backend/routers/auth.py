@@ -300,3 +300,27 @@ async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get
     })
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}})
     return {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}
+
+
+@router.post("/profile/photo")
+async def upload_profile_photo(photo: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    data = await photo.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Fichier vide")
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image trop volumineuse (max 8 Mo)")
+    ct = photo.content_type or "image/jpeg"
+    if not ct.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Veuillez sélectionner une image")
+    ext = photo.filename.split(".")[-1] if photo.filename and "." in photo.filename else "jpg"
+    path = f"{APP_NAME}/photos/{user['user_id']}/{uuid.uuid4()}.{ext}"
+    put_object(path, data, ct)
+    file_id = str(uuid.uuid4())
+    await db.files.insert_one({
+        "id": file_id, "storage_path": path, "original_filename": photo.filename or "photo",
+        "content_type": ct, "owner_id": user["user_id"], "public": True,
+        "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    picture = f"/api/files/public/{file_id}"
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"picture": picture, "picture_file_id": file_id}})
+    return {"picture": picture}

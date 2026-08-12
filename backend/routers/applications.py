@@ -259,6 +259,15 @@ async def delete_application(app_id: str, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 
+@router.get("/files/public/{file_id}")
+async def download_public_file(file_id: str):
+    record = await db.files.find_one({"id": file_id, "is_deleted": False, "public": True}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    data, content_type = get_object(record["storage_path"])
+    return Response(content=data, media_type=record.get("content_type", content_type))
+
+
 @router.get("/files/{file_id}")
 async def download_file(file_id: str, user: dict = Depends(get_current_user)):
     record = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})

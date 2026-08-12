@@ -7,6 +7,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PasswordInput from "@/components/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Briefcase, Loader2, Sun, Moon, RefreshCw, ShieldCheck, ArrowLeft } from "lucide-react";
@@ -188,7 +189,7 @@ export default function Auth() {
                 </div>
                 <div>
                   <Label htmlFor="password">{t("auth.password")}</Label>
-                  <Input id="password" type="password" data-testid="auth-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required className="mt-1.5" />
+                  <PasswordInput id="password" data-testid="auth-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required wrapperClassName="mt-1.5" />
                   {tab === "register" && <p className="text-xs text-muted-foreground mt-1">{t("auth.passwordHint")}</p>}
                 </div>
                 {CaptchaFieldEl}
@@ -241,7 +242,7 @@ export default function Auth() {
                 </div>
                 <div>
                   <Label htmlFor="rp">{t("auth.newPassword")}</Label>
-                  <Input id="rp" type="password" data-testid="reset-password" value={reset.new_password} onChange={(e) => setReset({ ...reset, new_password: e.target.value })} required className="mt-1.5" />
+                  <PasswordInput id="rp" data-testid="reset-password" value={reset.new_password} onChange={(e) => setReset({ ...reset, new_password: e.target.value })} required wrapperClassName="mt-1.5" />
                   <p className="text-xs text-muted-foreground mt-1">{t("auth.passwordHint")}</p>
                 </div>
                 <Button type="submit" disabled={loading} className="w-full rounded-full h-11" data-testid="reset-submit-btn">

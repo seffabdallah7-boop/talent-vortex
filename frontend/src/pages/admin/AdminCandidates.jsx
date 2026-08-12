@@ -42,6 +42,13 @@ export default function Candidates({ onOpenProfile }) {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
+  const toggleSuper = async (u) => {
+    try {
+      await api.put(`/users/${u.user_id}/super`, { is_super: !u.is_super });
+      toast.success(!u.is_super ? `${u.name} est désormais super admin` : `Statut super admin retiré à ${u.name}`);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
 
   return (
     <div>
@@ -112,6 +119,7 @@ export default function Candidates({ onOpenProfile }) {
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.role === "admin" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>
                         {u.role === "admin" ? "Administrateur" : "Candidat"}
                       </span>
+                      {me?.is_super && u.is_super && <span className="ml-1 rounded-full bg-amber-500/15 text-amber-600 px-2 py-0.5 text-[10px] font-semibold" data-testid={`super-badge-${u.user_id}`}>Super</span>}
                     </TableCell>
                     <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{u.application_count}</span></TableCell>
                     <TableCell className="text-right">
@@ -120,6 +128,9 @@ export default function Candidates({ onOpenProfile }) {
                       )}
                       {!isSelf && u.role === "admin" && (
                         <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => changeRole(u, "candidate")} data-testid={`demote-${u.user_id}`}>Rétrograder</Button>
+                      )}
+                      {me?.is_super && !isSelf && u.role === "admin" && (
+                        <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => toggleSuper(u)} data-testid={`super-${u.user_id}`}>{u.is_super ? "Retirer super" : "Super admin"}</Button>
                       )}
                       {!isSelf && (
                         <Button variant="ghost" size="icon" onClick={() => setDel(u)} data-testid={`delete-candidate-${u.user_id}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>

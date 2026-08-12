@@ -5,13 +5,17 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
-from core import db, require_admin, public_user
+from core import db, require_admin, require_super, get_current_user, public_user
 
 router = APIRouter()
 
 
 class RoleInput(BaseModel):
     role: str
+
+
+class SuperInput(BaseModel):
+    is_super: bool
 
 
 async def _rating_map() -> dict:
@@ -33,6 +37,9 @@ async def list_candidates(admin: dict = Depends(require_admin)):
         r = rmap.get(u["user_id"])
         u["rating"] = r["avg"] if r else None
         u["rating_count"] = r["n"] if r else 0
+    if not admin.get("is_super"):
+        for u in users:
+            u.pop("is_super", None)
     return users
 
 
@@ -56,6 +63,9 @@ async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] =
         u["rating_count"] = r["n"] if r else 0
     if min_rating:
         users = [u for u in users if (u.get("rating") or 0) >= min_rating]
+    if not admin.get("is_super"):
+        for u in users:
+            u.pop("is_super", None)
     return users
 
 
@@ -67,7 +77,10 @@ async def get_user_detail(user_id: str, admin: dict = Depends(require_admin)):
     apps = await db.applications.find({"candidate_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
     interviews = await db.interviews.find({"candidate_id": user_id}, {"_id": 0}).sort([("date", 1), ("time", 1)]).to_list(500)
     contracts = await db.contracts.find({"candidate_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(500)
-    return {"user": public_user(u), "applications": apps, "interviews": interviews, "contracts": contracts}
+    pub = public_user(u)
+    if not admin.get("is_super"):
+        pub.pop("is_super", None)
+    return {"user": pub, "applications": apps, "interviews": interviews, "contracts": contracts}
 
 
 @router.get("/admin/nationalities")
@@ -86,16 +99,33 @@ async def set_user_role(user_id: str, body: RoleInput, admin: dict = Depends(req
         raise HTTPException(status_code=400, detail="Rôle invalide")
     if user_id == admin["user_id"] and body.role != "admin":
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas retirer votre propre rôle admin")
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "is_super": 1})
+    if target and target.get("is_super") and not admin.get("is_super"):
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     res = await db.users.update_one({"user_id": user_id}, {"$set": {"role": body.role}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     return await db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
 
 
+@router.put("/users/{user_id}/super")
+async def set_super(user_id: str, body: SuperInput, admin: dict = Depends(require_super)):
+    if user_id == admin["user_id"] and not body.is_super:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas retirer votre propre statut")
+    upd = {"is_super": True, "role": "admin"} if body.is_super else {"is_super": False}
+    res = await db.users.update_one({"user_id": user_id}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return {"ok": True, "is_super": body.is_super}
+
+
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     if user_id == admin["user_id"]:
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "is_super": 1})
+    if target and target.get("is_super"):
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     await db.users.delete_one({"user_id": user_id})
     await db.applications.delete_many({"candidate_id": user_id})
     await db.messages.delete_many({"conversation_id": user_id})
@@ -104,6 +134,9 @@ async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
 
 @router.delete("/candidates/{user_id}")
 async def delete_candidate(user_id: str, admin: dict = Depends(require_admin)):
+    target = await db.users.find_one({"user_id": user_id}, {"_id": 0, "is_super": 1})
+    if target and target.get("is_super"):
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     await db.users.delete_one({"user_id": user_id, "role": "candidate"})
     await db.applications.delete_many({"candidate_id": user_id})
     await db.messages.delete_many({"conversation_id": user_id})
