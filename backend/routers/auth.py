@@ -1,6 +1,5 @@
 """Auth & profile routes."""
 import uuid
-import random
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
@@ -132,8 +131,8 @@ async def verify_otp(body: OtpInput):
 
 @router.get("/auth/captcha")
 async def get_captcha():
-    a = random.randint(1, 9)
-    b = random.randint(1, 9)
+    a = secrets.randbelow(9) + 1
+    b = secrets.randbelow(9) + 1
     cid = secrets.token_urlsafe(12)
     await db.captchas.update_one(
         {"cid": cid},
@@ -156,7 +155,7 @@ async def forgot_password(body: ForgotInput):
     email = body.email.lower().strip()
     user = await db.users.find_one({"email": email})
     if user and user.get("password_hash"):
-        code = f"{random.randint(0, 999999):06d}"
+        code = f"{secrets.randbelow(1000000):06d}"
         await db.password_reset_tokens.update_one(
             {"email": email},
             {"$set": {"email": email, "code_hash": hash_password(code),

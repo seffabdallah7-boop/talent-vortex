@@ -20,7 +20,7 @@ function Chips({ items, variant = "secondary" }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((it, i) => (
-        <span key={i} className={`rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>{it}</span>
+        <span key={`${it}-${i}`} className={`rounded-full px-2.5 py-1 text-xs font-medium ${cls}`}>{it}</span>
       ))}
     </div>
   );
@@ -86,6 +86,22 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
                 )}
               </div>
             </div>
+
+            {/* CV */}
+            {u.cv_file_id && (
+              <div className="rounded-2xl border border-border bg-card p-5 flex items-center justify-between gap-3" data-testid="profile-cv-card">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><FileText className="h-5 w-5" /></div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">CV du candidat</p>
+                    <p className="text-xs text-muted-foreground truncate">{u.cv_filename || "Document"}</p>
+                  </div>
+                </div>
+                <Button asChild size="sm" variant="outline" className="rounded-full shrink-0" data-testid="profile-cv-btn">
+                  <a href={fileUrl(u.cv_file_id)} target="_blank" rel="noreferrer"><FileText className="h-4 w-4 mr-1.5" /> Voir le CV</a>
+                </Button>
+              </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-4 gap-3">

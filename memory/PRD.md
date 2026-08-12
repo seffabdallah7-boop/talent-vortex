@@ -148,5 +148,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Chat responsive** : ChatWidget plein écran + retour sur mobile / flottant + fermer sur desktop ; vue Messages admin ~90 % de l'écran, bouton retour placé en tête de la bande horizontale de profils.
 - Vérifié frontend **100 % (5/5)** — testing agent iter 23. Aucun fichier corrompu.
 
+## Implemented (2026-06, itération 27 — CV côté admin + correctifs code review)
+- **CV dans le profil candidat (admin)** : `CandidateProfileDialog` affiche une carte « CV du candidat » avec lien « Voir le CV » (`profile-cv-card` / `profile-cv-btn`) quand `cv_file_id` existe. `GET /api/users/{id}` renvoie déjà `cv_file_id`/`cv_filename` via `public_user`.
+- **Sécurité (code review #5)** : captcha et code de réinitialisation générés via `secrets` (aléa cryptographique) au lieu de `random`.
+- **Clés React (code review #7)** : clés composites pour le marquee des catégories (Landing) et les puces (Chips) au lieu de l'index.
+- Faux positifs écartés : les `is None`/`is not None` (code review #6) sont corrects ; `i18n.js` ne contient que des traductions (pas de secrets, #1) ; localStorage/httpOnly (#3) = choix d'archi Emergent conservé.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

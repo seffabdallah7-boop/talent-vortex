@@ -108,7 +108,7 @@ export default function Landing() {
       <div className="border-b border-border overflow-hidden py-4 bg-card">
         <div className="flex whitespace-nowrap animate-marquee">
           {[...CATS, ...CATS].map((c, i) => (
-            <span key={i} className="mx-6 font-display text-2xl font-semibold text-muted-foreground/50 flex items-center gap-6">
+            <span key={`${c}-${i}`} className="mx-6 font-display text-2xl font-semibold text-muted-foreground/50 flex items-center gap-6">
               {c}<Star className="h-4 w-4 text-primary" />
             </span>
           ))}
