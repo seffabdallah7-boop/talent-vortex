@@ -209,14 +209,8 @@ def _msg_email_html(sender_name: str, text: str) -> str:
 
 async def _deliver_chat(doc, sender_role, conv, cand, preview):
     # On ne crée PAS de notification in-app par message (évite de saturer la cloche).
-    # Les messages non lus sont signalés par le badge du chat. On garde l'email hors-ligne.
-    if sender_role == "candidate":
-        admins = await db.users.find({"role": "admin"}, {"_id": 0, "email": 1, "last_seen": 1}).to_list(50)
-        for a in admins:
-            if not _is_online(a.get("last_seen")) and a.get("email"):
-                await send_email(a["email"], "Nouveau message — Talent Vortex",
-                                 _msg_email_html(doc.get('candidate_name') or "Un candidat", preview))
-    else:
+    # Emails admin désactivés. On garde uniquement l'email hors-ligne vers le candidat.
+    if sender_role == "admin":
         if cand and not _is_online(cand.get("last_seen")) and cand.get("email"):
             await send_email(cand["email"], "Nouveau message du recruteur — Talent Vortex",
                              _msg_email_html("Le recruteur", preview))

@@ -162,14 +162,10 @@ async def create_application(
     }
     await db.applications.insert_one(app_doc)
     app_doc.pop("_id", None)
-    admins = await notify_admins(
+    await notify_admins(
         "application", "Nouvelle candidature",
         f"{app_doc['candidate_name']} a postulé à « {app_doc['job_title']} ».",
     )
-    for adm in admins:
-        if adm.get("email"):
-            await send_email(adm["email"], f"Nouvelle candidature — {app_doc['job_title']}",
-                             admin_new_app_email_html(app_doc))
     return app_doc
 
 

@@ -228,14 +228,10 @@ async def notify_admin_suggestions(job: dict):
     if not top:
         return
     names = ", ".join(f"{c['name']} ({c['score']}%)" for c in top)
-    admins = await notify_admins(
+    await notify_admins(
         "suggestion", "Profils suggérés pour votre offre",
         f"« {job.get('title','')} » : {names}.", {"job_id": job["id"]},
     )
-    for a in admins:
-        if a.get("email"):
-            await send_email(a["email"], f"Profils suggérés — {job.get('title','')}",
-                             suggestions_email_html(job, top))
 
 
 @router.get("/jobs/{job_id}/suggestions")
