@@ -340,6 +340,32 @@ async def notify_admins(ntype: str, title: str, body: str, extra: dict = None):
 # ---------------------------------------------------------------------------
 # Shared AI utility
 # ---------------------------------------------------------------------------
+def extract_cv_text(data: bytes, filename: str = "") -> str:
+    """Extract plain text from a CV file (PDF / DOCX / TXT) for full-text search."""
+    import io
+    name = (filename or "").lower()
+    text = ""
+    try:
+        if name.endswith(".pdf") or data[:4] == b"%PDF":
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            text = "\n".join((p.extract_text() or "") for p in reader.pages)
+        elif name.endswith(".docx"):
+            from docx import Document
+            doc = Document(io.BytesIO(data))
+            text = "\n".join(p.text for p in doc.paragraphs)
+        elif name.endswith(".txt"):
+            text = data.decode("utf-8", errors="ignore")
+    except Exception as e:
+        logger.warning(f"extract_cv_text failed for {filename}: {e}")
+    if not text:
+        try:
+            text = data.decode("utf-8", errors="ignore")
+        except Exception:
+            text = ""
+    return re.sub(r"[ \t]+", " ", text).strip()[:200000]
+
+
 async def transcribe_audio(data: bytes, ext: str) -> str:
     try:
         with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:

@@ -12,6 +12,7 @@ from core import (
     db, logger, APP_NAME, EMERGENT_LLM_KEY, LlmChat, UserMessage,
     get_current_user, require_admin, put_object, get_object, transcribe_audio,
     notify_admins, send_email, admin_new_app_email_html, status_email_html,
+    extract_cv_text,
 )
 
 router = APIRouter()
@@ -114,6 +115,7 @@ async def create_application(
             "content_type": cv.content_type or "application/pdf", "owner_id": user["user_id"],
             "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
         })
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cv_text": extract_cv_text(cv_bytes, cv.filename or "cv.pdf")}})
     elif user.get("cv_file_id"):
         cv_file_id = user["cv_file_id"]
         cv_filename = user.get("cv_filename") or "cv.pdf"

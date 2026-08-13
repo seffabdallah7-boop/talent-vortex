@@ -75,7 +75,7 @@ export default function Candidates({ onOpenProfile }) {
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="flex-1 sm:w-72">
-            <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher (poste, domaine, nationalité...)" className="rounded-full" />
+            <Input data-testid="candidate-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher (nom, email, domaine, contenu du CV...)" className="rounded-full" />
           </div>
           <Select value={minRating} onValueChange={setMinRating}>
             <SelectTrigger className="w-44 rounded-full shrink-0" data-testid="rating-filter"><SelectValue /></SelectTrigger>

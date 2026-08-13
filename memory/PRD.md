@@ -205,6 +205,13 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
   - Clé d'index `ChatWidget:232` = liste `aiMsgs` en append-only (jamais réordonnée) → sûre.
   - Refactors de complexité (ChatWidget/CandidateProfileDialog/create_application) → backlog (code testé, refactor = risque sans gain fonctionnel).
 
+## Implemented (2026-06, itération 36 — Recherche full-text sur le contenu des CV)
+- **Extraction de texte des CV** (`core.extract_cv_text`, via `pypdf` + `python-docx`, fallback txt) exécutée à chaque upload de CV (`POST /profile/cv` et candidature avec CV joint) ; texte stocké dans `users.cv_text` (tronqué à 200k).
+- **Recherche admin étendue** (`GET /users?q=`) : le regex `$or` inclut désormais `cv_text` et `cv_filename`, en plus des champs structurés (nom, email, poste, nationalité, domaines, outils, ville, pays, headline, bio). Permet de retrouver un candidat par le contenu de son CV même si les champs structurés sont vides.
+- **Backfill** des CV existants : `backend/backfill_cv_text.py` (exécuté une fois — 2 utilisateurs mis à jour).
+- Placeholder de recherche mis à jour (« …contenu du CV… »).
+- Vérifié par curl : recherche par mot-clé unique présent uniquement dans le CV → candidat trouvé ; « Kubernetes » (contenu CV) → trouvé ; recherche par nom → OK. Emails admin automatiques : désactivés (itération précédente).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

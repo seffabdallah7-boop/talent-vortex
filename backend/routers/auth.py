@@ -13,6 +13,7 @@ from core import (
     hash_password, verify_password, create_jwt, public_user,
     get_current_user, send_email, validate_password, ensure_not_locked,
     register_failed, clear_attempts, verify_captcha, reset_email_html,
+    extract_cv_text,
 )
 
 router = APIRouter()
@@ -305,9 +306,12 @@ async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get
         "content_type": cv.content_type or "application/pdf", "owner_id": user["user_id"],
         "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
     })
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}})
+    cv_text = extract_cv_text(data, cv.filename or "cv.pdf")
     complete = bool(user.get("name") and user.get("phone") and user.get("nationality") and user.get("domains") and file_id)
-    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"profile_completed": complete}})
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {
+        "cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf",
+        "cv_text": cv_text, "profile_completed": complete,
+    }})
     return {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}
 
 

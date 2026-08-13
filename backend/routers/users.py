@@ -51,6 +51,7 @@ async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] =
         query["$or"] = [
             {"name": rx}, {"email": rx}, {"current_position": rx}, {"nationality": rx},
             {"headline": rx}, {"bio": rx}, {"domains": rx}, {"tools": rx}, {"city": rx}, {"country": rx},
+            {"cv_text": rx}, {"cv_filename": rx},
         ]
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
     counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
