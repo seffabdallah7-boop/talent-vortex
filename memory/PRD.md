@@ -160,5 +160,10 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Super admin** : statut caché `is_super`. Non supprimable (delete → 404), invisible/inconnu des admins simples (`is_super` retiré des réponses liste/détail sauf pour un super admin), et seul un super admin peut nommer un autre super admin (`PUT /api/users/{id}/super`, dépendance `require_super`). Bootstrap : `SUPER_ADMIN_EMAIL` (défaut = `ADMIN_EMAIL`). UI (badge + bouton « Super admin ») visible uniquement pour un super admin.
 - Vérifié frontend **100 %** (iter 24) + backend par curl. Aucun fichier corrompu.
 
+## Implemented (2026-06, itération 29 — Sélection multiple + pagination des listes)
+- Nouveau hook `useListControls` + composants `Pager`/`BulkBar` réutilisables (15 éléments/page, sélection multiple, « tout sélectionner » sur la page affichée, suppression groupée).
+- Appliqué à : **Utilisateurs** (`AdminCandidates`), **Candidatures** et **Contrats** (`AdminDashboard`). Case d'en-tête = tout sélectionner la page ; barre `BulkBar` = compteur + Supprimer ; `Pager` en pied.
+- ⏳ Restant à équiper du même motif : **Entretiens** (vue liste), **Offres d'emploi**, **Enregistrements**.
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

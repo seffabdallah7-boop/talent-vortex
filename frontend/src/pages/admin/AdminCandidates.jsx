@@ -10,6 +10,9 @@ import {
   AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Avatar } from "@/components/Avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useListControls } from "@/hooks/useListControls";
+import { Pager, BulkBar } from "@/components/ListControls";
 import { Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,6 +23,15 @@ export default function Candidates({ onOpenProfile }) {
   const [q, setQ] = useState("");
   const [minRating, setMinRating] = useState("all");
   const [nats, setNats] = useState([]);
+  const lc = useListControls(list, { pageSize: 15, selectId: (u) => u.user_id });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} utilisateur(s) ? Les comptes protégés seront ignorés.`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/users/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
   const load = useCallback(() => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -90,14 +102,17 @@ export default function Candidates({ onOpenProfile }) {
       {list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun utilisateur.</div>
       ) : (
+        <>
+        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="users-bulk" /></div>
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-users" /></TableHead><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {list.map((u) => {
+              {lc.pageItems.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
                 return (
                   <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
+                    <TableCell className="w-10"><Checkbox checked={lc.selected.has(u.user_id)} onCheckedChange={() => lc.toggle(u.user_id)} data-testid={`select-user-${u.user_id}`} /></TableCell>
                     <TableCell className="font-medium">
                       <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(u.user_id)} data-testid={`open-profile-${u.user_id}`}>
                         <Avatar name={u.name} src={u.picture} size={36} />
@@ -142,6 +157,8 @@ export default function Candidates({ onOpenProfile }) {
             </TableBody>
           </Table>
         </div>
+        <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="users-pager" />
+        </>
       )}
       <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
         <AlertDialogContent>

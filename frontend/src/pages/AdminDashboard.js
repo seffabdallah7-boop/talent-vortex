@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { fileUrl, formatApiError, API } from "@/lib/api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useListControls } from "@/hooks/useListControls";
+import { Pager, BulkBar } from "@/components/ListControls";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useDarkMode } from "@/context/DarkModeContext";
@@ -485,6 +488,17 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
+  const shown = apps.filter((a) => { const q = search.trim().toLowerCase(); return !q || (a.candidate_name || "").toLowerCase().includes(q) || (a.candidate_email || "").toLowerCase().includes(q) || (a.job_title || "").toLowerCase().includes(q); });
+  const lc = useListControls(shown, { pageSize: 15 });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} candidature(s) ?`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/applications/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
@@ -522,15 +536,18 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
         </div>
       )}
 
-      {apps.filter((a) => { const q = search.trim().toLowerCase(); return !q || (a.candidate_name || "").toLowerCase().includes(q) || (a.candidate_email || "").toLowerCase().includes(q) || (a.job_title || "").toLowerCase().includes(q); }).length === 0 ? (
+      {shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucune candidature.</div>
       ) : (
+        <>
+        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="apps-bulk" /></div>
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead><TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
-              {apps.filter((a) => { const q = search.trim().toLowerCase(); return !q || (a.candidate_name || "").toLowerCase().includes(q) || (a.candidate_email || "").toLowerCase().includes(q) || (a.job_title || "").toLowerCase().includes(q); }).map((a) => (
+              {lc.pageItems.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
+                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(a.id)} onCheckedChange={() => lc.toggle(a.id)} data-testid={`select-app-${a.id}`} /></TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -562,6 +579,8 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
             </TableBody>
           </Table>
         </div>
+        <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="apps-pager" />
+        </>
       )}
 
       <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
@@ -708,6 +727,15 @@ function Contracts({ initialFilter }) {
   };
   const remove = async () => { await api.delete(`/contracts/${del.id}`); toast.success("Contrat supprimé"); setDel(null); load(); };
   const shown = list.filter((c) => { const q = search.trim().toLowerCase(); return !q || [c.title, c.client, c.candidate_name, c.job_title].some((v) => (v || "").toLowerCase().includes(q)); });
+  const lc = useListControls(shown, { pageSize: 15 });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} contrat(s) ?`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/contracts/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
 
   return (
     <div>
@@ -733,12 +761,15 @@ function Contracts({ initialFilter }) {
       {shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun contrat.</div>
       ) : (
+        <>
+        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="contracts-bulk" /></div>
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-contracts" /></TableHead><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {shown.map((c) => (
+              {lc.pageItems.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => openEdit(c)} data-testid={`contract-row-${c.id}`}>
+                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(c.id)} onCheckedChange={() => lc.toggle(c.id)} data-testid={`select-contract-${c.id}`} /></TableCell>
                   <TableCell className="font-medium">{c.title}</TableCell>
                   <TableCell className="text-muted-foreground">{c.client}</TableCell>
                   <TableCell className="text-muted-foreground">{c.candidate_name}</TableCell>
@@ -753,6 +784,8 @@ function Contracts({ initialFilter }) {
             </TableBody>
           </Table>
         </div>
+        <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="contracts-pager" />
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
