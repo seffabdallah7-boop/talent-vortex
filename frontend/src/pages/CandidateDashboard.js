@@ -640,7 +640,7 @@ function ProfileForm({ profile, onSaved }) {
             <FileText className="h-4 w-4" /> {profile.cv_filename || "Voir mon CV"}
           </a>
         ) : (
-          <p className="text-sm text-muted-foreground">Aucun CV enregistré pour le moment.</p>
+          <p className="text-sm text-amber-600" data-testid="cv-required-hint">CV requis pour postuler — ajoutez-le ci-dessous (clé pour le matching IA).</p>
         )}
         <input ref={cvRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={uploadCv} data-testid="cv-file-input" />
         <div>

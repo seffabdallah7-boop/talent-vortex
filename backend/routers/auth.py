@@ -282,7 +282,7 @@ async def update_profile(body: ProfileInput, background: BackgroundTasks, user: 
         raise HTTPException(status_code=400, detail=f"Champs obligatoires manquants : {', '.join(missing)}")
     if upd:
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": upd})
-    complete = bool(merged.get("name") and merged.get("phone") and merged.get("nationality") and (merged.get("domains")))
+    complete = bool(merged.get("name") and merged.get("phone") and merged.get("nationality") and merged.get("domains") and merged.get("cv_file_id"))
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"profile_completed": complete}})
     background.add_task(refresh_user_domains, user["user_id"])
     fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
@@ -306,6 +306,8 @@ async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get
         "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
     })
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}})
+    complete = bool(user.get("name") and user.get("phone") and user.get("nationality") and user.get("domains") and file_id)
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"profile_completed": complete}})
     return {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}
 
 

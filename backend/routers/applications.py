@@ -89,27 +89,36 @@ async def create_application(
     job_id: str = Form(...),
     cover_note: str = Form(""),
     salary_expectation: str = Form(""),
-    cv: UploadFile = File(...),
+    cv: Optional[UploadFile] = File(None),
     voice: Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_user),
 ):
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Offre introuvable")
+    if not (user.get("phone") or "").strip() or not (user.get("domains") or []):
+        raise HTTPException(status_code=400, detail="Complétez votre profil (téléphone et domaines d'expertise) avant de postuler.")
     if await db.applications.find_one({"job_id": job_id, "candidate_id": user["user_id"]}):
         raise HTTPException(status_code=400, detail="Vous avez déjà postulé à cette offre.")
 
-    # CV upload
-    cv_bytes = await cv.read()
-    cv_ext = cv.filename.split(".")[-1] if "." in (cv.filename or "") else "pdf"
-    cv_path = f"{APP_NAME}/cv/{user['user_id']}/{uuid.uuid4()}.{cv_ext}"
-    put_object(cv_path, cv_bytes, cv.content_type or "application/pdf")
-    cv_file_id = str(uuid.uuid4())
-    await db.files.insert_one({
-        "id": cv_file_id, "storage_path": cv_path, "original_filename": cv.filename,
-        "content_type": cv.content_type or "application/pdf", "owner_id": user["user_id"],
-        "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    # CV : fichier joint sinon CV du profil (obligatoire pour le matching IA)
+    cv_bytes = await cv.read() if cv is not None else b""
+    if cv_bytes:
+        cv_ext = cv.filename.split(".")[-1] if "." in (cv.filename or "") else "pdf"
+        cv_path = f"{APP_NAME}/cv/{user['user_id']}/{uuid.uuid4()}.{cv_ext}"
+        put_object(cv_path, cv_bytes, cv.content_type or "application/pdf")
+        cv_file_id = str(uuid.uuid4())
+        cv_filename = cv.filename
+        await db.files.insert_one({
+            "id": cv_file_id, "storage_path": cv_path, "original_filename": cv.filename,
+            "content_type": cv.content_type or "application/pdf", "owner_id": user["user_id"],
+            "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    elif user.get("cv_file_id"):
+        cv_file_id = user["cv_file_id"]
+        cv_filename = user.get("cv_filename") or "cv.pdf"
+    else:
+        raise HTTPException(status_code=400, detail="Ajoutez un CV à votre profil ou joignez-en un pour postuler.")
 
     voice_file_id = None
     transcription = ""
@@ -137,7 +146,7 @@ async def create_application(
         "candidate_name": user.get("name", ""),
         "candidate_email": user["email"],
         "cv_file_id": cv_file_id,
-        "cv_filename": cv.filename,
+        "cv_filename": cv_filename,
         "voice_file_id": voice_file_id,
         "transcription": transcription,
         "cover_note": cover_note,

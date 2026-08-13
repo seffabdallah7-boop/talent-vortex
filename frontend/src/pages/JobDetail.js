@@ -23,6 +23,7 @@ export default function JobDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [myApp, setMyApp] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     api.get(`/jobs/${id}`).then(({ data }) => setJob(data)).catch(() => navigate("/"));
@@ -33,6 +34,7 @@ export default function JobDetail() {
       api.get("/applications/me")
         .then(({ data }) => setMyApp((data || []).find((a) => a.job_id === id) || null))
         .catch(() => {});
+      api.get("/profile").then(({ data }) => setProfile(data)).catch(() => {});
     } else {
       setMyApp(null);
     }
@@ -40,13 +42,12 @@ export default function JobDetail() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!cv) return toast.error("Veuillez joindre votre CV.");
     setSubmitting(true);
     const fd = new FormData();
     fd.append("job_id", id);
     fd.append("cover_note", note);
     fd.append("salary_expectation", e.target.salary_expectation?.value || "");
-    fd.append("cv", cv);
+    if (cv) fd.append("cv", cv);
     if (voice) fd.append("voice", voice, "message-vocal.webm");
     try {
       const { data } = await api.post("/applications", fd, { headers: { "Content-Type": "multipart/form-data" } });
@@ -125,10 +126,16 @@ export default function JobDetail() {
               </div>
               <Button variant="outline" onClick={() => navigate("/dashboard")} className="rounded-full mt-4" data-testid="view-my-application-btn">Voir ma candidature</Button>
             </div>
+          ) : profile && !(profile.phone && profile.domains && profile.domains.length && profile.cv_file_id) ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6" data-testid="profile-incomplete-block">
+              <p className="font-medium mb-1">Complétez votre profil pour postuler</p>
+              <p className="text-sm text-muted-foreground mb-4">Renseignez votre <strong>téléphone</strong> et vos <strong>domaines d'expertise</strong>, et ajoutez votre <strong>CV</strong> — ces informations sont indispensables à notre matching IA.</p>
+              <Button onClick={() => navigate("/dashboard?section=profile")} className="rounded-full" data-testid="complete-profile-cta">Compléter mon profil</Button>
+            </div>
           ) : (
             <form onSubmit={submit} className="space-y-6">
               <div>
-                <Label className="mb-2 block">CV (PDF, DOCX) *</Label>
+                <Label className="mb-2 block">CV pour cette candidature <span className="text-muted-foreground font-normal">(facultatif — le CV de votre profil est utilisé par défaut)</span></Label>
                 <label className="flex items-center gap-3 rounded-xl border border-dashed border-border p-5 cursor-pointer hover:border-primary transition-colors" data-testid="cv-upload-label">
                   <div className="h-11 w-11 rounded-lg bg-primary/10 flex items-center justify-center">
                     {cv ? <FileText className="h-5 w-5 text-primary" /> : <Upload className="h-5 w-5 text-primary" />}

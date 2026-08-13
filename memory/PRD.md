@@ -189,6 +189,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Champs obligatoires** au profil candidat : **Téléphone** et **Domaines d'expertise** désormais requis (attribut `required` côté formulaire ; nom et nationalité l'étaient déjà). **Validation serveur** dans `PUT /api/profile` : renvoie **400** « Champs obligatoires manquants… » si nom/téléphone/nationalité/domaines vides (empêche le contournement API). Vérifié par curl (400 vide / 200 complet).
 - **Refonte design du formulaire « Mon profil »** (`CandidateDashboard.ProfileForm`) : badge de statut (Profil complété / À compléter), carte photo « hero » (avatar 88px + nom + poste), en-têtes de section avec pastilles d'icônes (Infos perso, Expertise, CV), largeur max lisible, bouton « Enregistrer » collant en bas. Tous les `data-testid` conservés.
 
+## Implemented (2026-06, itération 34 — Blocage candidature + CV obligatoire)
+- **CV intégré à la complétude du profil** : `profile_completed` = nom + téléphone + nationalité + domaines + **CV** (recalculé aussi lors de l'upload CV via `POST /profile/cv`).
+- **Blocage de candidature** (`POST /applications`) : renvoie **400** « Complétez votre profil (téléphone et domaines d'expertise)… » si profil incomplet ; **400** « Ajoutez un CV… » si aucun CV. Vérifié par curl (400/400/200).
+- **Réutilisation du CV du profil** : le champ CV de la candidature est désormais **facultatif** ; s'il est vide, le CV du profil est utilisé (évite le double upload). Un CV joint remplace ponctuellement.
+- **Frontend** : `JobDetail` affiche une carte de blocage claire + CTA « Compléter mon profil » tant que téléphone/domaines/CV manquent ; le formulaire de candidature indique que le CV du profil sert par défaut ; la carte CV du profil est marquée requise (`*` + message ambre). Rendu vérifié par capture.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
