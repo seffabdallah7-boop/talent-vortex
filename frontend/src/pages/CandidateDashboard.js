@@ -592,14 +592,21 @@ function ProfileForm({ profile, onSaved }) {
   };
 
   return (
-    <form onSubmit={save} className="space-y-6" data-testid="profile-form">
-      <div>
-        <h2 className="font-display text-2xl font-semibold">Mon profil</h2>
-        <p className="text-sm text-muted-foreground">Ces informations aident notre IA à vous proposer les offres les plus pertinentes.</p>
+    <form onSubmit={save} className="max-w-3xl space-y-6" data-testid="profile-form">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-display text-2xl sm:text-3xl font-semibold">Mon profil</h2>
+          <p className="text-sm text-muted-foreground mt-1">Ces informations aident notre IA à vous proposer les offres les plus pertinentes.</p>
+        </div>
+        {profile.profile_completed ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 text-green-600 px-3 py-1 text-xs font-semibold" data-testid="profile-status-complete"><CheckCircle2 className="h-3.5 w-3.5" /> Profil complété</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 text-amber-600 px-3 py-1 text-xs font-semibold" data-testid="profile-status-incomplete"><Clock className="h-3.5 w-3.5" /> À compléter</span>
+        )}
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-        <p className="font-medium">Informations personnelles</p>
+        <div className="flex items-center gap-2.5"><span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"><User className="h-4 w-4" /></span><p className="font-medium">Informations personnelles</p></div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div><Label>Nom complet *</Label><Input className="mt-1.5" data-testid="profile-name" {...field("name")} required /></div>
           <div><Label>Téléphone *</Label><Input className="mt-1.5" data-testid="profile-phone" {...field("phone")} required /></div>
@@ -610,14 +617,15 @@ function ProfileForm({ profile, onSaved }) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-6 space-y-3" data-testid="photo-card">
-        <p className="font-medium">Photo de profil</p>
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
-            <Avatar name={profile.name} src={profile.picture} size={72} />
-          </button>
+      <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-6 flex items-center gap-5 flex-wrap" data-testid="photo-card">
+        <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
+          <Avatar name={form.name || profile.name} src={profile.picture} size={88} />
+        </button>
+        <div className="flex-1 min-w-[180px]">
+          <p className="font-display text-lg font-semibold">{form.name || profile.name || "Votre nom"}</p>
+          <p className="text-sm text-muted-foreground">{form.current_position || "Ajoutez votre poste actuel"}</p>
           <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
-          <Button type="button" variant="outline" className="rounded-full" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
+          <Button type="button" variant="outline" size="sm" className="rounded-full mt-3" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
             {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
             {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
           </Button>
@@ -644,9 +652,9 @@ function ProfileForm({ profile, onSaved }) {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
-        <p className="font-medium">Expertise</p>
+        <div className="flex items-center gap-2.5"><span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"><Sparkles className="h-4 w-4" /></span><p className="font-medium">Expertise</p></div>
         <div><Label>Poste actuel</Label><Input className="mt-1.5" data-testid="profile-position" placeholder="Ex : Développeur Full-Stack" {...field("current_position")} /></div>
-        <div><Label>Domaines d'expertise * <span className="text-muted-foreground font-normal">(séparés par des virgules)</span></Label><Input className="mt-1.5" data-testid="profile-domains" placeholder="Ex : Tech, Data" {...field("domains")} /></div>
+        <div><Label>Domaines d'expertise * <span className="text-muted-foreground font-normal">(séparés par des virgules)</span></Label><Input className="mt-1.5" data-testid="profile-domains" placeholder="Ex : Tech, Data" {...field("domains")} required /></div>
         <div><Label>Outils maîtrisés <span className="text-muted-foreground font-normal">(séparés par des virgules)</span></Label><Input className="mt-1.5" data-testid="profile-tools" placeholder="Ex : React, Python, Figma" {...field("tools")} /></div>
         <div><Label>Titre / accroche</Label><Input className="mt-1.5" data-testid="profile-headline" placeholder="Ex : Ingénieur logiciel passionné" {...field("headline")} /></div>
         <div><Label>À propos</Label><Textarea rows={4} className="mt-1.5" data-testid="profile-bio" placeholder="Parlez de votre parcours..." {...field("bio")} /></div>
@@ -659,9 +667,11 @@ function ProfileForm({ profile, onSaved }) {
         </div>
       )}
 
-      <Button type="submit" disabled={saving} className="rounded-full h-11 px-8" data-testid="save-profile-btn">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Enregistrer mon profil
-      </Button>
+      <div className="sticky bottom-4 flex justify-end">
+        <Button type="submit" disabled={saving} className="rounded-full h-12 px-8 shadow-lg shadow-primary/20" data-testid="save-profile-btn">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Enregistrer mon profil
+        </Button>
+      </div>
     </form>
   );
 }

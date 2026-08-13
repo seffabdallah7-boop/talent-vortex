@@ -272,9 +272,16 @@ async def get_profile(user: dict = Depends(get_current_user)):
 @router.put("/profile")
 async def update_profile(body: ProfileInput, background: BackgroundTasks, user: dict = Depends(get_current_user)):
     upd = {k: v for k, v in body.model_dump().items() if v is not None}
+    merged = {**user, **upd}
+    missing = []
+    if not (merged.get("name") or "").strip(): missing.append("nom")
+    if not (merged.get("phone") or "").strip(): missing.append("téléphone")
+    if not (merged.get("nationality") or "").strip(): missing.append("nationalité")
+    if not (merged.get("domains") or []): missing.append("domaine d'expertise")
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Champs obligatoires manquants : {', '.join(missing)}")
     if upd:
         await db.users.update_one({"user_id": user["user_id"]}, {"$set": upd})
-    merged = {**user, **upd}
     complete = bool(merged.get("name") and merged.get("phone") and merged.get("nationality") and (merged.get("domains")))
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"profile_completed": complete}})
     background.add_task(refresh_user_domains, user["user_id"])

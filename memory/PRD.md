@@ -185,6 +185,10 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Vérifié : frontend compile, page d'accueil sans erreur runtime, fichiers de test compilent + env chargé.
 - **Faux positifs / choix d'archi NON modifiés (justifiés)** : `i18n.js` (chaînes de traduction, pas de secrets) ; `localStorage` pour JWT (architecture Emergent) ; deps de hooks eslint (singletons `api`/setters stables → ajout risquerait des boucles) ; refactors de complexité (ChatWidget/VideoCall/routers) reportés (code testé, refactor = risque de régression sans gain fonctionnel).
 
+## Implemented (2026-06, itération 33 — Champs profil obligatoires + refonte design profil)
+- **Champs obligatoires** au profil candidat : **Téléphone** et **Domaines d'expertise** désormais requis (attribut `required` côté formulaire ; nom et nationalité l'étaient déjà). **Validation serveur** dans `PUT /api/profile` : renvoie **400** « Champs obligatoires manquants… » si nom/téléphone/nationalité/domaines vides (empêche le contournement API). Vérifié par curl (400 vide / 200 complet).
+- **Refonte design du formulaire « Mon profil »** (`CandidateDashboard.ProfileForm`) : badge de statut (Profil complété / À compléter), carte photo « hero » (avatar 88px + nom + poste), en-têtes de section avec pastilles d'icônes (Infos perso, Expertise, CV), largeur max lisible, bouton « Enregistrer » collant en bas. Tous les `data-testid` conservés.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
