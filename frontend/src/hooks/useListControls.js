@@ -5,6 +5,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 export function useListControls(items, { pageSize = 15, selectId = (x) => x.id } = {}) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
   const total = items.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -41,8 +42,16 @@ export function useListControls(items, { pageSize = 15, selectId = (x) => x.id }
 
   const clear = useCallback(() => setSelected(new Set()), []);
 
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode((m) => {
+      if (m) setSelected(new Set());
+      return !m;
+    });
+  }, []);
+
   return {
     page, setPage, totalPages, total, pageItems, pageSize,
+    selectMode, setSelectMode, toggleSelectMode,
     selected, selectedCount: selected.size, toggle, toggleAllPage, allPageSelected, clear,
     selectedIds: () => [...selected],
   };

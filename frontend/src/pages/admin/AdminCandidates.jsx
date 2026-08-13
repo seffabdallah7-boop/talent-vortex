@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
-import { Star, Trash2 } from "lucide-react";
+import { Star, Trash2, CheckSquare, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Candidates({ onOpenProfile }) {
@@ -23,7 +23,11 @@ export default function Candidates({ onOpenProfile }) {
   const [q, setQ] = useState("");
   const [minRating, setMinRating] = useState("all");
   const [nats, setNats] = useState([]);
-  const lc = useListControls(list, { pageSize: 15, selectId: (u) => u.user_id });
+  const [natFilter, setNatFilter] = useState("");
+  const [natOpen, setNatOpen] = useState(false);
+  const visibleList = list.filter((u) => !me || u.user_id !== me.user_id);
+  const filteredList = natFilter ? visibleList.filter((u) => (u.nationality || "") === natFilter) : visibleList;
+  const lc = useListControls(filteredList, { pageSize: 15, selectId: (u) => u.user_id });
   const bulkDelete = async () => {
     const ids = lc.selectedIds();
     if (ids.length === 0) return;
@@ -88,31 +92,43 @@ export default function Candidates({ onOpenProfile }) {
       </div>
       {nats.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-4 mb-6" data-testid="nationalities-panel">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Répartition par nationalité</p>
-          <div className="flex flex-wrap gap-2">
-            {nats.map((n) => (
-              <span key={n.nationality} data-testid={`nat-${n.nationality}`} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-sm">
-                {n.nationality}
-                <span className="rounded-full bg-primary/15 text-primary px-1.5 text-xs font-bold">{n.count}</span>
-              </span>
-            ))}
-          </div>
+          <button type="button" onClick={() => setNatOpen((o) => !o)} data-testid="toggle-nationalities" className="flex items-center gap-2 w-full text-left">
+            <ChevronDown className={`h-4 w-4 transition-transform ${natOpen ? "" : "-rotate-90"}`} />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Répartition par nationalité</span>
+            {natFilter && <span onClick={(e) => { e.stopPropagation(); setNatFilter(""); }} className="ml-auto text-xs text-primary hover:underline" data-testid="nat-clear-filter">Filtre : {natFilter} ✕</span>}
+          </button>
+          {natOpen && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {nats.map((n) => (
+                <button key={n.nationality} type="button" data-testid={`nat-${n.nationality}`} onClick={() => setNatFilter((f) => f === n.nationality ? "" : n.nationality)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm transition-colors ${natFilter === n.nationality ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-primary/10"}`}>
+                  {n.nationality}
+                  <span className={`rounded-full px-1.5 text-xs font-bold ${natFilter === n.nationality ? "bg-white/20" : "bg-primary/15 text-primary"}`}>{n.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
-      {list.length === 0 ? (
+      {filteredList.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun utilisateur.</div>
       ) : (
         <>
-        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="users-bulk" /></div>
+        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Button variant={lc.selectMode ? "default" : "outline"} size="sm" className="rounded-full" onClick={lc.toggleSelectMode} data-testid="toggle-select-mode"><CheckSquare className="h-4 w-4 mr-2" /> {lc.selectMode ? "Annuler" : "Sélectionner"}</Button>
+            {lc.selectMode && <BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="users-bulk" />}
+          </div>
+          <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="users-pager-top" />
+        </div>
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-users" /></TableHead><TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-users" /></TableHead>}<TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
                 return (
                   <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
-                    <TableCell className="w-10"><Checkbox checked={lc.selected.has(u.user_id)} onCheckedChange={() => lc.toggle(u.user_id)} data-testid={`select-user-${u.user_id}`} /></TableCell>
+                    {lc.selectMode && <TableCell className="w-10"><Checkbox checked={lc.selected.has(u.user_id)} onCheckedChange={() => lc.toggle(u.user_id)} data-testid={`select-user-${u.user_id}`} /></TableCell>}
                     <TableCell className="font-medium">
                       <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(u.user_id)} data-testid={`open-profile-${u.user_id}`}>
                         <Avatar name={u.name} src={u.picture} size={36} />

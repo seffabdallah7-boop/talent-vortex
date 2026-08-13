@@ -169,9 +169,18 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Prétention salariale** (facultative) : champ dans le formulaire de candidature (`JobDetail`, `salary-expectation-input`), stocké via `POST /api/applications` (`salary_expectation`), affiché dans le détail de candidature côté admin (`detail-salary-expectation`). Vérifié end-to-end.
 - **Header admin** : bouton **Déconnexion** ajouté à droite du header desktop (`admin-header-logout`). Le hamburger mobile existe déjà (Sheet `md:hidden`).
 
-## ⏳ En attente (demandé, à faire prochaine étape)
-- Sélection multiple + pagination sur **Entretiens**, **Offres d'emploi**, **Enregistrements**.
-- Refonte du motif : cases à cocher masquées derrière un bouton **« Sélectionner »** en haut ; flèches de pagination **en haut ET en bas** (à propager sur Utilisateurs/Candidatures/Contrats déjà équipés).
+## Implemented (2026-06, itération 31 — Bouton « Sélectionner » partout + correctifs)
+- **Correctif compilation P0** : `useListControls.js` (lignes corrompues supprimées) + hook complété avec `selectMode` / `toggleSelectMode`.
+- **Motif unifié `ListToolbar`** (`components/ListControls.jsx`) : bouton **« Sélectionner »** (révèle les cases) en haut à gauche + flèches de pagination en haut à droite + `BulkBar` de suppression groupée. Prop `showPager`.
+- **Appliqué à TOUTES les listes admin** : Utilisateurs, Candidatures, Contrats, **Offres d'emploi**, **Entretiens** (vue liste), **Enregistrements**. Les cases restent masquées tant que « Sélectionner » n'est pas cliqué.
+- **Panneau nationalités** (`AdminCandidates`) : **fermé par défaut**, cliquable pour ouvrir/filtrer.
+- **Utilisateur connecté exclu** de la liste Utilisateurs (impossible de se supprimer soi-même).
+- **Fermeture au clic extérieur** du panneau de notifications (`NotificationBell`, `wrapRef` + listener `mousedown`).
+- Vérifié frontend **100 %** — testing agent iter 25 (6 listes) + iter 26 (les 2 correctifs).
+
+## ⏳ Backlog / Futur
+- (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
+- (P3, code review) Découper `AdminDashboard.js` (~1090 lignes) en fichiers par onglet (jobs/applications/contracts/recordings) ; harmoniser le testid `toggle-select-mode` → `users-toggle-select` ; retirer le pager du bas des Enregistrements (redondant avec le pager du haut) ; trim des nationalités côté serveur (« Malgache »).
 
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.

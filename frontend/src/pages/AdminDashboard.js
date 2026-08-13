@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { fileUrl, formatApiError, API } from "@/lib/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
-import { Pager, BulkBar } from "@/components/ListControls";
+import { Pager, ListToolbar } from "@/components/ListControls";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useDarkMode } from "@/context/DarkModeContext";
@@ -301,6 +301,15 @@ function Jobs({ onViewApplications }) {
 
   const load = useCallback(() => api.get("/jobs/all").then(({ data }) => setJobs(data)).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
+  const lc = useListControls(jobs, { pageSize: 15 });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} offre(s) ?`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/jobs/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
 
   const openNew = () => { setEditing(null); setForm(EMPTY_JOB); setAiBrief(""); setOpen(true); };
   const openEdit = (j) => { setEditing(j); setForm({ ...EMPTY_JOB, ...j }); setOpen(true); };
@@ -351,12 +360,15 @@ function Jobs({ onViewApplications }) {
           <Button onClick={openNew} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Publier votre première offre</Button>
         </div>
       ) : (
+        <>
+        <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="jobs" />
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead>Poste</TableHead><TableHead>Lieu</TableHead><TableHead>Candidatures</TableHead><TableHead>Visible</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-jobs" /></TableHead>}<TableHead>Poste</TableHead><TableHead>Lieu</TableHead><TableHead>Candidatures</TableHead><TableHead>Visible</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {jobs.map((j) => (
+              {lc.pageItems.map((j) => (
                 <TableRow key={j.id} data-testid={`job-row-${j.id}`}>
+                  {lc.selectMode && <TableCell className="w-10"><Checkbox checked={lc.selected.has(j.id)} onCheckedChange={() => lc.toggle(j.id)} data-testid={`select-job-${j.id}`} /></TableCell>}
                   <TableCell>
                     <button onClick={() => navigate(`/jobs/${j.id}`)} className="text-left hover:text-primary transition-colors" data-testid={`open-job-${j.id}`}>
                       <div className="font-medium">{j.title}</div>
@@ -380,6 +392,8 @@ function Jobs({ onViewApplications }) {
             </TableBody>
           </Table>
         </div>
+        <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="jobs-pager" />
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -541,14 +555,14 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucune candidature.</div>
       ) : (
         <>
-        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="apps-bulk" /></div>
+        <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="apps" />
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead><TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead>}<TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
-                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(a.id)} onCheckedChange={() => lc.toggle(a.id)} data-testid={`select-app-${a.id}`} /></TableCell>
+                  {lc.selectMode && <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(a.id)} onCheckedChange={() => lc.toggle(a.id)} data-testid={`select-app-${a.id}`} /></TableCell>}
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -764,14 +778,14 @@ function Contracts({ initialFilter }) {
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground">Aucun contrat.</div>
       ) : (
         <>
-        <div className="mb-3 flex justify-end"><BulkBar count={lc.selectedCount} onDelete={bulkDelete} onClear={lc.clear} testId="contracts-bulk" /></div>
+        <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="contracts" />
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-contracts" /></TableHead><TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-contracts" /></TableHead>}<TableHead>Intitulé</TableHead><TableHead>Client</TableHead><TableHead>Candidat</TableHead><TableHead>Montant</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => openEdit(c)} data-testid={`contract-row-${c.id}`}>
-                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(c.id)} onCheckedChange={() => lc.toggle(c.id)} data-testid={`select-contract-${c.id}`} /></TableCell>
+                  {lc.selectMode && <TableCell className="w-10" onClick={(e) => e.stopPropagation()}><Checkbox checked={lc.selected.has(c.id)} onCheckedChange={() => lc.toggle(c.id)} data-testid={`select-contract-${c.id}`} /></TableCell>}
                   <TableCell className="font-medium">{c.title}</TableCell>
                   <TableCell className="text-muted-foreground">{c.client}</TableCell>
                   <TableCell className="text-muted-foreground">{c.candidate_name}</TableCell>
@@ -938,6 +952,15 @@ function Recordings() {
   const load = useCallback(() => api.get("/recordings").then(({ data }) => setList(data)).catch(() => {}), []);
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [load]);
   const remove = async () => { await api.delete(`/recordings/${del.id}`); toast.success("Enregistrement supprimé"); setDel(null); load(); };
+  const lc = useListControls(list, { pageSize: 15 });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} enregistrement(s) ?`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/recordings/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
   const shareLink = async (r) => {
     try {
       const { data } = await api.post(`/recordings/${r.id}/share`);
@@ -961,13 +984,18 @@ function Recordings() {
           Aucun enregistrement. Lancez un appel ou une réunion et cliquez sur « Enregistrer ».
         </div>
       ) : (
+        <>
+        <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="recordings" />
         <div className="space-y-5">
-          {list.map((r) => (
+          {lc.pageItems.map((r) => (
             <div key={r.id} className="rounded-2xl border border-border bg-card p-5" data-testid={`recording-${r.id}`}>
               <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
-                <div>
-                  <h3 className="font-display text-lg font-semibold">{r.title}</h3>
-                  <p className="text-xs text-muted-foreground">{r.candidate_name ? `${r.candidate_name} • ` : ""}{new Date(r.created_at).toLocaleString("fr-FR")}</p>
+                <div className="flex items-start gap-3">
+                  {lc.selectMode && <Checkbox checked={lc.selected.has(r.id)} onCheckedChange={() => lc.toggle(r.id)} data-testid={`select-recording-${r.id}`} className="mt-1" />}
+                  <div>
+                    <h3 className="font-display text-lg font-semibold">{r.title}</h3>
+                    <p className="text-xs text-muted-foreground">{r.candidate_name ? `${r.candidate_name} • ` : ""}{new Date(r.created_at).toLocaleString("fr-FR")}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {r.status === "processing"
@@ -1006,6 +1034,8 @@ function Recordings() {
             </div>
           ))}
         </div>
+        <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId="recordings-pager" />
+        </>
       )}
       <AlertDialog open={!!del} onOpenChange={() => setDel(null)}>
         <AlertDialogContent>

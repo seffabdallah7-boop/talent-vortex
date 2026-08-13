@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only validation of two small features: (1) connected admin excluded from Users list, (2) NotificationBell panel closes on outside click. Both features PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "seffabdallah7@gmail.com / Admin@2026! + math captcha",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow: 3 inputs total (email, password, captcha - type=null text input). Read arithmetic (a op b =) from body text and fill inputs[2]. Users list contained 3 rows, none matched seffabdallah7@gmail.com nor showed '(vous)' badge. NotificationBell test: click bell -> notif-panel appears; click inside panel -> stays open; click outside at (400,500) -> panel removed from DOM. Note: an outside click on a candidate row can also open the candidate detail modal, but this does not affect the notif panel close behavior.",
+  "test_results": {
+    "test_1_user_not_in_list": "PASS - 3 rows, no self-email, no (vous) badge",
+    "test_2_notif_bell_outside_click": "PASS - panel opens on bell click, stays open on inside click, closes on outside click"
+  }
+}

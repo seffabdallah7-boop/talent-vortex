@@ -1,5 +1,20 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, X, CheckSquare } from "lucide-react";
+
+// Standard admin list header: "Sélectionner" toggle (top-left) + Pager (top-right).
+export function ListToolbar({ lc, onBulkDelete, testId = "list", showPager = true }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-center gap-2">
+        <Button variant={lc.selectMode ? "default" : "outline"} size="sm" className="rounded-full" onClick={lc.toggleSelectMode} data-testid={`${testId}-toggle-select`}>
+          <CheckSquare className="h-4 w-4 mr-2" /> {lc.selectMode ? "Annuler" : "Sélectionner"}
+        </Button>
+        {lc.selectMode && <BulkBar count={lc.selectedCount} onDelete={onBulkDelete} onClear={lc.clear} testId={`${testId}-bulk`} />}
+      </div>
+      {showPager && <Pager page={lc.page} totalPages={lc.totalPages} total={lc.total} onPage={lc.setPage} testId={`${testId}-pager-top`} />}
+    </div>
+  );
+}
 
 export function Pager({ page, totalPages, total, onPage, testId = "pager" }) {
   if (totalPages <= 1) return null;

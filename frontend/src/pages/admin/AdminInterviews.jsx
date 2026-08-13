@@ -11,6 +11,9 @@ import {
   AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import VideoCall from "@/components/VideoCall";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useListControls } from "@/hooks/useListControls";
+import { ListToolbar } from "@/components/ListControls";
 import { CalendarDays, ChevronLeft, ChevronRight, Video, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -97,6 +100,15 @@ export default function Interviews() {
   const filtered = list.filter((i) => { const q = search.trim().toLowerCase(); return !q || [i.title, i.candidate_name, i.location].some((v) => (v || "").toLowerCase().includes(q)); });
   const groups = filtered.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {});
   const dates = Object.keys(groups).sort();
+  const lc = useListControls(filtered, { pageSize: 9999, selectId: (i) => i.id });
+  const bulkDelete = async () => {
+    const ids = lc.selectedIds();
+    if (ids.length === 0) return;
+    if (!window.confirm(`Supprimer ${ids.length} entretien(s) ?`)) return;
+    await Promise.all(ids.map((id) => api.delete(`/interviews/${id}`).catch(() => {})));
+    toast.success("Suppression effectuée");
+    lc.clear(); load();
+  };
   const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); } catch { return d; } };
 
   return (
@@ -125,6 +137,8 @@ export default function Interviews() {
           Aucun entretien planifié.
         </div>
       ) : (
+        <>
+        <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="interviews" showPager={false} />
         <div className="space-y-6">
           {dates.map((d) => (
             <div key={d} className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -135,6 +149,7 @@ export default function Interviews() {
               <div className="divide-y divide-border">
                 {groups[d].sort((a, b) => a.time.localeCompare(b.time)).map((i) => (
                   <div key={i.id} className="flex items-center gap-4 px-5 py-3" data-testid={`interview-row-${i.id}`}>
+                    {lc.selectMode && <Checkbox checked={lc.selected.has(i.id)} onCheckedChange={() => lc.toggle(i.id)} data-testid={`select-interview-${i.id}`} />}
                     <span className="font-mono font-semibold text-primary w-14">{i.time}</span>
                     <div className="flex-1">
                       <p className="font-medium">{i.title}</p>
@@ -149,6 +164,7 @@ export default function Interviews() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
