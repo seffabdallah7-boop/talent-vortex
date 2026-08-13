@@ -195,6 +195,16 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Réutilisation du CV du profil** : le champ CV de la candidature est désormais **facultatif** ; s'il est vide, le CV du profil est utilisé (évite le double upload). Un CV joint remplace ponctuellement.
 - **Frontend** : `JobDetail` affiche une carte de blocage claire + CTA « Compléter mon profil » tant que téléphone/domaines/CV manquent ; le formulaire de candidature indique que le CV du profil sert par défaut ; la carte CV du profil est marquée requise (`*` + message ambre). Rendu vérifié par capture.
 
+## Implemented (2026-06, itération 35 — Revue de code #3, corrections ciblées)
+- **Blocs catch vides** traités là où c'est utile : `Auth.js` (échec captcha → `console.error`), `ChatWidget` (échec d'envoi → `console.error` + **toast** + restauration du texte pour réessayer), `CandidateDashboard` (statut d'appel → `console.warn`). Les catches WebRTC/cleanup restent volontairement silencieux (déjà commentés).
+- **Faux positifs confirmés et NON modifiés (justifiés)** :
+  - `i18n.js` « secrets » = chaînes de traduction (vérifié).
+  - `is` vs `==` (24) = uniquement `is None`/`is not None`/`.tzinfo is None`/`doc is not None` → idiomes Python **corrects** ; les changer introduirait des bugs.
+  - `localStorage` pour JWT = architecture Emergent.
+  - 66 deps de hooks = singletons stables (`api`, setters) ; ajout risquerait des boucles.
+  - Clé d'index `ChatWidget:232` = liste `aiMsgs` en append-only (jamais réordonnée) → sûre.
+  - Refactors de complexité (ChatWidget/CandidateProfileDialog/create_application) → backlog (code testé, refactor = risque sans gain fonctionnel).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

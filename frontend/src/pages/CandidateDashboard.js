@@ -85,12 +85,12 @@ export default function CandidateDashboard() {
   }, []);
 
   const acceptCall = async () => {
-    try { await api.put(`/calls/${incoming.id}/status`, { status: "accepted" }); } catch { /* noop */ }
+    try { await api.put(`/calls/${incoming.id}/status`, { status: "accepted" }); } catch (e) { console.warn("accept call status failed", e); }
     setCall({ room: incoming.room, audioOnly: incoming.mode === "audio" });
     setIncoming(null);
   };
   const declineCall = async () => {
-    try { await api.put(`/calls/${incoming.id}/status`, { status: "declined" }); } catch { /* noop */ }
+    try { await api.put(`/calls/${incoming.id}/status`, { status: "declined" }); } catch (e) { console.warn("decline call status failed", e); }
     setIncoming(null);
   };
 

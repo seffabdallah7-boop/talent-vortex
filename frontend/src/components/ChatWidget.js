@@ -132,7 +132,11 @@ export default function ChatWidget() {
     try {
       const { data } = await api.post("/chat/messages", { text: msg });
       setSupMsgs((m) => [...m, data]);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Échec de l'envoi du message", e);
+      toast.error("Échec de l'envoi du message. Réessayez.");
+      setText(msg);
+    }
     setSending(false);
   };
 

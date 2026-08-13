@@ -49,7 +49,9 @@ export default function Auth() {
     try {
       const { data } = await api.get("/auth/captcha");
       setCaptcha(data);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Échec du chargement du captcha", e);
+    }
   }, []);
 
   useEffect(() => { refreshCaptcha(); }, [refreshCaptcha]);
