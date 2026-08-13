@@ -4,12 +4,15 @@ import re
 import time
 import pytest
 import requests
+from dotenv import load_dotenv
+
+load_dotenv("/app/backend/.env")
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "seffabdallah7@gmail.com"
-ADMIN_PASSWORD = "Admin@2026!"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "seffabdallah7@gmail.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 
 def _solve_captcha(s: requests.Session):

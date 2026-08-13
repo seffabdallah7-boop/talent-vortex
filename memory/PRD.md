@@ -178,7 +178,15 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Fermeture au clic extérieur** du panneau de notifications (`NotificationBell`, `wrapRef` + listener `mousedown`).
 - Vérifié frontend **100 %** — testing agent iter 25 (6 listes) + iter 26 (les 2 correctifs).
 
+## Implemented (2026-06, itération 32 — Corrections revue de code)
+- **Secrets fichiers de test** : `tests/backend_test.py` et `tests/test_refactor_regression.py` lisent désormais les identifiants via `os.environ` (+ `load_dotenv('/app/backend/.env')`) ; plus de mots de passe en dur dans les sources.
+- **Clés React stables** (fini les `key={i}` sur listes) : Landing (avatars `key={s}`, cartes `key={f.n}`), examen IA admin, ScreeningQuiz.
+- **`useMemo`** sur `filtered`/`groups`/`dates` dans `AdminInterviews` (calcul déplacé hors du rendu).
+- Vérifié : frontend compile, page d'accueil sans erreur runtime, fichiers de test compilent + env chargé.
+- **Faux positifs / choix d'archi NON modifiés (justifiés)** : `i18n.js` (chaînes de traduction, pas de secrets) ; `localStorage` pour JWT (architecture Emergent) ; deps de hooks eslint (singletons `api`/setters stables → ajout risquerait des boucles) ; refactors de complexité (ChatWidget/VideoCall/routers) reportés (code testé, refactor = risque de régression sans gain fonctionnel).
+
 ## ⏳ Backlog / Futur
+- (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
 - (P3, code review) Découper `AdminDashboard.js` (~1090 lignes) en fichiers par onglet (jobs/applications/contracts/recordings) ; harmoniser le testid `toggle-select-mode` → `users-toggle-select` ; retirer le pager du bas des Enregistrements (redondant avec le pager du haut) ; trim des nationalités côté serveur (« Malgache »).
 

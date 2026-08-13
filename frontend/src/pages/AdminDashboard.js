@@ -668,7 +668,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                 </div>
                 <div className="space-y-3">
                   {(examApp.screening?.questions || []).map((q, i) => (
-                    <div key={i} className="rounded-lg border border-border p-3" data-testid={`exam-qa-${i}`}>
+                    <div key={`exam-qa-${i}`} className="rounded-lg border border-border p-3" data-testid={`exam-qa-${i}`}>
                       <p className="text-sm font-medium">{i + 1}. {q}</p>
                       <p className="text-sm text-muted-foreground mt-1">{examApp.screening?.answers?.[i] || "—"}</p>
                     </div>

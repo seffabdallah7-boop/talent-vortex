@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import api, { formatApiError } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -97,9 +97,9 @@ export default function Interviews() {
   };
   const remove = async () => { await api.delete(`/interviews/${del.id}`); toast.success("Entretien supprimé"); setDel(null); load(); };
 
-  const filtered = list.filter((i) => { const q = search.trim().toLowerCase(); return !q || [i.title, i.candidate_name, i.location].some((v) => (v || "").toLowerCase().includes(q)); });
-  const groups = filtered.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {});
-  const dates = Object.keys(groups).sort();
+  const filtered = useMemo(() => list.filter((i) => { const q = search.trim().toLowerCase(); return !q || [i.title, i.candidate_name, i.location].some((v) => (v || "").toLowerCase().includes(q)); }), [list, search]);
+  const groups = useMemo(() => filtered.reduce((acc, i) => { (acc[i.date] = acc[i.date] || []).push(i); return acc; }, {}), [filtered]);
+  const dates = useMemo(() => Object.keys(groups).sort(), [groups]);
   const lc = useListControls(filtered, { pageSize: 9999, selectId: (i) => i.id });
   const bulkDelete = async () => {
     const ids = lc.selectedIds();

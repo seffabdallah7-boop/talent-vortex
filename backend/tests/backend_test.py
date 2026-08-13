@@ -14,6 +14,9 @@ import subprocess
 import time
 import uuid
 
+from dotenv import load_dotenv
+load_dotenv("/app/backend/.env")
+
 import pytest
 import requests
 
@@ -34,11 +37,11 @@ def _load_backend_url():
 BASE_URL = _load_backend_url().rstrip("/")
 API = f"{BASE_URL}/api"
 
-ADMIN_EMAIL = "seffabdallah7@gmail.com"
-ADMIN_PASSWORD = "Admin@2026!"
-ADMIN_CODE = "RECRUT-ADM-2026"
-CANDIDATE_EMAIL = "candidate1@test.com"
-CANDIDATE_PASSWORD = "Test@2026!"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "seffabdallah7@gmail.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_CODE = os.environ.get("ADMIN_CODE", "")
+CANDIDATE_EMAIL = os.environ.get("TEST_CANDIDATE_EMAIL", "candidate1@test.com")
+CANDIDATE_PASSWORD = os.environ.get("TEST_CANDIDATE_PASSWORD", "")
 
 LOG_FILE = "/var/log/supervisor/backend.err.log"
 

@@ -47,7 +47,7 @@ export default function ScreeningQuiz({ app, open, onClose, onDone }) {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Quelques questions rapides pour compléter votre candidature à <b>{app?.job_title}</b>.</p>
             {questions.map((q, i) => (
-              <div key={i} data-testid={`screening-q-${i}`}>
+              <div key={`screening-q-${i}`} data-testid={`screening-q-${i}`}>
                 <Label className="text-sm">{i + 1}. {q}</Label>
                 <Textarea
                   rows={2}

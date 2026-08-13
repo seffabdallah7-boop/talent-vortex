@@ -74,8 +74,8 @@ export default function Landing() {
             </motion.div>
             <div className="mt-8 flex items-center gap-3 text-sm text-muted-foreground">
               <div className="flex -space-x-2">
-                {[AV1, AV2].map((s, i) => (
-                  <img key={i} src={s} className="h-8 w-8 rounded-full border-2 border-background object-cover" alt="" />
+                {[AV1, AV2].map((s) => (
+                  <img key={s} src={s} className="h-8 w-8 rounded-full border-2 border-background object-cover" alt="" />
                 ))}
                 <span className="h-8 w-8 rounded-full border-2 border-background bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center">+9</span>
               </div>
@@ -127,7 +127,7 @@ export default function Landing() {
             { n: "03", Icon: ShieldCheck, t: t("landing.f3t"), d: t("landing.f3d") },
           ].map((f, i) => (
             <motion.div
-              key={i}
+              key={f.n}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
