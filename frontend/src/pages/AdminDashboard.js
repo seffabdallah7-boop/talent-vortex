@@ -190,6 +190,7 @@ export default function AdminDashboard() {
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => { logout(); navigate("/"); }} data-testid="admin-header-logout"><LogOut className="h-4 w-4 mr-2" /> Déconnexion</Button>
         </div>
         <div className="md:hidden flex items-center gap-3 p-3 border-b border-border">
           <Sheet open={mobileNav} onOpenChange={setMobileNav}>
@@ -604,6 +605,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                 )}
                 <p className="text-sm text-muted-foreground">{detail.candidate_email}</p>
                 {detail.cover_note && <div className="rounded-lg bg-secondary/50 p-3"><p className="text-xs font-semibold mb-1">Note de motivation</p><p className="text-sm italic">"{detail.cover_note}"</p></div>}
+                {detail.salary_expectation && <div className="rounded-lg bg-secondary/50 p-3" data-testid="detail-salary-expectation"><p className="text-xs font-semibold mb-1">Prétention salariale</p><p className="text-sm">{detail.salary_expectation}</p></div>}
                 {detail.transcription && <div className="rounded-lg bg-secondary/50 p-3"><p className="text-xs font-semibold mb-1">Transcription du message vocal</p><p className="text-sm">{detail.transcription}</p></div>}
                 <div className="flex flex-wrap gap-2">
                   {detail.cv_file_id && <Button asChild variant="outline" size="sm" className="rounded-full" data-testid="admin-view-cv"><a href={fileUrl(detail.cv_file_id)} target="_blank" rel="noreferrer"><FileText className="h-4 w-4 mr-2" /> Voir le CV</a></Button>}

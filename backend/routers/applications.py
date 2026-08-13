@@ -88,6 +88,7 @@ async def assess_screening(job: dict, questions: list, answers: list):
 async def create_application(
     job_id: str = Form(...),
     cover_note: str = Form(""),
+    salary_expectation: str = Form(""),
     cv: UploadFile = File(...),
     voice: Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_user),
@@ -140,6 +141,7 @@ async def create_application(
         "voice_file_id": voice_file_id,
         "transcription": transcription,
         "cover_note": cover_note,
+        "salary_expectation": salary_expectation,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),

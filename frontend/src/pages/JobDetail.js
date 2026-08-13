@@ -45,6 +45,7 @@ export default function JobDetail() {
     const fd = new FormData();
     fd.append("job_id", id);
     fd.append("cover_note", note);
+    fd.append("salary_expectation", e.target.salary_expectation?.value || "");
     fd.append("cv", cv);
     if (voice) fd.append("voice", voice, "message-vocal.webm");
     try {
@@ -148,6 +149,11 @@ export default function JobDetail() {
               <div>
                 <Label htmlFor="note" className="mb-2 block">Note de motivation (facultatif)</Label>
                 <Textarea id="note" data-testid="cover-note-input" value={note} onChange={(e) => setNote(e.target.value)} rows={4} placeholder="Quelques mots sur votre motivation..." />
+              </div>
+
+              <div>
+                <Label htmlFor="salary_expectation" className="mb-2 block">Prétention salariale (facultatif)</Label>
+                <input id="salary_expectation" name="salary_expectation" data-testid="salary-expectation-input" placeholder="Ex : 45 000 € / an, ou à négocier" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
 
               <Button type="submit" disabled={submitting} className="rounded-full h-12 px-8" data-testid="submit-application-btn">

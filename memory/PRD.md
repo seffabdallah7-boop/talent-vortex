@@ -165,5 +165,13 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Appliqué à : **Utilisateurs** (`AdminCandidates`), **Candidatures** et **Contrats** (`AdminDashboard`). Case d'en-tête = tout sélectionner la page ; barre `BulkBar` = compteur + Supprimer ; `Pager` en pied.
 - ⏳ Restant à équiper du même motif : **Entretiens** (vue liste), **Offres d'emploi**, **Enregistrements**.
 
+## Implemented (2026-06, itération 30 — Prétention salariale + déconnexion header)
+- **Prétention salariale** (facultative) : champ dans le formulaire de candidature (`JobDetail`, `salary-expectation-input`), stocké via `POST /api/applications` (`salary_expectation`), affiché dans le détail de candidature côté admin (`detail-salary-expectation`). Vérifié end-to-end.
+- **Header admin** : bouton **Déconnexion** ajouté à droite du header desktop (`admin-header-logout`). Le hamburger mobile existe déjà (Sheet `md:hidden`).
+
+## ⏳ En attente (demandé, à faire prochaine étape)
+- Sélection multiple + pagination sur **Entretiens**, **Offres d'emploi**, **Enregistrements**.
+- Refonte du motif : cases à cocher masquées derrière un bouton **« Sélectionner »** en haut ; flèches de pagination **en haut ET en bas** (à propager sur Utilisateurs/Candidatures/Contrats déjà équipés).
+
 ## ✅ Roadmap A→H terminée
 Toutes les phases demandées (navigation/interactivité, appréciation, entretien à l'acceptation, notifications d'offres, appels vidéo+enregistrement+résumé IA, auth simplifiée, examen IA de pré-qualification, nettoyage auto, traduction complète FR/EN) sont livrées et testées.
