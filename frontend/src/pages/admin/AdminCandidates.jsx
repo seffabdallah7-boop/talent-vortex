@@ -38,6 +38,19 @@ export default function Candidates({ onOpenProfile }) {
   const [natFilter, setNatFilter] = useState("");
   const [natOpen, setNatOpen] = useState(false);
   const [cvView, setCvView] = useState(null);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState(null);
+  const runAiSearch = async () => {
+    const query = aiQuery.trim();
+    if (!query) return;
+    setAiLoading(true);
+    try {
+      const { data } = await api.post("/users/ai-search", { query });
+      setAiResults(data.results || []);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Recherche IA indisponible"); }
+    finally { setAiLoading(false); }
+  };
   const openCv = async (u) => {
     setCvView({ user: u, loading: true, text: "" });
     try {

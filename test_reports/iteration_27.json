@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only testing on Talent Vortex admin 'Utilisateurs & rôles' page after re-insertion of aiQuery/aiLoading/aiResults useState + runAiSearch in AdminCandidates.jsx. Admin login (with math captcha), navigation to Users page, AI search panel visibility, AI search execution (LLM), clear button, and classic search were all validated. No runtime error 'aiQuery is not defined' and no console/page errors observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_27.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminCandidates.jsx (289 lines) is fine size-wise but consider extracting the AI search panel and CV viewer into subcomponents for readability.",
+    "runAiSearch: setAiLoading(false) is not in a finally block — if an unexpected non-axios error occurs before catch, loading state could persist. Wrap in try/finally."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "Admin: seffabdallah7@gmail.com / Admin@2026! + math captcha (worked, 7+3=10)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix verified: aiQuery useState + runAiSearch present in AdminCandidates.jsx (lines ~41-53). AI search panel (data-testid=ai-search-panel/input/btn/results/clear) all present and functional. AI search returned 3 scored results with justifications for the DevOps/Terraform/Docker query (LLM took ~10s). Classic candidate-search and users table also functional (18 rows loaded).",
+  "rca of the issue": "Previous edit had lost the useState declarations for aiQuery/aiLoading/aiResults and the runAiSearch function while the JSX referencing them remained, causing a ReferenceError. Fix: re-insert states + handler at top of Candidates component. Verified fixed."
+}
