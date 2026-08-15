@@ -120,6 +120,14 @@ async def get_user_detail(user_id: str, admin: dict = Depends(require_admin)):
     return {"user": pub, "applications": apps, "interviews": interviews, "contracts": contracts}
 
 
+@router.get("/users/{user_id}/cv-text")
+async def get_user_cv_text(user_id: str, admin: dict = Depends(require_admin)):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "cv_text": 1, "cv_filename": 1, "cv_file_id": 1})
+    if not u:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    return {"cv_text": u.get("cv_text", ""), "cv_filename": u.get("cv_filename"), "cv_file_id": u.get("cv_file_id")}
+
+
 @router.get("/admin/nationalities")
 async def nationalities(admin: dict = Depends(require_admin)):
     agg = await db.users.aggregate([

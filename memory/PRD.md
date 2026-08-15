@@ -218,6 +218,20 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Vérifié de bout en bout (curl + capture) : mot-clé unique du CV → trouvé + snippet ; « Terraform » → 2 candidats surlignés ; « Kubern » (partiel) → repli regex OK ; recherche par nom → pas de snippet.
 - ⚠️ Note incident : `users.py` a subi une corruption (fonctions dupliquées + décalage de lignes) pendant les éditions ; reconstruit proprement par troncature déterministe.
 
+## Implemented (2026-06, itération 38 — Aperçu CV avec surlignage complet)
+- **Nouvel endpoint** `GET /users/{user_id}/cv-text` (admin) → texte intégral du CV + `cv_filename` + `cv_file_id`.
+- **Aperçu CV cliquable** : dans les résultats de recherche, l'extrait « CV : … (voir tout) » est un bouton qui ouvre un **Dialog** affichant le texte complet du CV avec **toutes** les occurrences du mot recherché surlignées (`Highlight` = regex global). Bouton « CV original » qui ouvre le fichier source (PDF/DOCX) via blob authentifié.
+- Vérifié par capture : recherche « Terraform » → clic sur l'extrait → Dialog « Aperçu du CV » avec terme surligné + bouton CV original.
+
+## Implemented (2026-06, itération 39 — Design dashboard candidat + suppression totale « Emergent » visible)
+- **Dashboard candidat** : conteneur passé en **pleine largeur** (`px-5 lg:px-8 xl:px-12`, plus de `max-w-7xl mx-auto`) → marges latérales supprimées sur grand écran. Grille des publications passée à **3 colonnes** (`sm:grid-cols-2 xl:grid-cols-3`).
+- **Suppression des références « Emergent » visibles / liens** :
+  - `index.html` réécrit : meta description + **OG/Twitter Talent Vortex**, `og:url`/`canonical` → `https://talentvortexagence.com/`. Retrait du **badge** `emergent-main.js` et du script **PostHog** (`ap.emergent.sh`).
+  - **Bouton « Se connecter avec Google » retiré** (+ fonction `googleLogin`) : il redirigeait vers `auth.emergentagent.com`. Connexion désormais email/mot de passe uniquement.
+  - Image hero de la landing (hébergée sur `emergentagent.com`) remplacée par une image Unsplash.
+- Vérifié par capture : login sans Google ni « Emergent », dashboard 3 colonnes pleine largeur.
+- Restes non visibles/non modifiés : `REACT_APP_BACKEND_URL` = emergentagent.com en préview (production = talentvortexagence.com) ; test-ids internes. La marque affichée par Google (si un jour OAuth propre) nécessiterait des identifiants Google Cloud du client.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

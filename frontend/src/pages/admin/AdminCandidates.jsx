@@ -13,7 +13,8 @@ import { Avatar } from "@/components/Avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
-import { Star, Trash2, CheckSquare, ChevronDown } from "lucide-react";
+import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -36,6 +37,24 @@ export default function Candidates({ onOpenProfile }) {
   const [nats, setNats] = useState([]);
   const [natFilter, setNatFilter] = useState("");
   const [natOpen, setNatOpen] = useState(false);
+  const [cvView, setCvView] = useState(null);
+  const openCv = async (u) => {
+    setCvView({ user: u, loading: true, text: "" });
+    try {
+      const { data } = await api.get(`/users/${u.user_id}/cv-text`);
+      setCvView({ user: u, loading: false, text: data.cv_text || "", cv_file_id: data.cv_file_id, cv_filename: data.cv_filename });
+    } catch (e) {
+      toast.error("Impossible de charger le CV");
+      setCvView(null);
+    }
+  };
+  const openOriginalCv = async () => {
+    if (!cvView?.cv_file_id) return;
+    try {
+      const { data } = await api.get(`/files/${cvView.cv_file_id}`, { responseType: "blob" });
+      window.open(URL.createObjectURL(data), "_blank");
+    } catch (e) { toast.error("Impossible d'ouvrir le CV original"); }
+  };
   const visibleList = list.filter((u) => !me || u.user_id !== me.user_id);
   const filteredList = natFilter ? visibleList.filter((u) => (u.nationality || "") === natFilter) : visibleList;
   const lc = useListControls(filteredList, { pageSize: 15, selectId: (u) => u.user_id });
@@ -183,8 +202,11 @@ export default function Candidates({ onOpenProfile }) {
                   {u.cv_snippet && (
                     <TableRow data-testid={`cv-snippet-row-${u.user_id}`} className="bg-secondary/30 hover:bg-secondary/30">
                       <TableCell colSpan={9} className="py-2 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground/70 mr-1">CV :</span>
-                        <Highlight text={u.cv_snippet} q={q} />
+                        <button type="button" onClick={() => openCv(u)} className="text-left hover:opacity-80" data-testid={`cv-snippet-${u.user_id}`}>
+                          <span className="font-semibold text-foreground/70 mr-1">CV :</span>
+                          <Highlight text={u.cv_snippet} q={q} />
+                          <span className="ml-1 text-primary font-medium">(voir tout)</span>
+                        </button>
                       </TableCell>
                     </TableRow>
                   )}
@@ -203,6 +225,30 @@ export default function Candidates({ onOpenProfile }) {
           <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-candidate">Supprimer</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!cvView} onOpenChange={(o) => !o && setCvView(null)}>
+        <DialogContent className="max-w-2xl" data-testid="cv-preview-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              Aperçu du CV — {cvView?.user?.name}
+              {cvView?.cv_file_id && (
+                <Button variant="outline" size="sm" className="rounded-full ml-auto" onClick={openOriginalCv} data-testid="open-original-cv-btn">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> CV original
+                </Button>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {cvView?.loading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Chargement…</div>
+          ) : cvView?.text ? (
+            <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed rounded-lg border border-border bg-secondary/20 p-4" data-testid="cv-preview-text">
+              <Highlight text={cvView.text} q={q} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-8 text-center">Aucun texte exploitable dans ce CV.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

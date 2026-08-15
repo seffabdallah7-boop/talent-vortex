@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Briefcase, Search, ArrowRight, FileAudio, ShieldCheck, Bot, MoveUpRight, Star } from "lucide-react";
 
-const HERO = "https://static.prod-images.emergentagent.com/jobs/ad379664-d6fd-49f5-b212-fa711498c483/images/c22824a5a6045698503ab5f468121c8e1737b885742b22d5f16531bedca176e1.jpeg";
+const HERO = "https://images.unsplash.com/photo-1559136555-9303baea8ebd?crop=entropy&cs=srgb&fm=jpg&q=85&w=1600";
 const AV1 = "https://images.unsplash.com/photo-1560250097-0b93528c311a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBvZmZpY2UlMjB3b3JrZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODYyMTY1Nzh8MA&ixlib=rb-4.1.0&q=85";
 const AV2 = "https://images.pexels.com/photos/8101982/pexels-photo-8101982.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 const CATS = ["Tech", "Ressources Humaines", "Design", "Data", "Marketing", "Finance"];

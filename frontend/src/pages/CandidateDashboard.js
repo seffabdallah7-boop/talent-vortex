@@ -158,7 +158,7 @@ export default function CandidateDashboard() {
       <Navbar />
       {incoming && <IncomingCall call={incoming} onAccept={acceptCall} onDecline={declineCall} />}
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title="Entretien" onClose={() => setCall(null)} />}
-      <div className="max-w-7xl mx-auto px-5 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
+      <div className="px-5 lg:px-8 xl:px-12 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-24 h-fit" data-testid="candidate-sidebar">
           {/* Mobile menu bar */}
@@ -278,7 +278,7 @@ function JobsHome({ jobs, apps }) {
           Aucune offre disponible pour le moment.
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((job, i) => {
             const status = statusByJob[job.id];
             return (
