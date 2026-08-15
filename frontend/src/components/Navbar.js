@@ -102,7 +102,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 glass border-b border-border">
-      <div className="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
+      <div className="px-5 lg:px-8 xl:px-12 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5" data-testid="nav-logo">
           <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
           <span className="font-display text-xl font-semibold">Talent Vortex</span>

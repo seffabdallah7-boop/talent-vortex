@@ -158,7 +158,7 @@ export default function CandidateDashboard() {
       <Navbar />
       {incoming && <IncomingCall call={incoming} onAccept={acceptCall} onDecline={declineCall} />}
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title="Entretien" onClose={() => setCall(null)} />}
-      <div className="px-5 lg:px-8 xl:px-12 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
+      <div className="pl-0 pr-5 lg:pr-8 xl:pr-12 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
         {/* Sidebar */}
         <aside className="lg:sticky lg:top-24 h-fit" data-testid="candidate-sidebar">
           {/* Mobile menu bar */}

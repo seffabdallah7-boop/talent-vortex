@@ -236,6 +236,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Navigation retour (mobile)** : après connexion, `navigate(..., { replace: true })` (login retiré de l'historique). Un utilisateur **déjà connecté** qui atteint `/login` ou `/` (accueil public) est **redirigé** vers son tableau de bord (`/admin` pour admin, `/dashboard` pour candidat). Résultat : le bouton retour du téléphone ne renvoie plus jamais vers la page de connexion ; il ramène au tableau de bord. Vérifié (URL finale = /dashboard).
 - Rappel anti-Emergent (itération 39) confirmé : plus aucun lien/mot Emergent visible (badge, posthog, bouton Google, image hero, meta OG). URL backend = domaine client en production.
 
+## Implemented (2026-06, itération 41 — Google restauré + header pleine largeur espace candidat)
+- **Connexion Google RESTAURÉE** (bouton + `googleLogin` → `auth.emergentagent.com`). Compromis documenté : l'écran Google affiche le domaine Emergent (auth gérée par Emergent) ; pour son propre domaine, il faudrait des identifiants Google OAuth du client.
+- **Header (`Navbar`) pleine largeur** : `max-w-7xl mx-auto` retiré → `justify-between` s'étend bord à bord (logo extrême gauche, actions extrême droite). S'applique aussi à la Landing.
+- **Espace candidat, contenu du bas `margin-left = 0`** : conteneur du dashboard passé en `pl-0` (sidebar/contenu collés au bord gauche), `pr-*` conservé.
+- **Recherche full-text CV** : déjà implémentée et **revérifiée en préview avec un vrai PDF** (extraction pypdf OK, snippet surligné). ⚠️ Nécessite un **redéploiement** pour la production ; les CV déjà présents en prod nécessiteront un ré-upload ou un backfill (base prod inaccessible depuis la préview).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
