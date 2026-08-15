@@ -248,6 +248,9 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Bouton Retour navigateur** : `section` des deux dashboards **dérivé de l'URL** (`?section=`), `setSection` = `setSearchParams`. Vérifié : onglet→URL, Retour revient à l'onglet précédent sans boucle ni auth.
 - **Scrub Emergent** : plus aucune référence visible dans le code (badge, posthog, meta OG=Talent Vortex, `og:url`/canonical=talentvortexagence.com, image hero). Seul reste : le redirect OAuth Google `auth.emergentagent.com` (auth gérée par Emergent — supprimable uniquement via OAuth Google propre au client). `REACT_APP_BACKEND_URL`=emergentagent.com en préview uniquement (prod = domaine client).
 
+## Implemented (2026-06, itération 43 — Design admin appliqué à l'espace candidat)
+- `CandidateDashboard` restructuré avec le **même layout que l'admin** : `aside` w-64 (logo en haut, nav, **déconnexion en bas**) + `main` avec **header sticky** (LanguageSwitcher, NotificationBell, bascule thème, déconnexion). `<Navbar />` retiré au profit de cette structure. Contenu candidat inchangé (banners + sections). Vérifié par capture.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

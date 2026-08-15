@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import Navbar from "@/components/Navbar";
+import { NotificationBell } from "@/components/Navbar";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useDarkMode } from "@/context/DarkModeContext";
 import ChatWidget from "@/components/ChatWidget";
 import StatusBadge from "@/components/StatusBadge";
 import VideoCall from "@/components/VideoCall";
@@ -18,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle, Camera,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle, Camera, LogOut, Sun, Moon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,7 +33,9 @@ const STEPS = [
 const fmtDate = (d) => { try { return new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }); } catch { return d; } };
 
 export default function CandidateDashboard() {
-  const { user, checkAuth } = useAuth();
+  const { user, checkAuth, logout } = useAuth();
+  const navigate = useNavigate();
+  const { dark, toggle } = useDarkMode();
   const [apps, setApps] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [interviews, setInterviews] = useState([]);
@@ -133,7 +137,7 @@ export default function CandidateDashboard() {
             key={n.key}
             onClick={() => n.action === "chat" ? (window.dispatchEvent(new CustomEvent("open-support-chat")), setMobileNav(false)) : selectSection(n.key)}
             data-testid={`sidebar-${n.key}`}
-            className={`w-full flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground hover:text-foreground"}`}
+            className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${section === n.key ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground hover:text-foreground"}`}
           >
             <n.Icon className="h-4 w-4" />
             <span className="flex-1 text-left">{n.label}</span>
@@ -150,41 +154,47 @@ export default function CandidateDashboard() {
   );
 
   return (
-    <div className="App">
-      <Navbar />
+    <div className="min-h-screen flex bg-background">
       {incoming && <IncomingCall call={incoming} onAccept={acceptCall} onDecline={declineCall} />}
       {call && <VideoCall room={call.room} audioOnly={call.audioOnly} title="Entretien" onClose={() => setCall(null)} />}
-      <div className="pl-0 pr-5 lg:pr-8 xl:pr-12 py-8 grid lg:grid-cols-[260px_1fr] gap-8">
-        {/* Sidebar */}
-        <aside className="lg:sticky lg:top-24 h-fit" data-testid="candidate-sidebar">
-          {/* Mobile menu bar */}
-          <div className="lg:hidden mb-2 flex items-center gap-3">
-            <Sheet open={mobileNav} onOpenChange={setMobileNav}>
-              <SheetTrigger asChild>
-                <button className="h-10 w-10 rounded-lg border border-border flex items-center justify-center hover:bg-secondary transition-colors" data-testid="candidate-mobile-menu-btn" aria-label="Menu"><Menu className="h-5 w-5" /></button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72">
-                <SheetHeader className="text-left mb-4"><SheetTitle>Espace candidat</SheetTitle></SheetHeader>
-                {navBlock}
-              </SheetContent>
-            </Sheet>
-            <div className="min-w-0">
-              <p className="label-caps text-primary">Espace candidat</p>
-              <h1 className="font-display text-lg font-semibold leading-tight truncate">{user?.name}</h1>
-            </div>
-          </div>
-          {/* Desktop sidebar */}
-          <div className="hidden lg:block">
-            <div className="mb-6">
-              <p className="label-caps text-primary mb-1">Espace candidat</p>
-              <h1 className="font-display text-2xl font-semibold leading-tight">{user?.name}</h1>
-            </div>
-            {navBlock}
-          </div>
-        </aside>
+      <aside className="w-64 shrink-0 border-r border-border bg-card hidden lg:flex flex-col" data-testid="candidate-sidebar">
+        <div className="h-16 flex items-center px-5 border-b border-border">
+          <button onClick={() => navigate("/")} className="flex items-center gap-2.5" data-testid="candidate-logo">
+            <img src="/logo.png" alt="Talent Vortex" className="h-9 w-9 rounded-lg object-contain bg-white p-0.5" />
+            <span className="font-display text-lg font-semibold">Talent Vortex</span>
+          </button>
+        </div>
+        <div className="flex-1 p-3 overflow-y-auto">{navBlock}</div>
+        <div className="p-3 border-t border-border space-y-2">
+          <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
+          <Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="candidate-logout-btn"><LogOut className="h-4 w-4 mr-2" /> Déconnexion</Button>
+        </div>
+      </aside>
 
-        {/* Content */}
-        <main className="min-w-0">
+      <main className="flex-1 overflow-y-auto">
+        <div className="hidden lg:flex items-center justify-end gap-2 px-8 h-16 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-20" data-testid="candidate-header">
+          <LanguageSwitcher />
+          <NotificationBell />
+          <button onClick={toggle} data-testid="candidate-dark-toggle" aria-label="Basculer le thème" className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-secondary transition-colors">
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => { logout(); navigate("/"); }} data-testid="candidate-header-logout"><LogOut className="h-4 w-4 mr-2" /> Déconnexion</Button>
+        </div>
+        <div className="lg:hidden flex items-center gap-3 p-3 border-b border-border">
+          <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+            <SheetTrigger asChild>
+              <button className="h-10 w-10 rounded-lg border border-border flex items-center justify-center hover:bg-secondary transition-colors" data-testid="candidate-mobile-menu-btn" aria-label="Menu"><Menu className="h-5 w-5" /></button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-72 flex flex-col">
+              <SheetHeader className="p-4 border-b border-border text-left"><SheetTitle className="flex items-center gap-2"><img src="/logo.png" alt="Talent Vortex" className="h-8 w-8 rounded-lg object-contain bg-white p-0.5" /> Talent Vortex</SheetTitle></SheetHeader>
+              <div className="flex-1 p-3 overflow-y-auto">{navBlock}</div>
+              <div className="p-3 border-t border-border"><Button variant="outline" className="w-full rounded-lg" onClick={() => { logout(); navigate("/"); }} data-testid="candidate-mobile-logout-btn"><LogOut className="h-4 w-4 mr-2" /> Déconnexion</Button></div>
+            </SheetContent>
+          </Sheet>
+          <button onClick={() => navigate("/")} className="font-display text-lg font-semibold flex items-center gap-2" data-testid="candidate-mobile-logo"><img src="/logo.png" alt="Talent Vortex" className="h-7 w-7 rounded-md object-contain bg-white p-0.5" /> Talent Vortex</button>
+          <div className="ml-auto flex items-center gap-2"><LanguageSwitcher /><NotificationBell /></div>
+        </div>
+        <div className="p-6 md:p-8 max-w-6xl">
           {reminder && (
             <div className="rounded-2xl border border-primary bg-primary/10 p-4 mb-6 flex items-center justify-between gap-3" data-testid="interview-reminder-banner">
               <div className="flex items-center gap-3">
@@ -213,8 +223,8 @@ export default function CandidateDashboard() {
           {section === "interviews" && <InterviewsView interviews={interviews} onReload={loadAll} />}
           {section === "contracts" && <ContractsView contracts={contracts} />}
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
-        </main>
-      </div>
+        </div>
+      </main>
       <ChatWidget />
     </div>
   );
