@@ -232,6 +232,10 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Vérifié par capture : login sans Google ni « Emergent », dashboard 3 colonnes pleine largeur.
 - Restes non visibles/non modifiés : `REACT_APP_BACKEND_URL` = emergentagent.com en préview (production = talentvortexagence.com) ; test-ids internes. La marque affichée par Google (si un jour OAuth propre) nécessiterait des identifiants Google Cloud du client.
 
+## Implemented (2026-06, itération 40 — Retour mobile → tableau de bord + finalisation anti-Emergent)
+- **Navigation retour (mobile)** : après connexion, `navigate(..., { replace: true })` (login retiré de l'historique). Un utilisateur **déjà connecté** qui atteint `/login` ou `/` (accueil public) est **redirigé** vers son tableau de bord (`/admin` pour admin, `/dashboard` pour candidat). Résultat : le bouton retour du téléphone ne renvoie plus jamais vers la page de connexion ; il ramène au tableau de bord. Vérifié (URL finale = /dashboard).
+- Rappel anti-Emergent (itération 39) confirmé : plus aucun lien/mot Emergent visible (badge, posthog, bouton Google, image hero, meta OG). URL backend = domaine client en production.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

@@ -28,7 +28,7 @@ function CaptchaField({ question, value, onChange, onRefresh }) {
 }
 
 export default function Auth() {
-  const { setSession } = useAuth();
+  const { setSession, user } = useAuth();
   const { dark, toggle } = useDarkMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function Auth() {
   const [pendingEmail, setPendingEmail] = useState("");
   const [reset, setReset] = useState({ email: "", code: "", new_password: "" });
 
-  const go = (user) => navigate(user.role === "admin" ? "/admin" : "/dashboard");
+  const go = (u) => navigate(u.role === "admin" ? "/admin" : "/dashboard", { replace: true });
 
   const refreshCaptcha = useCallback(async () => {
     setCaptchaAns("");
@@ -55,6 +55,11 @@ export default function Auth() {
   }, []);
 
   useEffect(() => { refreshCaptcha(); }, [refreshCaptcha]);
+
+  // Utilisateur déjà connecté : ne jamais afficher la page de connexion (retour mobile → tableau de bord)
+  useEffect(() => {
+    if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+  }, [user, navigate]);
 
   const submit = async (e) => {
     e.preventDefault();
