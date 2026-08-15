@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
-import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink } from "lucide-react";
+import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -119,6 +119,27 @@ export default function Candidates({ onOpenProfile }) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+      <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-6" data-testid="ai-search-panel">
+        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Recherche IA — langage naturel (profils + contenu des CV)</span></div>
+        <div className="flex gap-2 flex-wrap">
+          <Input data-testid="ai-search-input" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runAiSearch()} placeholder="Ex : candidats avec 3 ans d'expérience React qui connaissent Docker" className="rounded-full flex-1 min-w-[220px] bg-background" />
+          <Button onClick={runAiSearch} disabled={aiLoading} className="rounded-full" data-testid="ai-search-btn">{aiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}Rechercher</Button>
+          {aiResults !== null && <Button variant="outline" onClick={() => { setAiResults(null); setAiQuery(""); }} className="rounded-full" data-testid="ai-search-clear">Effacer</Button>}
+        </div>
+        {aiResults !== null && (
+          <div className="mt-4 space-y-2" data-testid="ai-search-results">
+            {aiResults.length === 0 ? <p className="text-sm text-muted-foreground">Aucun candidat correspondant à cette requête.</p> : aiResults.map((r) => (
+              <div key={r.user_id} className="rounded-xl border border-border bg-card p-3 flex items-start justify-between gap-3" data-testid={`ai-result-${r.user_id}`}>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold">{r.name}</span><span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-0.5 font-bold">{r.ai_score}%</span><span className="text-xs text-muted-foreground truncate">{r.email}</span></div>
+                  <p className="text-sm text-muted-foreground mt-0.5">{r.ai_reason}</p>
+                </div>
+                <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={() => onOpenProfile?.(r.user_id)} data-testid={`ai-open-${r.user_id}`}>Voir le profil</Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {nats.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-4 mb-6" data-testid="nationalities-panel">

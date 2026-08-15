@@ -1,11 +1,16 @@
 """Candidates & users management (admin)."""
 import re
+import json
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
-from core import db, logger, require_admin, require_super, get_current_user, public_user
+from core import (
+    db, logger, require_admin, require_super, get_current_user, public_user,
+    EMERGENT_LLM_KEY, LlmChat, UserMessage,
+)
 
 router = APIRouter()
 
@@ -126,6 +131,68 @@ async def get_user_cv_text(user_id: str, admin: dict = Depends(require_admin)):
     if not u:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     return {"cv_text": u.get("cv_text", ""), "cv_filename": u.get("cv_filename"), "cv_file_id": u.get("cv_file_id")}
+
+
+class AiSearchInput(BaseModel):
+    query: str
+
+
+@router.post("/users/ai-search")
+async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_admin)):
+    """Agent IA : interprète une requête en langage naturel et retourne les candidats pertinents (profil + CV)."""
+    query = (body.query or "").strip()
+    if not query:
+        return {"results": []}
+    cands = await db.users.find({"role": {"$ne": "admin"}}, {"_id": 0, "password_hash": 0}).to_list(200)
+    if not EMERGENT_LLM_KEY or not cands:
+        return {"results": []}
+    lines = []
+    for c in cands[:60]:
+        tags = (c.get("domains") or []) + (c.get("ai_domains") or [])
+        cv = (c.get("cv_text") or "")[:900]
+        lines.append(
+            f"- id={c['user_id']} | nom={c.get('name','')} | poste={c.get('current_position','')} "
+            f"| domaines={', '.join(tags)} | outils={', '.join(c.get('tools') or [])} "
+            f"| experience={c.get('years_experience','?')} ans | CV: {cv}"
+        )
+    prompt = (
+        f"REQUETE DU RECRUTEUR: {query}\n\nCANDIDATS:\n" + "\n".join(lines) +
+        "\n\nRetourne uniquement les candidats qui correspondent vraiment a la requete."
+    )
+    system = (
+        "Tu es un agent de recherche RH intelligent. On te donne une requete en langage naturel et une liste de candidats "
+        "(profil structure + texte extrait de leur CV). Analyse en profondeur profils ET contenu des CV. "
+        "Reponds UNIQUEMENT par un tableau JSON valide, sans texte autour: "
+        "[{\"candidate_id\":\"<id>\",\"score\":<entier 0-100>,\"reason\":\"<phrase FR expliquant la correspondance>\"}]. "
+        "Inclure uniquement les candidats reellement pertinents (score >= 50), tries par score decroissant. Si aucun, retourne []."
+    )
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=f"aisearch-{uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        resp = await chat.send_message(UserMessage(text=prompt))
+        raw = (resp if isinstance(resp, str) else getattr(resp, "text", str(resp))) or ""
+        raw = raw.strip()
+        try:
+            arr = json.loads(raw)
+        except Exception:
+            m = re.search(r"\[.*\]", raw, re.DOTALL)
+            arr = json.loads(m.group(0)) if m else []
+    except Exception as e:
+        logger.warning(f"ai_search failed: {e}")
+        raise HTTPException(status_code=503, detail="Recherche IA momentanement indisponible.")
+    by_id = {c["user_id"]: c for c in cands}
+    results = []
+    for x in arr if isinstance(arr, list) else []:
+        c = by_id.get(str(x.get("candidate_id", "")))
+        if not c:
+            continue
+        c.pop("cv_text", None)
+        if not admin.get("is_super"):
+            c.pop("is_super", None)
+        results.append({**c, "ai_score": int(x.get("score", 0)), "ai_reason": x.get("reason", "")})
+    return {"results": results}
 
 
 @router.get("/admin/nationalities")

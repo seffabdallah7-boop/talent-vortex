@@ -251,6 +251,11 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 ## Implemented (2026-06, itération 43 — Design admin appliqué à l'espace candidat)
 - `CandidateDashboard` restructuré avec le **même layout que l'admin** : `aside` w-64 (logo en haut, nav, **déconnexion en bas**) + `main` avec **header sticky** (LanguageSwitcher, NotificationBell, bascule thème, déconnexion). `<Navbar />` retiré au profit de cette structure. Contenu candidat inchangé (banners + sections). Vérifié par capture.
 
+## Implemented (2026-06, itération 44 — Agent de recherche IA sur les CV)
+- **Endpoint `POST /users/ai-search`** (admin) : agent IA (Claude Sonnet 4.6 via `EMERGENT_LLM_KEY`) qui reçoit une requête en langage naturel + profils + **texte extrait des CV**, et renvoie les candidats pertinents avec `ai_score` (0-100) et `ai_reason`. Limite 60 candidats, CV tronqué à 900 car.
+- **Barre de recherche IA** (`AdminCandidates`, page Utilisateurs) : champ langage naturel + bouton « Rechercher », résultats en cartes (nom, score %, justification, « Voir le profil »), bouton « Effacer ». Coexiste avec la recherche full-text classique.
+- Vérifié par curl : « spécialiste DevOps qui connaît Terraform et Docker » → 3 candidats classés (82/75/52%) avec justifications basées sur le contenu des CV.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
