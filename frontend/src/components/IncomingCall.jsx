@@ -24,10 +24,10 @@ export default function IncomingCall({ call, onAccept, onDecline }) {
       interval = setInterval(beep, 1500);
       ringRef.current = { ctx, interval };
       if (navigator.vibrate) navigator.vibrate([300, 200, 300]);
-    } catch { /* audio not available */ }
+    } catch (e) { console.debug("son de sonnerie indisponible", e); }
     return () => {
       if (interval) clearInterval(interval);
-      try { ctx && ctx.close(); } catch { /* noop */ }
+      try { ctx && ctx.close(); } catch (e) { console.debug("fermeture AudioContext", e); }
     };
   }, []);
 

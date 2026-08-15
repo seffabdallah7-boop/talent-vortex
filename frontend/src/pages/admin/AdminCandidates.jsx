@@ -23,8 +23,8 @@ const Highlight = ({ text, q }) => {
   const parts = String(text).split(new RegExp(`(${escapeRe(q.trim())})`, "ig"));
   return parts.map((p, i) =>
     p.toLowerCase() === q.trim().toLowerCase()
-      ? <mark key={i} className="bg-primary/25 text-foreground rounded px-0.5">{p}</mark>
-      : <span key={i}>{p}</span>
+      ? <mark key={`${i}-${p}`} className="bg-primary/25 text-foreground rounded px-0.5">{p}</mark>
+      : <span key={`${i}-${p}`}>{p}</span>
   );
 };
 

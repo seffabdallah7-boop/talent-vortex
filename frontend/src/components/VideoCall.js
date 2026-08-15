@@ -31,7 +31,7 @@ export default function VideoCall({ room, audioOnly, title, onClose, recordCtx }
       const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       streams.current.push(display);
       let mic = null;
-      try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); streams.current.push(mic); } catch { /* mic optional */ }
+      try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); streams.current.push(mic); } catch (e) { console.debug("micro indisponible (optionnel)", e); }
 
       const ac = new (window.AudioContext || window.webkitAudioContext)();
       const dest = ac.createMediaStreamDestination();
@@ -64,8 +64,8 @@ export default function VideoCall({ room, audioOnly, title, onClose, recordCtx }
 
   const stopRecording = () => {
     setRecording(false);
-    try { audioRec.current?.state === "recording" && audioRec.current.stop(); } catch { /* noop */ }
-    try { videoRec.current?.state === "recording" && videoRec.current.stop(); } catch { /* noop */ }
+    try { audioRec.current?.state === "recording" && audioRec.current.stop(); } catch (e) { console.debug("stop audio recorder", e); }
+    try { videoRec.current?.state === "recording" && videoRec.current.stop(); } catch (e) { console.debug("stop video recorder", e); }
   };
 
   const finalize = async () => {
