@@ -28,7 +28,7 @@ function CaptchaField({ question, value, onChange, onRefresh }) {
 }
 
 export default function Auth() {
-  const { setSession, user } = useAuth();
+  const { setSession, user, loading: authLoading } = useAuth();
   const { dark, toggle } = useDarkMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -145,6 +145,15 @@ export default function Auth() {
     const redirectUrl = window.location.origin + "/dashboard";
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
   };
+
+  // Éviter le flash du formulaire de connexion pendant la vérification d'auth ou avant la redirection
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background" data-testid="auth-loading">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2 relative">

@@ -242,6 +242,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Espace candidat, contenu du bas `margin-left = 0`** : conteneur du dashboard passé en `pl-0` (sidebar/contenu collés au bord gauche), `pr-*` conservé.
 - **Recherche full-text CV** : déjà implémentée et **revérifiée en préview avec un vrai PDF** (extraction pypdf OK, snippet surligné). ⚠️ Nécessite un **redéploiement** pour la production ; les CV déjà présents en prod nécessiteront un ré-upload ou un backfill (base prod inaccessible depuis la préview).
 
+## Implemented (2026-06, itération 42 — Anti-flicker auth + Retour navigateur + scrub Emergent)
+- **Anti-flicker `/login`** : `Auth.js` rend un spinner tant que `authLoading` ou `user` est présent (formulaire jamais affiché à un connecté). Redirections `replace: true` sur `/login`, `/` (Landing) et `AuthCallback`. `ProtectedRoute` gère déjà `loading`.
+- **`AuthCallback`** amélioré : si pas de `session_id`, redirige (connecté → dashboard, sinon `/login`) en `replace`; erreurs en `replace`.
+- **Bouton Retour navigateur** : `section` des deux dashboards **dérivé de l'URL** (`?section=`), `setSection` = `setSearchParams`. Vérifié : onglet→URL, Retour revient à l'onglet précédent sans boucle ni auth.
+- **Scrub Emergent** : plus aucune référence visible dans le code (badge, posthog, meta OG=Talent Vortex, `og:url`/canonical=talentvortexagence.com, image hero). Seul reste : le redirect OAuth Google `auth.emergentagent.com` (auth gérée par Emergent — supprimable uniquement via OAuth Google propre au client). `REACT_APP_BACKEND_URL`=emergentagent.com en préview uniquement (prod = domaine client).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

@@ -38,15 +38,16 @@ export default function CandidateDashboard() {
   const [contracts, setContracts] = useState([]);
   const [notifs, setNotifs] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [section, setSection] = useState("home");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section = searchParams.get("section") || "home";
+  const setSection = useCallback((key, opts) => setSearchParams({ section: key }, opts), [setSearchParams]);
   const [mobileNav, setMobileNav] = useState(false);
   const [call, setCall] = useState(null);
   const [incoming, setIncoming] = useState(null);
   const [reminder, setReminder] = useState(null);
-  const didAutoNav = useRef(false);
+  const didAutoNav = useRef(!!searchParams.get("section"));
   const alerted = useRef(new Set());
   const [chatMeta, setChatMeta] = useState({ active: false, unread: 0 });
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const load = () => api.get("/chat/unread").then(({ data }) => setChatMeta(data)).catch(() => {});
@@ -54,11 +55,6 @@ export default function CandidateDashboard() {
     const t = setInterval(load, 8000);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    const s = searchParams.get("section");
-    if (s) { setSection(s); didAutoNav.current = true; }
-  }, [searchParams]);
 
   const loadAll = useCallback(() => {
     api.get("/applications/me").then(({ data }) => setApps(data)).catch(() => {});
@@ -68,9 +64,9 @@ export default function CandidateDashboard() {
     api.get("/notifications").then(({ data }) => setNotifs(data.items || [])).catch(() => {});
     api.get("/profile").then(({ data }) => {
       setProfile(data);
-      if (!data.profile_completed && !didAutoNav.current) { setSection("profile"); didAutoNav.current = true; }
+      if (!data.profile_completed && !didAutoNav.current) { setSection("profile", { replace: true }); didAutoNav.current = true; }
     }).catch(() => {});
-  }, []);
+  }, [setSection]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 

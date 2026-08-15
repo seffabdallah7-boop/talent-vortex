@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const { setSession } = useAuth();
+  const { setSession, user } = useAuth();
   const processed = useRef(false);
   const [error, setError] = useState(null);
 
@@ -16,7 +16,7 @@ export default function AuthCallback() {
     const hash = window.location.hash || "";
     const match = hash.match(/session_id=([^&]+)/);
     if (!match) {
-      navigate("/login");
+      navigate(user ? (user.role === "admin" ? "/admin" : "/dashboard") : "/login", { replace: true });
       return;
     }
     const sessionId = decodeURIComponent(match[1]);
@@ -29,9 +29,9 @@ export default function AuthCallback() {
       })
       .catch(() => {
         setError("Échec de la connexion Google.");
-        setTimeout(() => navigate("/login"), 1500);
+        setTimeout(() => navigate("/login", { replace: true }), 1500);
       });
-  }, [navigate, setSession]);
+  }, [navigate, setSession, user]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4" data-testid="auth-callback">

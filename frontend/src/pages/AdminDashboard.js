@@ -100,7 +100,9 @@ export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useDarkMode();
   const navigate = useNavigate();
-  const [section, setSection] = useState("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section = searchParams.get("section") || "overview";
+  const setSection = useCallback((key, opts) => setSearchParams({ section: key }, opts), [setSearchParams]);
   const [jobFilter, setJobFilter] = useState(null);
   const [profileId, setProfileId] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
@@ -110,7 +112,6 @@ export default function AdminDashboard() {
   const [chatFocus, setChatFocus] = useState(null);
   const [initialSuggestionJob, setInitialSuggestionJob] = useState(null);
   const [chatUnread, setChatUnread] = useState(0);
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const load = () => api.get("/chat/conversations").then(({ data }) => setChatUnread(data.reduce((s, c) => s + (c.unread || 0), 0))).catch(() => {});
@@ -120,12 +121,10 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const s = searchParams.get("section");
     const candidate = searchParams.get("candidate");
     const name = searchParams.get("name");
     const profile = searchParams.get("profile");
     const job = searchParams.get("job");
-    if (s) setSection(s);
     if (candidate) setChatFocus({ candidate_id: candidate, candidate_name: name || "" });
     if (profile) setProfileId(profile);
     if (job) setInitialSuggestionJob(job);
