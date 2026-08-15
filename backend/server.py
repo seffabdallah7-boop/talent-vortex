@@ -35,6 +35,12 @@ async def startup():
         await db.interviews.create_index("date")
         await db.password_reset_tokens.create_index("email")
         await db.captchas.create_index("cid", unique=True)
+        await db.users.create_index([
+            ("cv_text", "text"), ("name", "text"), ("email", "text"),
+            ("current_position", "text"), ("headline", "text"), ("bio", "text"),
+            ("domains", "text"), ("tools", "text"), ("nationality", "text"),
+            ("city", "text"), ("country", "text"),
+        ], name="users_fulltext")
     except Exception as e:
         logger.warning(f"Index warning: {e}")
     try:

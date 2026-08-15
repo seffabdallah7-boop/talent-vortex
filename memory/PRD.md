@@ -212,6 +212,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Placeholder de recherche mis à jour (« …contenu du CV… »).
 - Vérifié par curl : recherche par mot-clé unique présent uniquement dans le CV → candidat trouvé ; « Kubernetes » (contenu CV) → trouvé ; recherche par nom → OK. Emails admin automatiques : désactivés (itération précédente).
 
+## Implemented (2026-06, itération 37 — Extrait CV surligné + index texte Mongo)
+- **Extrait de CV dans les résultats** : `GET /users?q=` renvoie `cv_snippet` (≈180 car. autour du mot trouvé) quand le match vient du CV. Frontend `AdminCandidates` affiche une ligne « CV : … » sous le candidat avec le terme **surligné** (`<mark>`, composant `Highlight`). `cv_text` retiré de la réponse (payload allégé, plus de fuite).
+- **Index texte MongoDB** : index full-text composé `users_fulltext` (cv_text + nom, email, poste, headline, bio, domaines, outils, nationalité, ville, pays) créé au startup. `list_users` utilise une **voie rapide `$text`** (indexée, mots entiers) avec **repli regex** pour les recherches partielles (ex. « Kubern »).
+- Vérifié de bout en bout (curl + capture) : mot-clé unique du CV → trouvé + snippet ; « Terraform » → 2 candidats surlignés ; « Kubern » (partiel) → repli regex OK ; recherche par nom → pas de snippet.
+- ⚠️ Note incident : `users.py` a subi une corruption (fonctions dupliquées + décalage de lignes) pendant les éditions ; reconstruit proprement par troncature déterministe.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
-from core import db, require_admin, require_super, get_current_user, public_user
+from core import db, logger, require_admin, require_super, get_current_user, public_user
 
 router = APIRouter()
 
@@ -37,23 +37,55 @@ async def list_candidates(admin: dict = Depends(require_admin)):
         r = rmap.get(u["user_id"])
         u["rating"] = r["avg"] if r else None
         u["rating_count"] = r["n"] if r else 0
+        u.pop("cv_text", None)
     if not admin.get("is_super"):
         for u in users:
             u.pop("is_super", None)
     return users
 
 
+def _cv_snippet(cv_text: str, q: str, radius: int = 90) -> Optional[str]:
+    if not cv_text or not q:
+        return None
+    low, ql = cv_text.lower(), q.lower().strip()
+    idx = low.find(ql)
+    if idx < 0:
+        first = ql.split()[0] if ql.split() else ""
+        idx = low.find(first) if first else -1
+        if idx < 0:
+            return None
+        ql = first
+    start = max(0, idx - radius)
+    end = min(len(cv_text), idx + len(ql) + radius)
+    snip = cv_text[start:end].strip()
+    return ("… " if start > 0 else "") + snip + (" …" if end < len(cv_text) else "")
+
+
 @router.get("/users")
 async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] = Query(None), admin: dict = Depends(require_admin)):
-    query = {}
+    proj = {"_id": 0, "password_hash": 0}
+    users = None
     if q:
-        rx = {"$regex": re.escape(q), "$options": "i"}
-        query["$or"] = [
-            {"name": rx}, {"email": rx}, {"current_position": rx}, {"nationality": rx},
-            {"headline": rx}, {"bio": rx}, {"domains": rx}, {"tools": rx}, {"city": rx}, {"country": rx},
-            {"cv_text": rx}, {"cv_filename": rx},
-        ]
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+        # Voie rapide : recherche full-text indexée (mots entiers)
+        try:
+            users = await db.users.find(
+                {"$text": {"$search": q}},
+                {**proj, "score": {"$meta": "textScore"}},
+            ).sort([("score", {"$meta": "textScore"})]).to_list(1000)
+        except Exception as e:
+            logger.warning(f"text search failed, fallback regex: {e}")
+            users = None
+        # Repli / complément : regex sous-chaîne (recherche partielle)
+        if not users:
+            rx = {"$regex": re.escape(q), "$options": "i"}
+            users = await db.users.find({"$or": [
+                {"name": rx}, {"email": rx}, {"current_position": rx}, {"nationality": rx},
+                {"headline": rx}, {"bio": rx}, {"domains": rx}, {"tools": rx},
+                {"city": rx}, {"country": rx}, {"cv_text": rx}, {"cv_filename": rx},
+            ]}, proj).sort("created_at", -1).to_list(1000)
+    else:
+        users = await db.users.find({}, proj).sort("created_at", -1).to_list(1000)
+
     counts = await db.applications.aggregate([{"$group": {"_id": "$candidate_id", "n": {"$sum": 1}}}]).to_list(5000)
     cmap = {c["_id"]: c["n"] for c in counts}
     rmap = await _rating_map()
@@ -62,6 +94,10 @@ async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] =
         r = rmap.get(u["user_id"])
         u["rating"] = r["avg"] if r else None
         u["rating_count"] = r["n"] if r else 0
+        if q:
+            u["cv_snippet"] = _cv_snippet(u.get("cv_text", ""), q)
+        u.pop("cv_text", None)
+        u.pop("score", None)
     if min_rating:
         users = [u for u in users if (u.get("rating") or 0) >= min_rating]
     if not admin.get("is_super"):

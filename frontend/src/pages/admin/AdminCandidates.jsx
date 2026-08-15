@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,17 @@ import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
 import { Star, Trash2, CheckSquare, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const Highlight = ({ text, q }) => {
+  if (!q || !text) return text || null;
+  const parts = String(text).split(new RegExp(`(${escapeRe(q.trim())})`, "ig"));
+  return parts.map((p, i) =>
+    p.toLowerCase() === q.trim().toLowerCase()
+      ? <mark key={i} className="bg-primary/25 text-foreground rounded px-0.5">{p}</mark>
+      : <span key={i}>{p}</span>
+  );
+};
 
 export default function Candidates({ onOpenProfile }) {
   const { user: me } = useAuth();
@@ -127,7 +138,8 @@ export default function Candidates({ onOpenProfile }) {
               {lc.pageItems.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
                 return (
-                  <TableRow key={u.user_id} data-testid={`candidate-row-${u.user_id}`}>
+                  <Fragment key={u.user_id}>
+                  <TableRow data-testid={`candidate-row-${u.user_id}`}>
                     {lc.selectMode && <TableCell className="w-10"><Checkbox checked={lc.selected.has(u.user_id)} onCheckedChange={() => lc.toggle(u.user_id)} data-testid={`select-user-${u.user_id}`} /></TableCell>}
                     <TableCell className="font-medium">
                       <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(u.user_id)} data-testid={`open-profile-${u.user_id}`}>
@@ -168,6 +180,15 @@ export default function Candidates({ onOpenProfile }) {
                       )}
                     </TableCell>
                   </TableRow>
+                  {u.cv_snippet && (
+                    <TableRow data-testid={`cv-snippet-row-${u.user_id}`} className="bg-secondary/30 hover:bg-secondary/30">
+                      <TableCell colSpan={9} className="py-2 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/70 mr-1">CV :</span>
+                        <Highlight text={u.cv_snippet} q={q} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </Fragment>
                 );
               })}
             </TableBody>
