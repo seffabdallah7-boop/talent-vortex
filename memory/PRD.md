@@ -263,6 +263,16 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Vérifié : backend 4/4 (testing agent iter_28, multi-tours + auth + CV grounding) ; frontend E2E confirmé par capture (2 tours consécutifs, IA cite explicitement Docker depuis le CV, micro présent).
 - ⚠️ Redéploiement requis pour la production `talentvortexagence.com` (cv_text/index/endpoint présents en préview uniquement ; ré-upload/backfill des CV prod nécessaire).
 
+## Implemented (2026-06, itération 46 — Scanning IA des CV + extraction structurée)
+- **Collection `cv_data`** (index unique `user_id`, index `status`) : `{user_id, cv_file_id, cv_filename, raw_text, structured{...}, status:"scanned|error", error, scanned_at}` + booléen `users.cv_scanned` (true/false) pour cibler les CV non scannés.
+- **Extraction structurée par IA** via **Gemini 2.5 Flash** (`core.parse_cv_structured`) : OCR vision pour PDF/images (JPG/PNG/WEBP) via `FileContentWithMimeType`, texte pour DOCX/TXT. Champs extraits : nom/prénom, email, téléphone, poste actuel, années d'expérience, compétences[], expériences[], formations[], langues[], résumé, + texte brut complet.
+- **Scan auto en arrière-plan** à l'upload de CV (`/profile/cv` → `BackgroundTasks` + `cv_scanned=False`) et **batch admin** (`scan_all_cvs`, concurrence 3, `_scan_lock`) ne traitant que les CV `cv_scanned != True` (sauf `force`). Erreurs enregistrées + réessai (`Re-scanner`).
+- **Endpoints** (`routers/cv_scan.py`, admin) : `GET /cv-scan/status`, `POST /cv-scan/all?force=`, `POST /cv-scan/{user_id}?force=`, `GET /cv-scan/{user_id}/data`.
+- **Recherche IA enrichie** : `ai_search_users` exploite les données structurées `cv_data` (compétences, expériences, formations, langues, résumé) en plus des profils.
+- **UI Admin** (`AdminCandidates.jsx`) : panneau « Scanning IA des CV » avec stats live (total/scannés/à scanner/erreurs) + boutons « Scanner les CV non scannés » / « Tout re-scanner » / refresh ; le Dialog d'aperçu CV affiche les données extraites (chips compétences, expériences, formations, langues) + bouton « Re-scanner ».
+- Testé : backend 8/8 (auth guards, status, scan/rescan, batch, régression recherche IA) ; frontend 95% (stats correctes, dialog structuré). ✅
+- ⚠️ Prod `talentvortexagence.com` : redéploiement requis + lancer « Scanner tous les CV » pour peupler `cv_data`.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

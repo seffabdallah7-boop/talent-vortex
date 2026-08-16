@@ -146,15 +146,33 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
         return {"results": []}
     cands = await db.users.find({"role": {"$ne": "admin"}}, {"_id": 0, "password_hash": 0}).to_list(200)
     if not EMERGENT_LLM_KEY or not cands:
-        return {"results": []}
+        return {"answer": "", "results": []}
+    # Données de CV pré-extraites (structurées) — priorité au profil, complément par le CV scanné
+    cv_rows = await db.cv_data.find({"status": "scanned"}, {"_id": 0, "user_id": 1, "structured": 1, "raw_text": 1}).to_list(2000)
+    cvmap = {d["user_id"]: d for d in cv_rows}
     lines = []
     for c in cands[:60]:
         tags = (c.get("domains") or []) + (c.get("ai_domains") or [])
-        cv = (c.get("cv_text") or "")[:1500]
+        d = cvmap.get(c["user_id"]) or {}
+        s = d.get("structured") or {}
+        skills = ", ".join((s.get("skills") or [])[:30])
+        exps = "; ".join(
+            f"{e.get('title','')}@{e.get('company','')}({e.get('start','')}-{e.get('end','')})"
+            for e in (s.get("experiences") or [])[:6] if isinstance(e, dict)
+        )
+        edu = "; ".join(
+            f"{e.get('degree','')}-{e.get('school','')}"
+            for e in (s.get("education") or [])[:4] if isinstance(e, dict)
+        )
+        langs = ", ".join(s.get("languages") or [])
+        summary = (s.get("summary") or "")[:400]
+        cv = (d.get("raw_text") or c.get("cv_text") or "")[:1200]
         lines.append(
-            f"- id={c['user_id']} | nom={c.get('name','')} | poste={c.get('current_position','')} "
+            f"- id={c['user_id']} | nom={c.get('name','')} | poste={s.get('current_position') or c.get('current_position','')} "
+            f"| experience={s.get('years_experience') or c.get('years_experience','?')} ans "
             f"| domaines={', '.join(tags)} | outils={', '.join(c.get('tools') or [])} "
-            f"| experience={c.get('years_experience','?')} ans | CV: {cv}"
+            f"| competences_CV={skills} | experiences_CV={exps} | formations={edu} | langues={langs} "
+            f"| resume={summary} | extrait_CV: {cv}"
         )
     hist = ""
     for h in (body.history or [])[-8:]:

@@ -8,7 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from core import db, client, logger, init_storage, hash_password, verify_password
 from routers import (
-    auth, jobs, applications, users, chat, calls, interviews, contracts, misc,
+    auth, jobs, applications, users, chat, calls, interviews, contracts, misc, cv_scan,
 )
 
 app = FastAPI()
@@ -23,6 +23,7 @@ api.include_router(calls.router)
 api.include_router(interviews.router)
 api.include_router(contracts.router)
 api.include_router(misc.router)
+api.include_router(cv_scan.router)
 
 
 @app.on_event("startup")
@@ -41,6 +42,8 @@ async def startup():
             ("domains", "text"), ("tools", "text"), ("nationality", "text"),
             ("city", "text"), ("country", "text"),
         ], name="users_fulltext")
+        await db.cv_data.create_index("user_id", unique=True)
+        await db.cv_data.create_index("status")
     except Exception as e:
         logger.warning(f"Index warning: {e}")
     try:

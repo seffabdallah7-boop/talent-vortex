@@ -1,0 +1,39 @@
+{
+  "summary": "Tested CV scanning + structured extraction feature end-to-end. Backend: 8/8 pytest tests pass (auth guards, status shape/coherence, per-user rescan with data verification, non-existent user handling, batch scan, AI search regression). Frontend: cv-scan-panel visible in AdminCandidates with correct stats (7 total / 6 scanned / 1 pending / 1 error) matching backend. Buttons cv-scan-all-btn, cv-scan-force-btn, cv-scan-refresh all present and clickable. CV preview dialog opens correctly when clicking a cv-snippet row after a text search — cv-structured shows Poste + skills chips (Python, Docker, analyse de donnees), cv-preview-text shows raw OCR text, cv-rescan-btn and open-original-cv-btn present.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "cv-scan-all-btn label transition",
+        "issue": "After clicking 'Scanner les CV non scannés' the button label did NOT switch to 'Scan en cours…'. Likely because the backend responded with status='busy' (a previous background scan was still running) OR because scan={running:true} state is only refreshed on next loadScan() poll. Minor UX polish only — API call is fired correctly.",
+        "affected_selectors": ["cv-scan-all-btn"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cv_scan.py",
+    "/app/test_reports/pytest/cv_scan_results.xml"
+  ],
+  "action_items": [
+    "(Optional/polish) After POST /cv-scan/all click, immediately call loadScan() so the button visibly reflects 'Scan en cours…' without waiting for the next user-triggered refresh.",
+    "(Optional) Consider auto-polling /cv-scan/status every 5–10s while scan.running is true so admins see progress live."
+  ],
+  "critical_code_review_comments": [
+    "cv_scan.py::cv_scan_status computes pending = total_cv - scanned but does NOT subtract errors. If a CV is in error state it counts as pending, which is arguably correct (still retryable) but the label 'À scanner' on the UI may be misleading. Consider pending = total_cv - scanned - errors, or rename UI label.",
+    "core.py::scan_all_cvs uses an in-process `_scan_lock` dict — will not prevent duplicate scans if the app runs under multiple workers. Acceptable for single-worker uvicorn setup; document the constraint.",
+    "core.py::parse_cv_structured tmp file is created inside the try/finally but if NamedTemporaryFile write itself fails before assignment tmp_path remains None (OK). No leaks observed.",
+    "cv_scan.py POST /cv-scan/all returns 200 even when {status:'busy'} — semantically OK but consider 409 for machine consumers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cv_scan.py (new)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "95%" },
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! (from /app/memory/test_credentials.md). Candidate candidate_test@talentvortex.com / Candidate@2026! was (re)registered during this run for the 403 forbidden test.",
+  "seed_data_creation": "Registered candidate_test@talentvortex.com if it did not already exist (used only to validate 403 on /api/cv-scan/*).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "CV scan endpoints under /api/cv-scan/* are all admin-guarded and working. The dataset has 7 users with CVs; one PDF ('no pages') is a known un-scannable file kept as an 'error' example. Use POST /api/cv-scan/{user_id}?force=true on user_05ae3f5deb83 (Real PDF / realpdf_1786804616@tv.com) for a fast single-CV rescan test — it returns {status:'scanned'} in ~5-15s. Full backend regression file at /app/backend/tests/test_cv_scan.py.",
+  "rca of the issue": "N/A — no critical bugs found. Only minor UX polish action items above."
+}

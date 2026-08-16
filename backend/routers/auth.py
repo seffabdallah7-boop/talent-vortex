@@ -13,7 +13,7 @@ from core import (
     hash_password, verify_password, create_jwt, public_user,
     get_current_user, send_email, validate_password, ensure_not_locked,
     register_failed, clear_attempts, verify_captcha, reset_email_html,
-    extract_cv_text,
+    extract_cv_text, scan_user_cv,
 )
 
 router = APIRouter()
@@ -291,7 +291,7 @@ async def update_profile(body: ProfileInput, background: BackgroundTasks, user: 
 
 
 @router.post("/profile/cv")
-async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get_current_user)):
+async def upload_profile_cv(background: BackgroundTasks, cv: UploadFile = File(...), user: dict = Depends(get_current_user)):
     data = await cv.read()
     if not data:
         raise HTTPException(status_code=400, detail="Fichier vide")
@@ -310,8 +310,9 @@ async def upload_profile_cv(cv: UploadFile = File(...), user: dict = Depends(get
     complete = bool(user.get("name") and user.get("phone") and user.get("nationality") and user.get("domains") and file_id)
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {
         "cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf",
-        "cv_text": cv_text, "profile_completed": complete,
+        "cv_text": cv_text, "profile_completed": complete, "cv_scanned": False,
     }})
+    background.add_task(scan_user_cv, user["user_id"], True)
     return {"cv_file_id": file_id, "cv_filename": cv.filename or "cv.pdf"}
 
 

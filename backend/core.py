@@ -7,6 +7,8 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import uuid
+import json
+import asyncio
 import logging
 import tempfile
 import re
@@ -379,3 +381,157 @@ async def transcribe_audio(data: bytes, ext: str) -> str:
     except Exception as e:
         logger.error(f"Transcription echouee: {e}")
         return ""
+
+
+# ---------------------------------------------------------------------------
+# CV parsing — structured extraction (Gemini vision for PDF/images/text)
+# ---------------------------------------------------------------------------
+CV_PARSE_SYSTEM = (
+    "Tu es un expert en analyse de CV. On te fournit un CV (PDF, image scannee, ou texte). "
+    "Extrais TOUTES les informations et reponds UNIQUEMENT par un objet JSON valide, sans texte autour, "
+    "au format exact suivant: "
+    "{\"full_name\":\"\",\"first_name\":\"\",\"last_name\":\"\",\"email\":\"\",\"phone\":\"\","
+    "\"current_position\":\"\",\"years_experience\":0,"
+    "\"skills\":[],"
+    "\"experiences\":[{\"title\":\"\",\"company\":\"\",\"start\":\"\",\"end\":\"\",\"description\":\"\"}],"
+    "\"education\":[{\"degree\":\"\",\"school\":\"\",\"year\":\"\"}],"
+    "\"languages\":[],\"summary\":\"\","
+    "\"raw_text\":\"<tout le texte lisible du CV, complet>\"}. "
+    "Si une information est absente: chaine vide, 0, ou liste vide. "
+    "years_experience = nombre ENTIER d'annees d'experience professionnelle (estime si necessaire). "
+    "raw_text doit contenir l'INTEGRALITE du texte du CV (fais de l'OCR si c'est une image)."
+)
+
+
+def _cv_mime(filename: str, data: bytes) -> Optional[str]:
+    name = (filename or "").lower()
+    if name.endswith(".pdf") or data[:4] == b"%PDF":
+        return "application/pdf"
+    if name.endswith(".png"):
+        return "image/png"
+    if name.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if name.endswith(".webp"):
+        return "image/webp"
+    return None
+
+
+async def parse_cv_structured(data: bytes, filename: str = "", content_type: str = "") -> dict:
+    """Extract structured CV fields via Gemini (vision for PDF/images, text otherwise)."""
+    if not EMERGENT_LLM_KEY:
+        raise RuntimeError("EMERGENT_LLM_KEY manquant")
+    mime = _cv_mime(filename, data)
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY, session_id=f"cvparse-{uuid.uuid4().hex[:8]}",
+        system_message=CV_PARSE_SYSTEM,
+    ).with_model("gemini", "gemini-2.5-flash")
+    tmp_path = None
+    try:
+        if mime:
+            from emergentintegrations.llm.chat import FileContentWithMimeType
+            ext = mime.split("/")[-1]
+            with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+                tmp.write(data)
+                tmp_path = tmp.name
+            msg = UserMessage(
+                text="Analyse ce CV et renvoie le JSON structure demande.",
+                file_contents=[FileContentWithMimeType(file_path=tmp_path, mime_type=mime)],
+            )
+        else:
+            txt = extract_cv_text(data, filename)
+            if not txt:
+                raise ValueError("Aucun texte exploitable dans le CV")
+            msg = UserMessage(text="Analyse ce CV et renvoie le JSON structure demande.\n\nCONTENU DU CV:\n" + txt[:60000])
+        resp = await chat.send_message(msg)
+        raw = (resp if isinstance(resp, str) else getattr(resp, "text", str(resp))) or ""
+        raw = raw.strip()
+        try:
+            obj = json.loads(raw)
+        except Exception:
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            obj = json.loads(m.group(0)) if m else {}
+        return obj if isinstance(obj, dict) else {}
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+async def scan_user_cv(user_id: str, force: bool = False) -> dict:
+    """Scan one user's CV, extract structured data, persist to cv_data collection."""
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0, "cv_file_id": 1, "cv_filename": 1})
+    if not u or not u.get("cv_file_id"):
+        return {"user_id": user_id, "status": "skipped", "reason": "no_cv"}
+    cv_file_id = u["cv_file_id"]
+    existing = await db.cv_data.find_one({"user_id": user_id})
+    if (not force and existing and existing.get("status") == "scanned"
+            and existing.get("cv_file_id") == cv_file_id):
+        return {"user_id": user_id, "status": "already"}
+    f = await db.files.find_one({"id": cv_file_id})
+    now = datetime.now(timezone.utc).isoformat()
+    if not f:
+        await db.cv_data.update_one({"user_id": user_id}, {"$set": {
+            "user_id": user_id, "cv_file_id": cv_file_id, "status": "error",
+            "error": "Fichier CV introuvable", "scanned_at": now,
+        }}, upsert=True)
+        await db.users.update_one({"user_id": user_id}, {"$set": {"cv_scanned": False}})
+        return {"user_id": user_id, "status": "error", "error": "file_not_found"}
+    try:
+        data, ct = await asyncio.to_thread(get_object, f["storage_path"])
+        structured = await parse_cv_structured(data, f.get("original_filename") or u.get("cv_filename") or "cv.pdf", ct)
+        raw_text = (structured.pop("raw_text", "") or "").strip()
+        if not raw_text:
+            raw_text = extract_cv_text(data, f.get("original_filename") or "cv.pdf")
+        doc = {
+            "user_id": user_id, "cv_file_id": cv_file_id,
+            "cv_filename": f.get("original_filename") or u.get("cv_filename"),
+            "raw_text": raw_text[:200000], "structured": structured,
+            "status": "scanned", "error": None, "scanned_at": now,
+        }
+        await db.cv_data.update_one({"user_id": user_id}, {"$set": doc}, upsert=True)
+        await db.users.update_one({"user_id": user_id}, {"$set": {
+            "cv_scanned": True, "cv_text": raw_text[:200000],
+        }})
+        return {"user_id": user_id, "status": "scanned"}
+    except Exception as e:
+        logger.warning(f"scan_user_cv failed for {user_id}: {e}")
+        await db.cv_data.update_one({"user_id": user_id}, {"$set": {
+            "user_id": user_id, "cv_file_id": cv_file_id, "status": "error",
+            "error": str(e)[:500], "scanned_at": now,
+        }}, upsert=True)
+        await db.users.update_one({"user_id": user_id}, {"$set": {"cv_scanned": False}})
+        return {"user_id": user_id, "status": "error", "error": str(e)[:200]}
+
+
+_scan_lock = {"running": False}
+
+
+async def scan_all_cvs(force: bool = False) -> dict:
+    """Batch-scan every user whose CV is not yet scanned (cv_scanned != True)."""
+    if _scan_lock["running"]:
+        return {"status": "busy"}
+    _scan_lock["running"] = True
+    scanned = errors = 0
+    try:
+        query = {"cv_file_id": {"$exists": True, "$nin": [None, ""]}}
+        if not force:
+            query["cv_scanned"] = {"$ne": True}
+        users = await db.users.find(query, {"_id": 0, "user_id": 1}).to_list(5000)
+        sem = asyncio.Semaphore(3)
+
+        async def _one(uid):
+            nonlocal scanned, errors
+            async with sem:
+                r = await scan_user_cv(uid, force=force)
+                if r.get("status") == "scanned":
+                    scanned += 1
+                elif r.get("status") == "error":
+                    errors += 1
+
+        await asyncio.gather(*[_one(u["user_id"]) for u in users])
+        logger.info(f"scan_all_cvs done: {scanned} scanned / {errors} errors / {len(users)} total")
+        return {"status": "done", "scanned": scanned, "errors": errors, "total": len(users)}
+    finally:
+        _scan_lock["running"] = False

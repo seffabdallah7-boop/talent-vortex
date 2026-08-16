@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
-import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink, Sparkles, Mic, MicOff, Send } from "lucide-react";
+import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink, Sparkles, Mic, MicOff, Send, ScanLine, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -44,7 +44,27 @@ export default function Candidates({ onOpenProfile }) {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
   const aiScrollRef = useRef(null);
+  const [scan, setScan] = useState(null);
+  const [scanning, setScanning] = useState(false);
   const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const loadScan = useCallback(() => api.get("/cv-scan/status").then(({ data }) => setScan(data)).catch(() => {}), []);
+  useEffect(() => { loadScan(); }, [loadScan]);
+  useEffect(() => {
+    if (!scan?.running) return;
+    const t = setInterval(loadScan, 4000);
+    return () => clearInterval(t);
+  }, [scan?.running, loadScan]);
+  const runScanAll = async (force = false) => {
+    setScanning(true);
+    try {
+      const { data } = await api.post(`/cv-scan/all?force=${force}`);
+      if (data.status === "busy") toast.info("Un scan est déjà en cours.");
+      else { toast.success("Scan des CV lancé en arrière-plan."); setScan((s) => ({ ...(s || {}), running: true })); }
+      setTimeout(loadScan, 1500);
+    } catch (e) { toast.error("Impossible de lancer le scan."); }
+    finally { setScanning(false); }
+  };
 
   useEffect(() => {
     if (aiScrollRef.current) aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
@@ -92,12 +112,27 @@ export default function Candidates({ onOpenProfile }) {
   const openCv = async (u) => {
     setCvView({ user: u, loading: true, text: "" });
     try {
-      const { data } = await api.get(`/users/${u.user_id}/cv-text`);
-      setCvView({ user: u, loading: false, text: data.cv_text || "", cv_file_id: data.cv_file_id, cv_filename: data.cv_filename });
+      const [{ data }, sc] = await Promise.all([
+        api.get(`/users/${u.user_id}/cv-text`),
+        api.get(`/cv-scan/${u.user_id}/data`).catch(() => ({ data: null })),
+      ]);
+      setCvView({
+        user: u, loading: false, text: data.cv_text || "",
+        cv_file_id: data.cv_file_id, cv_filename: data.cv_filename,
+        structured: sc?.data?.structured || null, scanStatus: sc?.data?.status || null,
+      });
     } catch (e) {
       toast.error("Impossible de charger le CV");
       setCvView(null);
     }
+  };
+  const rescanCv = async (u) => {
+    toast.info("Re-scan du CV en cours…");
+    try {
+      await api.post(`/cv-scan/${u.user_id}?force=true`);
+      toast.success("CV re-scanné");
+      openCv(u); loadScan();
+    } catch (e) { toast.error("Échec du re-scan"); }
   };
   const openOriginalCv = async () => {
     if (!cvView?.cv_file_id) return;
@@ -170,6 +205,30 @@ export default function Candidates({ onOpenProfile }) {
             </SelectContent>
           </Select>
         </div>
+      </div>
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 mb-6" data-testid="cv-scan-panel">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <ScanLine className="h-4 w-4 text-emerald-600" />
+            <span className="text-sm font-semibold">Scanning IA des CV — extraction structurée (compétences, expériences, formations…)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" onClick={loadScan} data-testid="cv-scan-refresh" title="Rafraîchir"><RefreshCw className="h-4 w-4" /></Button>
+            <Button onClick={() => runScanAll(false)} disabled={scanning || scan?.running} className="rounded-full bg-emerald-600 hover:bg-emerald-700" data-testid="cv-scan-all-btn">
+              {(scanning || scan?.running) ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanLine className="h-4 w-4 mr-2" />}
+              {scan?.running ? "Scan en cours…" : "Scanner les CV non scannés"}
+            </Button>
+            <Button variant="outline" onClick={() => runScanAll(true)} disabled={scanning || scan?.running} className="rounded-full" data-testid="cv-scan-force-btn">Tout re-scanner</Button>
+          </div>
+        </div>
+        {scan && (
+          <div className="flex items-center gap-4 mt-3 text-sm flex-wrap" data-testid="cv-scan-stats">
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">CV total : <b className="text-foreground">{scan.total_cv}</b></span>
+            <span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Scannés : <b>{scan.scanned}</b></span>
+            <span className="inline-flex items-center gap-1.5 text-amber-600">À scanner : <b>{scan.pending}</b></span>
+            {scan.errors > 0 && <span className="inline-flex items-center gap-1.5 text-destructive"><AlertCircle className="h-4 w-4" /> Erreurs : <b>{scan.errors}</b></span>}
+          </div>
+        )}
       </div>
       <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-6" data-testid="ai-search-panel">
         <div className="flex items-center justify-between gap-2 mb-3">
@@ -328,21 +387,79 @@ export default function Candidates({ onOpenProfile }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 flex-wrap">
               Aperçu du CV — {cvView?.user?.name}
-              {cvView?.cv_file_id && (
-                <Button variant="outline" size="sm" className="rounded-full ml-auto" onClick={openOriginalCv} data-testid="open-original-cv-btn">
-                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> CV original
+              <div className="flex items-center gap-2 ml-auto">
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => cvView?.user && rescanCv(cvView.user)} data-testid="cv-rescan-btn">
+                  <ScanLine className="h-3.5 w-3.5 mr-1.5" /> Re-scanner
                 </Button>
-              )}
+                {cvView?.cv_file_id && (
+                  <Button variant="outline" size="sm" className="rounded-full" onClick={openOriginalCv} data-testid="open-original-cv-btn">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> CV original
+                  </Button>
+                )}
+              </div>
             </DialogTitle>
           </DialogHeader>
           {cvView?.loading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Chargement…</div>
-          ) : cvView?.text ? (
-            <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed rounded-lg border border-border bg-secondary/20 p-4" data-testid="cv-preview-text">
-              <Highlight text={cvView.text} q={q} />
-            </div>
           ) : (
-            <p className="text-sm text-muted-foreground py-8 text-center">Aucun texte exploitable dans ce CV.</p>
+            <div className="max-h-[68vh] overflow-y-auto space-y-4" data-testid="cv-preview-body">
+              {cvView?.structured ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3" data-testid="cv-structured">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><ScanLine className="h-4 w-4" /> Données extraites par l'IA</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                    {cvView.structured.current_position && <div><span className="text-muted-foreground">Poste : </span><b>{cvView.structured.current_position}</b></div>}
+                    {cvView.structured.years_experience ? <div><span className="text-muted-foreground">Expérience : </span><b>{cvView.structured.years_experience} ans</b></div> : null}
+                    {cvView.structured.email && <div><span className="text-muted-foreground">Email : </span>{cvView.structured.email}</div>}
+                    {cvView.structured.phone && <div><span className="text-muted-foreground">Téléphone : </span>{cvView.structured.phone}</div>}
+                  </div>
+                  {cvView.structured.summary && <p className="text-sm text-muted-foreground italic">{cvView.structured.summary}</p>}
+                  {(cvView.structured.skills || []).length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">Compétences</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cvView.structured.skills.map((s, i) => <span key={`${i}-${s}`} className="rounded-full bg-emerald-500/15 text-emerald-700 px-2.5 py-0.5 text-xs font-medium">{s}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {(cvView.structured.experiences || []).length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">Expériences</div>
+                      <div className="space-y-1.5">
+                        {cvView.structured.experiences.map((e, i) => (
+                          <div key={`${i}-${e.company}`} className="text-sm">
+                            <b>{e.title}</b>{e.company ? ` — ${e.company}` : ""} {(e.start || e.end) && <span className="text-muted-foreground text-xs">({e.start} → {e.end || "…"})</span>}
+                            {e.description && <p className="text-muted-foreground text-xs mt-0.5">{e.description}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(cvView.structured.education || []).length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">Formations</div>
+                      {cvView.structured.education.map((e, i) => <div key={`${i}-${e.school}`} className="text-sm"><b>{e.degree}</b>{e.school ? ` — ${e.school}` : ""} {e.year && <span className="text-muted-foreground text-xs">({e.year})</span>}</div>)}
+                    </div>
+                  )}
+                  {(cvView.structured.languages || []).length > 0 && (
+                    <div className="text-sm"><span className="text-xs font-semibold text-muted-foreground uppercase">Langues : </span>{cvView.structured.languages.join(", ")}</div>
+                  )}
+                </div>
+              ) : cvView?.scanStatus === "error" ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Échec du scan de ce CV. Cliquez « Re-scanner » pour réessayer.</div>
+              ) : (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700">Ce CV n'a pas encore été scanné. Cliquez « Re-scanner » pour extraire les données.</div>
+              )}
+              {cvView?.text ? (
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-1.5">Texte brut du CV</div>
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed rounded-lg border border-border bg-secondary/20 p-4" data-testid="cv-preview-text">
+                    <Highlight text={cvView.text} q={q} />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2 text-center">Aucun texte brut exploitable dans ce CV.</p>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
