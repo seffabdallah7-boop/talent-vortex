@@ -233,7 +233,7 @@ export default function ChatWidget() {
                     </p>
                   )}
                   {aiMsgs.map((m, i) => (
-                    <Bubble key={i} mine={m.role === "user"} text={m.text} />
+                    <Bubble key={`${i}-${m.role}`} mine={m.role === "user"} text={m.text} />
                   ))}
                   {sending && <div className="text-muted-foreground text-sm flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> ...</div>}
                 </>

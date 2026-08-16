@@ -191,6 +191,8 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
         "\"results\":[{\"candidate_id\":\"<id>\",\"score\":<0-100>,\"reason\":\"<preuve concrete tiree du CV/profil, FR>\"}]}. "
         "results = uniquement les candidats pertinents (score>=50), tries par score decroissant. Si aucun, results=[]."
     )
+    answer = ""
+    arr = []
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY, session_id=f"aisearch-{uuid.uuid4().hex[:8]}",
