@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import api from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
@@ -17,15 +16,8 @@ const CATS = ["Tech", "Ressources Humaines", "Design", "Data", "Marketing", "Fin
 
 export default function Landing() {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [q, setQ] = useState("");
-
-  // Utilisateur connecté : renvoyer vers son tableau de bord (retour mobile ne montre plus l'accueil public / login)
-  useEffect(() => {
-    if (user) navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-  }, [user, navigate]);
 
   useEffect(() => {
     api.get("/jobs").then(({ data }) => setJobs(data)).catch(() => {});

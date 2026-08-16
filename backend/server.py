@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 
-from core import db, client, logger, init_storage, hash_password, verify_password
+from core import db, client, logger, init_storage, hash_password, verify_password, normalize_nationalities
 from routers import (
     auth, jobs, applications, users, chat, calls, interviews, contracts, misc, cv_scan,
 )
@@ -46,6 +46,10 @@ async def startup():
         await db.cv_data.create_index("status")
     except Exception as e:
         logger.warning(f"Index warning: {e}")
+    try:
+        await normalize_nationalities()
+    except Exception as e:
+        logger.warning(f"normalize_nationalities warning: {e}")
     try:
         init_storage()
         logger.info("Storage initialized")

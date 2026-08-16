@@ -59,6 +59,7 @@ class ResetInput(BaseModel):
 class ProfileInput(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
+    whatsapp: Optional[str] = None
     nationality: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None

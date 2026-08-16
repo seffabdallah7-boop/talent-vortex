@@ -279,6 +279,14 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Profil candidat** (`CandidateDashboard`) : le champ **Nationalité** (texte libre) devient un select normalisé (adjectif féminin, ex : « française »), et **Pays de résidence** un select de pays. Data standardisée → l'affichage « Répartition par nationalité » côté admin devient sans ambiguïté.
 - Vérifié : endpoint 193 pays OK ; combobox filtre/sélectionne correctement (screenshot : « algér » → 🇩🇿 Algérienne). Backend + frontend compilent proprement. ✅
 
+## Implemented (2026-06, itération 48 — WhatsApp + indicatifs, logo→accueil, migration nationalités, layout)
+- **Champ WhatsApp avec indicatif pays** (`WhatsappInput`) : combobox d'indicatifs (drapeau + `+code`, 193 pays via `data.countries.DIAL`) + saisie du numéro avec exemple (`+33 6 12 34 56 78`). Stocké au format international. Affiché dans la fiche profil admin (`CandidateProfileDialog`) via une **icône WhatsApp verte cliquable** → `https://wa.me/<num>`.
+- **Endpoint `/api/countries`** enrichi avec `dial` (indicatif international).
+- **Migration douce des nationalités** (`core.normalize_nationalities`, exécutée au démarrage) : convertit les saisies libres vers l'adjectif féminin standard (ex : « algérien »/« Française » → « algérienne »/« française »). Confirmé sur les données existantes.
+- **Clic sur le logo → page d'accueil** : suppression de la redirection auto de `Landing.js` qui renvoyait les connectés vers leur dashboard. Le logo (admin + candidat) affiche désormais la landing (navbar « My space » pour revenir).
+- **Design profil** : la carte photo est déplacée **en bas du formulaire** (au-dessus du bouton Enregistrer) pour un rendu plus propre.
+- Vérifié : WhatsApp persiste (PUT/GET `+33612345678`), combobox rend bien (🇫🇷 +33), logo→landing reste sur `/`, migration OK, layout OK. ✅
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

@@ -119,6 +119,7 @@ def public_user(u: dict) -> dict:
         "picture": u.get("picture"),
         "created_at": u.get("created_at"),
         "phone": u.get("phone", ""),
+        "whatsapp": u.get("whatsapp", ""),
         "nationality": u.get("nationality", ""),
         "city": u.get("city", ""),
         "country": u.get("country", ""),
@@ -535,3 +536,49 @@ async def scan_all_cvs(force: bool = False) -> dict:
         return {"status": "done", "scanned": scanned, "errors": errors, "total": len(users)}
     finally:
         _scan_lock["running"] = False
+
+
+def _deaccent(s: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower().strip()
+
+
+async def normalize_nationalities() -> int:
+    """Migration douce : convertit les nationalités libres vers la liste standard (adjectif féminin FR)."""
+    from data.countries import COUNTRIES
+    canon = {}
+
+    def add(key, val):
+        k = _deaccent(key)
+        if k and k not in canon:
+            canon[k] = val
+
+    for _code, name, fem in COUNTRIES:
+        add(fem, fem)
+        add(name, fem)
+        for suf_f, suf_m in (("éenne", "éen"), ("ienne", "ien"), ("aine", "ain"),
+                             ("aise", "ais"), ("oise", "ois"), ("ane", "an"),
+                             ("ine", "in"), ("elle", "el")):
+            if fem.endswith(suf_f):
+                add(fem[:-len(suf_f)] + suf_m, fem)
+                break
+        else:
+            if fem.endswith("e"):
+                add(fem[:-1], fem)
+    valid = set(canon.values())
+    users = await db.users.find(
+        {"nationality": {"$exists": True, "$nin": [None, ""]}},
+        {"_id": 0, "user_id": 1, "nationality": 1},
+    ).to_list(20000)
+    fixed = 0
+    for u in users:
+        nat = (u.get("nationality") or "").strip()
+        if nat in valid:
+            continue
+        target = canon.get(_deaccent(nat))
+        if target and target != nat:
+            await db.users.update_one({"user_id": u["user_id"]}, {"$set": {"nationality": target}})
+            fixed += 1
+    if fixed:
+        logger.info(f"normalize_nationalities: {fixed} nationalité(s) normalisée(s)")
+    return fixed

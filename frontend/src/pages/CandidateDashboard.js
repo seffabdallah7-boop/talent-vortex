@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { fileUrl, formatApiError } from "@/lib/api";
 import { CountrySelect } from "@/components/CountrySelect";
+import { WhatsappInput } from "@/components/WhatsappInput";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -519,6 +520,7 @@ function ProfileForm({ profile, onSaved }) {
       setForm({
         name: profile.name || "",
         phone: profile.phone || "",
+        whatsapp: profile.whatsapp || "",
         nationality: profile.nationality || "",
         city: profile.city || "",
         country: profile.country || "",
@@ -541,6 +543,7 @@ function ProfileForm({ profile, onSaved }) {
       await api.put("/profile", {
         name: form.name,
         phone: form.phone,
+        whatsapp: form.whatsapp,
         nationality: form.nationality,
         city: form.city,
         country: form.country,
@@ -621,24 +624,9 @@ function ProfileForm({ profile, onSaved }) {
           <div><Label>Ville</Label><Input className="mt-1.5" data-testid="profile-city" {...field("city")} /></div>
           <div><Label>Pays de résidence</Label><CountrySelect mode="country" value={form.country} onChange={(v) => setForm({ ...form, country: v })} testId="profile-country" placeholder="Sélectionnez un pays" /></div>
           <div><Label>Années d'expérience</Label><Input type="number" min="0" className="mt-1.5" data-testid="profile-years" {...field("years_experience")} /></div>
+          <div className="sm:col-span-2"><Label>Numéro WhatsApp</Label><WhatsappInput value={form.whatsapp} onChange={(v) => setForm({ ...form, whatsapp: v })} testId="profile-whatsapp" /><p className="text-xs text-muted-foreground mt-1.5">Choisissez l'indicatif du pays puis saisissez votre numéro — ex : +33 6 12 34 56 78.</p></div>
         </div>
       </div>
-
-      <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-6 flex items-center gap-5 flex-wrap" data-testid="photo-card">
-        <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
-          <Avatar name={form.name || profile.name} src={profile.picture} size={88} />
-        </button>
-        <div className="flex-1 min-w-[180px]">
-          <p className="font-display text-lg font-semibold">{form.name || profile.name || "Votre nom"}</p>
-          <p className="text-sm text-muted-foreground">{form.current_position || "Ajoutez votre poste actuel"}</p>
-          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
-          <Button type="button" variant="outline" size="sm" className="rounded-full mt-3" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
-            {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
-            {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
-          </Button>
-        </div>
-      </div>
-      <ImageLightbox src={profile.picture} alt={profile.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
 
       <div className="rounded-2xl border border-border bg-card p-6 space-y-3" data-testid="cv-card">
         <p className="font-medium">CV / Curriculum Vitae</p>
@@ -673,6 +661,22 @@ function ProfileForm({ profile, onSaved }) {
           <span>Domaines détectés par l'IA : <b>{profile.ai_domains.join(", ")}</b></span>
         </div>
       )}
+
+      <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-6 flex items-center gap-5 flex-wrap" data-testid="photo-card">
+        <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
+          <Avatar name={form.name || profile.name} src={profile.picture} size={88} />
+        </button>
+        <div className="flex-1 min-w-[180px]">
+          <p className="font-display text-lg font-semibold">{form.name || profile.name || "Votre nom"}</p>
+          <p className="text-sm text-muted-foreground">{form.current_position || "Ajoutez votre poste actuel"}</p>
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
+          <Button type="button" variant="outline" size="sm" className="rounded-full mt-3" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
+            {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
+            {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
+          </Button>
+        </div>
+      </div>
+      <ImageLightbox src={profile.picture} alt={profile.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
 
       <div className="sticky bottom-4 flex justify-end">
         <Button type="submit" disabled={saving} className="rounded-full h-12 px-8 shadow-lg shadow-primary/20" data-testid="save-profile-btn">

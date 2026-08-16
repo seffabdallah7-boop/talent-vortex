@@ -3,6 +3,7 @@ import api, { fileUrl } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
+import { WhatsappIcon } from "@/components/WhatsappInput";
 import ImageLightbox from "@/components/ImageLightbox";
 import StatusBadge from "@/components/StatusBadge";
 import {
@@ -77,7 +78,8 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {u.email}</span>
                   {u.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> {u.phone}</span>}
-                  {u.nationality && <span className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> {u.nationality}</span>}
+                  {u.whatsapp && <a href={`https://wa.me/${u.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-green-600 hover:underline font-medium" data-testid="profile-whatsapp-link" title="Écrire sur WhatsApp"><WhatsappIcon className="h-4 w-4" /> {u.whatsapp}</a>}
+                  {u.nationality && <span className="flex items-center gap-1.5 capitalize"><Globe className="h-3.5 w-3.5" /> {u.nationality}</span>}
                   {(u.city || u.country) && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {[u.city, u.country].filter(Boolean).join(", ")}</span>}
                 </div>
                 {u.role !== "admin" && (onChat || onCall) && (

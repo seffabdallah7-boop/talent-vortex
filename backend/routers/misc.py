@@ -251,9 +251,9 @@ async def cron_interview_reminders(background: BackgroundTasks, authorization: O
 
 @router.get("/countries")
 async def list_countries():
-    from data.countries import COUNTRIES
+    from data.countries import COUNTRIES, DIAL
     return sorted(
-        [{"code": c, "name": n, "nationality": d} for c, n, d in COUNTRIES],
+        [{"code": c, "name": n, "nationality": d, "dial": DIAL.get(c, "")} for c, n, d in COUNTRIES],
         key=lambda x: x["name"],
     )
 
