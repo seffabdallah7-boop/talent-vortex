@@ -615,6 +615,22 @@ function ProfileForm({ profile, onSaved }) {
         )}
       </div>
 
+      <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-6 flex items-center gap-5 flex-wrap" data-testid="photo-card">
+        <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
+          <Avatar name={form.name || profile.name} src={profile.picture} size={88} />
+        </button>
+        <div className="flex-1 min-w-[180px]">
+          <p className="font-display text-lg font-semibold">{form.name || profile.name || "Votre nom"}</p>
+          <p className="text-sm text-muted-foreground">{form.current_position || "Ajoutez votre poste actuel"}</p>
+          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
+          <Button type="button" variant="outline" size="sm" className="rounded-full mt-3" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
+            {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
+            {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
+          </Button>
+        </div>
+      </div>
+      <ImageLightbox src={profile.picture} alt={profile.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
+
       <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center gap-2.5"><span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"><User className="h-4 w-4" /></span><p className="font-medium">Informations personnelles</p></div>
         <div className="grid sm:grid-cols-2 gap-4">
@@ -661,22 +677,6 @@ function ProfileForm({ profile, onSaved }) {
           <span>Domaines détectés par l'IA : <b>{profile.ai_domains.join(", ")}</b></span>
         </div>
       )}
-
-      <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-6 flex items-center gap-5 flex-wrap" data-testid="photo-card">
-        <button type="button" onClick={() => profile.picture && setPhotoOpen(true)} data-testid="profile-photo-preview" className={profile.picture ? "cursor-zoom-in" : "cursor-default"}>
-          <Avatar name={form.name || profile.name} src={profile.picture} size={88} />
-        </button>
-        <div className="flex-1 min-w-[180px]">
-          <p className="font-display text-lg font-semibold">{form.name || profile.name || "Votre nom"}</p>
-          <p className="text-sm text-muted-foreground">{form.current_position || "Ajoutez votre poste actuel"}</p>
-          <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadPhoto} data-testid="photo-file-input" />
-          <Button type="button" variant="outline" size="sm" className="rounded-full mt-3" disabled={photoUploading} onClick={() => photoRef.current?.click()} data-testid="upload-photo-btn">
-            {photoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
-            {profile.picture ? "Modifier la photo" : "Ajouter une photo"}
-          </Button>
-        </div>
-      </div>
-      <ImageLightbox src={profile.picture} alt={profile.name} open={photoOpen} onClose={() => setPhotoOpen(false)} />
 
       <div className="sticky bottom-4 flex justify-end">
         <Button type="submit" disabled={saving} className="rounded-full h-12 px-8 shadow-lg shadow-primary/20" data-testid="save-profile-btn">
