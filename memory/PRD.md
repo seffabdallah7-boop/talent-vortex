@@ -256,6 +256,13 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Barre de recherche IA** (`AdminCandidates`, page Utilisateurs) : champ langage naturel + bouton « Rechercher », résultats en cartes (nom, score %, justification, « Voir le profil »), bouton « Effacer ». Coexiste avec la recherche full-text classique.
 - Vérifié par curl : « spécialiste DevOps qui connaît Terraform et Docker » → 3 candidats classés (82/75/52%) avec justifications basées sur le contenu des CV.
 
+## Implemented (2026-06, itération 45 — Agent IA conversationnel multi-tours + micro vocal)
+- **Chat conversationnel multi-tours** (`AdminCandidates`) : la barre de recherche IA est devenue un vrai fil de discussion (`ai-chat-thread`). Chaque question du recruteur (bulle droite `ai-msg-user-*`) et chaque réponse de l'assistant (bulle gauche `ai-msg-assistant-*`) sont conservées ; l'`history` est renvoyé au backend à chaque tour → l'IA résout le contexte référentiel (« parmi eux… »). Cartes candidats (score % + justification tirée du CV) affichées sous chaque réponse. Bouton « Nouvelle conversation » (`ai-search-clear`) réinitialise le fil. Indicateur « L'agent analyse les CV… » (`ai-typing`).
+- **Backend `POST /users/ai-search`** gère `{query, history}` et renvoie `{answer, results}` (Claude Sonnet 4.6). Réponse conversationnelle FR + résultats groundés sur le contenu réel des CV.
+- **Micro vocal** (`ai-mic-btn`) : dictée de la requête via l'API navigateur native (`window.webkitSpeechRecognition`, `fr-FR`, résultats intermédiaires). Bouton animé en écoute, tolère le refus de permission sans crasher.
+- Vérifié : backend 4/4 (testing agent iter_28, multi-tours + auth + CV grounding) ; frontend E2E confirmé par capture (2 tours consécutifs, IA cite explicitement Docker depuis le CV, micro présent).
+- ⚠️ Redéploiement requis pour la production `talentvortexagence.com` (cv_text/index/endpoint présents en préview uniquement ; ré-upload/backfill des CV prod nécessaire).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

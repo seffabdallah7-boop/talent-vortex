@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Avatar } from "@/components/Avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useListControls } from "@/hooks/useListControls";
 import { Pager, BulkBar } from "@/components/ListControls";
-import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink, Sparkles } from "lucide-react";
+import { Star, Trash2, CheckSquare, ChevronDown, Loader2, ExternalLink, Sparkles, Mic, MicOff, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -40,16 +40,54 @@ export default function Candidates({ onOpenProfile }) {
   const [cvView, setCvView] = useState(null);
   const [aiQuery, setAiQuery] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResults, setAiResults] = useState(null);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const aiScrollRef = useRef(null);
+  const speechSupported = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => {
+    if (aiScrollRef.current) aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
+  }, [aiMessages, aiLoading]);
+
   const runAiSearch = async () => {
     const query = aiQuery.trim();
-    if (!query) return;
+    if (!query || aiLoading) return;
+    const history = aiMessages.map((m) => ({ role: m.role, content: m.content }));
+    setAiMessages((prev) => [...prev, { role: "user", content: query }]);
+    setAiQuery("");
     setAiLoading(true);
     try {
-      const { data } = await api.post("/users/ai-search", { query });
-      setAiResults(data.results || []);
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Recherche IA indisponible"); }
-    finally { setAiLoading(false); }
+      const { data } = await api.post("/users/ai-search", { query, history });
+      setAiMessages((prev) => [...prev, {
+        role: "assistant",
+        content: data.answer || "Voici les candidats correspondants.",
+        results: data.results || [],
+      }]);
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Recherche IA indisponible");
+      setAiMessages((prev) => [...prev, { role: "assistant", content: "Désolé, la recherche IA est momentanément indisponible.", results: [] }]);
+    } finally { setAiLoading(false); }
+  };
+  const clearAiChat = () => { setAiMessages([]); setAiQuery(""); };
+  const toggleMic = () => {
+    if (!speechSupported) { toast.error("La saisie vocale n'est pas supportée par ce navigateur (utilisez Chrome ou Edge)."); return; }
+    if (listening) { recognitionRef.current?.stop(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "fr-FR";
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onstart = () => setListening(true);
+    rec.onerror = () => { setListening(false); };
+    rec.onend = () => setListening(false);
+    rec.onresult = (ev) => {
+      let txt = "";
+      for (let i = 0; i < ev.results.length; i++) txt += ev.results[i][0].transcript;
+      setAiQuery(txt);
+    };
+    recognitionRef.current = rec;
+    rec.start();
   };
   const openCv = async (u) => {
     setCvView({ user: u, loading: true, text: "" });
@@ -134,25 +172,50 @@ export default function Candidates({ onOpenProfile }) {
         </div>
       </div>
       <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 mb-6" data-testid="ai-search-panel">
-        <div className="flex items-center gap-2 mb-2"><Sparkles className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Recherche IA — langage naturel (profils + contenu des CV)</span></div>
-        <div className="flex gap-2 flex-wrap">
-          <Input data-testid="ai-search-input" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runAiSearch()} placeholder="Ex : candidats avec 3 ans d'expérience React qui connaissent Docker" className="rounded-full flex-1 min-w-[220px] bg-background" />
-          <Button onClick={runAiSearch} disabled={aiLoading} className="rounded-full" data-testid="ai-search-btn">{aiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}Rechercher</Button>
-          {aiResults !== null && <Button variant="outline" onClick={() => { setAiResults(null); setAiQuery(""); }} className="rounded-full" data-testid="ai-search-clear">Effacer</Button>}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Agent IA conversationnel — analyse des profils & du contenu des CV</span></div>
+          {aiMessages.length > 0 && <Button variant="ghost" size="sm" onClick={clearAiChat} className="rounded-full text-xs h-7" data-testid="ai-search-clear">Nouvelle conversation</Button>}
         </div>
-        {aiResults !== null && (
-          <div className="mt-4 space-y-2" data-testid="ai-search-results">
-            {aiResults.length === 0 ? <p className="text-sm text-muted-foreground">Aucun candidat correspondant à cette requête.</p> : aiResults.map((r) => (
-              <div key={r.user_id} className="rounded-xl border border-border bg-card p-3 flex items-start justify-between gap-3" data-testid={`ai-result-${r.user_id}`}>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold">{r.name}</span><span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-0.5 font-bold">{r.ai_score}%</span><span className="text-xs text-muted-foreground truncate">{r.email}</span></div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{r.ai_reason}</p>
+        {aiMessages.length > 0 && (
+          <div ref={aiScrollRef} className="max-h-[46vh] overflow-y-auto space-y-3 mb-3 pr-1" data-testid="ai-chat-thread">
+            {aiMessages.map((m, i) => (
+              <div key={`${i}-${m.role}`} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] ${m.role === "user" ? "" : "w-full"}`}>
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm ${m.role === "user" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card border border-border rounded-bl-sm"}`} data-testid={`ai-msg-${m.role}-${i}`}>
+                    {m.content}
+                  </div>
+                  {m.role === "assistant" && m.results && m.results.length > 0 && (
+                    <div className="mt-2 space-y-2" data-testid={`ai-results-${i}`}>
+                      {m.results.map((r) => (
+                        <div key={r.user_id} className="rounded-xl border border-border bg-card p-3 flex items-start justify-between gap-3" data-testid={`ai-result-${r.user_id}`}>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold">{r.name}</span><span className="text-xs rounded-full bg-primary/15 text-primary px-2 py-0.5 font-bold">{r.ai_score}%</span><span className="text-xs text-muted-foreground truncate">{r.email}</span></div>
+                            <p className="text-sm text-muted-foreground mt-0.5">{r.ai_reason}</p>
+                          </div>
+                          <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={() => onOpenProfile?.(r.user_id)} data-testid={`ai-open-${r.user_id}`}>Voir le profil</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <Button size="sm" variant="outline" className="rounded-full shrink-0" onClick={() => onOpenProfile?.(r.user_id)} data-testid={`ai-open-${r.user_id}`}>Voir le profil</Button>
               </div>
             ))}
+            {aiLoading && (
+              <div className="flex justify-start" data-testid="ai-typing">
+                <div className="rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm bg-card border border-border flex items-center gap-2 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> L'agent analyse les CV…</div>
+              </div>
+            )}
           </div>
         )}
+        <div className="flex gap-2 items-center">
+          {speechSupported && (
+            <Button type="button" onClick={toggleMic} variant={listening ? "default" : "outline"} size="icon" className={`rounded-full shrink-0 ${listening ? "animate-pulse" : ""}`} data-testid="ai-mic-btn" title={listening ? "Arrêter la dictée" : "Dicter la requête"}>
+              {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+          )}
+          <Input data-testid="ai-search-input" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runAiSearch()} placeholder={listening ? "Parlez maintenant…" : "Ex : qui a de l'expérience React et connaît Docker ?"} className="rounded-full flex-1 min-w-[220px] bg-background" />
+          <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} className="rounded-full shrink-0" data-testid="ai-search-btn">{aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}<span className="hidden sm:inline ml-2">Envoyer</span></Button>
+        </div>
       </div>
       {nats.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-4 mb-6" data-testid="nationalities-panel">

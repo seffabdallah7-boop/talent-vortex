@@ -135,6 +135,7 @@ async def get_user_cv_text(user_id: str, admin: dict = Depends(require_admin)):
 
 class AiSearchInput(BaseModel):
     query: str
+    history: Optional[list] = None
 
 
 @router.post("/users/ai-search")
@@ -149,22 +150,28 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
     lines = []
     for c in cands[:60]:
         tags = (c.get("domains") or []) + (c.get("ai_domains") or [])
-        cv = (c.get("cv_text") or "")[:900]
+        cv = (c.get("cv_text") or "")[:1500]
         lines.append(
             f"- id={c['user_id']} | nom={c.get('name','')} | poste={c.get('current_position','')} "
             f"| domaines={', '.join(tags)} | outils={', '.join(c.get('tools') or [])} "
             f"| experience={c.get('years_experience','?')} ans | CV: {cv}"
         )
+    hist = ""
+    for h in (body.history or [])[-8:]:
+        role = "Recruteur" if h.get("role") == "user" else "Assistant"
+        hist += f"{role}: {h.get('content','')}\n"
     prompt = (
-        f"REQUETE DU RECRUTEUR: {query}\n\nCANDIDATS:\n" + "\n".join(lines) +
-        "\n\nRetourne uniquement les candidats qui correspondent vraiment a la requete."
+        (f"HISTORIQUE DE LA CONVERSATION:\n{hist}\n" if hist else "") +
+        f"NOUVELLE DEMANDE DU RECRUTEUR: {query}\n\nCANDIDATS (profil + extrait reel du CV):\n" + "\n".join(lines) +
+        "\n\nAnalyse le CONTENU DES CV et les profils pour repondre precisement."
     )
     system = (
-        "Tu es un agent de recherche RH intelligent. On te donne une requete en langage naturel et une liste de candidats "
-        "(profil structure + texte extrait de leur CV). Analyse en profondeur profils ET contenu des CV. "
-        "Reponds UNIQUEMENT par un tableau JSON valide, sans texte autour: "
-        "[{\"candidate_id\":\"<id>\",\"score\":<entier 0-100>,\"reason\":\"<phrase FR expliquant la correspondance>\"}]. "
-        "Inclure uniquement les candidats reellement pertinents (score >= 50), tries par score decroissant. Si aucun, retourne []."
+        "Tu es un agent conversationnel de recherche RH. On te donne l'historique de la conversation, une demande, "
+        "et des candidats (profil + texte extrait de leur CV). Tu DOIS baser tes reponses sur le CONTENU REEL des CV et des profils. "
+        "Reponds UNIQUEMENT par un objet JSON valide, sans texte autour: "
+        "{\"answer\":\"<message FR conversationnel, 1-3 phrases, repond au recruteur et peut demander une precision>\","
+        "\"results\":[{\"candidate_id\":\"<id>\",\"score\":<0-100>,\"reason\":\"<preuve concrete tiree du CV/profil, FR>\"}]}. "
+        "results = uniquement les candidats pertinents (score>=50), tries par score decroissant. Si aucun, results=[]."
     )
     try:
         chat = LlmChat(
@@ -175,10 +182,12 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
         raw = (resp if isinstance(resp, str) else getattr(resp, "text", str(resp))) or ""
         raw = raw.strip()
         try:
-            arr = json.loads(raw)
+            obj = json.loads(raw)
         except Exception:
-            m = re.search(r"\[.*\]", raw, re.DOTALL)
-            arr = json.loads(m.group(0)) if m else []
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            obj = json.loads(m.group(0)) if m else {}
+        answer = obj.get("answer", "") if isinstance(obj, dict) else ""
+        arr = obj.get("results", []) if isinstance(obj, dict) else (obj if isinstance(obj, list) else [])
     except Exception as e:
         logger.warning(f"ai_search failed: {e}")
         raise HTTPException(status_code=503, detail="Recherche IA momentanement indisponible.")
@@ -192,7 +201,7 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
         if not admin.get("is_super"):
             c.pop("is_super", None)
         results.append({**c, "ai_score": int(x.get("score", 0)), "ai_reason": x.get("reason", "")})
-    return {"results": results}
+    return {"answer": answer, "results": results}
 
 
 @router.get("/admin/nationalities")
