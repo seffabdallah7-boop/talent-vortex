@@ -129,13 +129,33 @@ async def ai_rank_candidates(job: dict, candidates: list) -> dict:
     """Return {candidate_id: {"score": int, "reason": str}} ranked by AI."""
     if not EMERGENT_LLM_KEY or not candidates:
         return {}
+    cids = [c["user_id"] for c in candidates]
+    cv_rows = await db.cv_data.find(
+        {"user_id": {"$in": cids}, "status": "scanned"},
+        {"_id": 0, "user_id": 1, "structured": 1},
+    ).to_list(5000)
+    cvmap = {d["user_id"]: (d.get("structured") or {}) for d in cv_rows}
     lines = []
     for c in candidates:
         tags = (c.get("domains") or []) + (c.get("ai_domains") or [])
+        s = cvmap.get(c["user_id"]) or {}
+        skills = ", ".join((s.get("skills") or [])[:30])
+        exps = "; ".join(
+            f"{e.get('title','')}@{e.get('company','')}({e.get('start','')}-{e.get('end','')})"
+            for e in (s.get("experiences") or [])[:6] if isinstance(e, dict)
+        )
+        edu = "; ".join(
+            f"{e.get('degree','')}-{e.get('school','')}"
+            for e in (s.get("education") or [])[:4] if isinstance(e, dict)
+        )
+        langs = ", ".join(s.get("languages") or [])
+        summary = (s.get("summary") or "")[:300]
         lines.append(
-            f"- id={c['user_id']} | nom={c.get('name','')} | poste={c.get('current_position','')} "
+            f"- id={c['user_id']} | nom={c.get('name','')} | poste={s.get('current_position') or c.get('current_position','')} "
             f"| domaines={', '.join(tags)} | outils={', '.join(c.get('tools') or [])} "
-            f"| experience={c.get('years_experience','?')} ans | bio={(c.get('bio') or '')[:200]}"
+            f"| experience={s.get('years_experience') or c.get('years_experience','?')} ans "
+            f"| competences_CV={skills} | experiences_CV={exps} | formations={edu} | langues={langs} "
+            f"| resume_CV={summary} | bio={(c.get('bio') or '')[:200]}"
         )
     prompt = (
         f"OFFRE:\nTitre: {job.get('title','')}\nCategorie: {job.get('category','')}\n"
@@ -240,6 +260,33 @@ async def job_suggestions(job_id: str, admin: dict = Depends(require_admin)):
     if not job:
         raise HTTPException(status_code=404, detail="Offre introuvable")
     return await compute_job_suggestions(job)
+
+
+@router.get("/jobs/{job_id}/applicant-scores")
+async def job_applicant_scores(job_id: str, admin: dict = Depends(require_admin)):
+    """Score de correspondance IA (0-100) pour chaque candidat ayant postulé a cette offre."""
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Offre introuvable")
+    apps = await db.applications.find({"job_id": job_id}, {"_id": 0, "candidate_id": 1}).to_list(2000)
+    cand_ids = list({a["candidate_id"] for a in apps if a.get("candidate_id")})
+    if not cand_ids:
+        return {}
+    candidates = await db.users.find({"user_id": {"$in": cand_ids}}, {"_id": 0}).to_list(5000)
+    ranking = await ai_rank_candidates(job, candidates)
+    result = {}
+    for c in candidates:
+        tags = (c.get("ai_domains") or []) + (c.get("domains") or [])
+        ai = ranking.get(c["user_id"])
+        if ai and ai.get("score", 0) > 0:
+            result[c["user_id"]] = {"score": ai["score"], "reason": ai.get("reason") or "Profil pertinent selon l'IA."}
+        else:
+            h = _job_match_score(job, tags)
+            result[c["user_id"]] = {
+                "score": min(80, 35 + h * 8) if h > 0 else 20,
+                "reason": "Correspondance sur les domaines." if h > 0 else "Correspondance faible avec l'offre.",
+            }
+    return result
 
 
 def _extract_json(raw: str) -> dict:

@@ -438,6 +438,11 @@ function Jobs({ onViewApplications }) {
   );
 }
 
+function MatchBadge({ score, reason }) {
+  const cls = score >= 70 ? "bg-emerald-500/15 text-emerald-600" : score >= 45 ? "bg-amber-500/15 text-amber-600" : "bg-secondary text-muted-foreground";
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${cls}`} title={reason || ""} data-testid="match-badge"><Sparkles className="h-3 w-3" /> {score}%</span>;
+}
+
 function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatus }) {
   const [apps, setApps] = useState([]);
   const [filter, setFilter] = useState(initialStatus || "all");
@@ -460,6 +465,18 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
     return api.get(`/applications?${params.toString()}`).then(({ data }) => setApps(data)).catch(() => {});
   }, [filter, jobFilter, jobSel]);
   useEffect(() => { load(); }, [load]);
+
+  const [scores, setScores] = useState({});
+  const [scoresLoading, setScoresLoading] = useState(false);
+  const activeJobId = jobFilter?.id || (jobSel !== "all" ? jobSel : null);
+  useEffect(() => {
+    if (!activeJobId) { setScores({}); return; }
+    setScoresLoading(true);
+    api.get(`/jobs/${activeJobId}/applicant-scores`)
+      .then(({ data }) => setScores(data || {}))
+      .catch(() => setScores({}))
+      .finally(() => setScoresLoading(false));
+  }, [activeJobId]);
 
   const [schedule, setSchedule] = useState(null);
   const [examApp, setExamApp] = useState(null);
@@ -557,7 +574,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
         <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="apps" />
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead>}<TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead>}<TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead>{activeJobId && <TableHead>Match IA</TableHead>}<TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
@@ -579,6 +596,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                   </TableCell>
                   <TableCell>{a.job_title}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
+                  {activeJobId && <TableCell data-testid={`app-match-${a.id}`}>{scoresLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : scores[a.candidate_id] ? <MatchBadge score={scores[a.candidate_id].score} reason={scores[a.candidate_id].reason} /> : <span className="text-muted-foreground text-sm">—</span>}</TableCell>}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="outline" size="sm" className="rounded-full">Examiner</Button>
@@ -611,8 +629,15 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                 <div className="flex items-center gap-2 flex-wrap">
                   <StatusBadge status={detail.status} />
                   <span className="text-sm text-muted-foreground">• {detail.job_title}</span>
+                  {scores[detail.candidate_id] && <MatchBadge score={scores[detail.candidate_id].score} reason={scores[detail.candidate_id].reason} />}
                   <Button variant="outline" size="sm" className="rounded-full ml-auto" onClick={() => onOpenProfile(detail.candidate_id)} data-testid="view-full-profile-btn">Voir le profil complet</Button>
                 </div>
+                {scores[detail.candidate_id]?.reason && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/20 p-3" data-testid="detail-match-reason">
+                    <p className="text-xs font-semibold text-primary flex items-center gap-1.5 mb-1"><Sparkles className="h-3.5 w-3.5" /> Analyse de correspondance IA</p>
+                    <p className="text-sm">{scores[detail.candidate_id].reason}</p>
+                  </div>
+                )}
                 {detail.screening?.completed && (
                   <Button variant="outline" size="sm" className="rounded-full w-fit" onClick={() => setExamApp(detail)} data-testid="view-exam-btn"><Sparkles className="h-4 w-4 mr-2" /> Voir l'examen IA</Button>
                 )}
@@ -896,7 +921,7 @@ function Suggestions({ onOpenProfile, initialJob }) {
   return (
     <div data-testid="suggestions-section">
       <h1 className="font-display text-3xl font-semibold mb-2">Suggestions IA</h1>
-      <p className="text-muted-foreground mb-6">Pour chaque offre, l'IA analyse les profils des candidats et propose les plus pertinents, classés par score de compatibilité.</p>
+      <p className="text-muted-foreground mb-6">Pour chaque offre, l'IA analyse les profils des candidats <b>et le contenu de leurs CV</b> pour proposer les plus pertinents, classés par score de compatibilité.</p>
       {jobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-16 text-center text-muted-foreground" data-testid="no-suggestions-jobs">
           <Sparkles className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" /> Publiez une offre pour obtenir des suggestions de candidats.

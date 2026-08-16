@@ -1,0 +1,30 @@
+{
+  "summary": "E2E test of the two new AI features leveraging cv_data: (1) /api/jobs/{id}/applicant-scores endpoint used in Applications with 'Match IA' column, (2) cv_data-enriched ai_rank_candidates now powers /api/jobs/{id}/suggestions. Backend: 8/8 pytest pass (auth guards 401/403, 404 unknown job, empty dict when no applications, score-shape 0-100, suggestions still work and sorted desc). Frontend: admin login (email+password+captcha) works; Suggestions IA intro contains 'et le contenu de leurs CV'; expanding job 94d2d203... reveals 3 suggested-score-* badges ('65% compatible'); Applications page with no filter has NO 'Match IA' column; selecting 'Développeur React Senior' shows Match IA column with match-badge '80%' inside app-match-* cell; clicking the row opens dialog with detail-match-reason ('Analyse de correspondance IA — Correspondance sur les domaines.') and dialog match-badge (80%).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_applicant_scores.py",
+    "/app/test_reports/pytest/applicant_scores_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "jobs.py::ai_rank_candidates — LLM call is fired synchronously on every /applicant-scores and /suggestions request; consider caching the AI ranking per (job_id, cv_data updated_at) to avoid latency (5-15s) and repeated cost when the admin flips between jobs. A short TTL (e.g. 10 min) would be enough.",
+    "jobs.py::/applicant-scores — when the LLM fails or returns nothing, a fallback score of 20 with reason 'Correspondance faible avec l'offre.' is applied for every applicant. Consider surfacing an AI-unavailable flag so the UI can differentiate LLM-derived scores from heuristic fallback.",
+    "AdminDashboard.js Applications — the effect on activeJobId depends on jobFilter, so re-selecting the same job (or switching then back) will re-fire the AI call. Combined with the backend having no cache, this is expensive; adding a client-side memo keyed by activeJobId would help.",
+    "AdminDashboard.js Applications — 'Match IA' column header text is hardcoded; consider i18n if language switcher is FR/EN (visible in header)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_applicant_scores.py (new)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! ; Candidate candidate_test@talentvortex.com / Candidate@2026! (used to verify 403 on admin endpoints).",
+  "seed_data_creation": "None. Reused existing job 94d2d203-2b10-4bae-82ed-3fc8d2a4fb7e (Développeur React Senior) which already has 1 application (Saifullah Abdallah).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New pytest suite lives at /app/backend/tests/test_applicant_scores.py — run with `python -m pytest backend/tests/test_applicant_scores.py -v -o 'addopts='`. It picks a job with applications automatically. Frontend testids exercised: nav-suggestions, suggestion-toggle-{id}, suggested-score-{cid}, nav-applications, app-job-filter, app-match-{app_id}, match-badge, detail-match-reason. AI call takes 3-10s in this env; ranking sometimes yields identical scores (all 65%) when candidates lack differentiating cv_data.",
+  "rca of the issue": "N/A — no bugs. Feature works as specified."
+}

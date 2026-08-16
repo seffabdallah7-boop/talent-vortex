@@ -249,6 +249,15 @@ async def cron_interview_reminders(background: BackgroundTasks, authorization: O
     return {"ok": True}
 
 
+@router.get("/countries")
+async def list_countries():
+    from data.countries import COUNTRIES
+    return sorted(
+        [{"code": c, "name": n, "nationality": d} for c, n, d in COUNTRIES],
+        key=lambda x: x["name"],
+    )
+
+
 @router.get("/")
 async def root():
     return {"message": "Talent Vortex API"}

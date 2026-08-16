@@ -273,6 +273,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Testé : backend 8/8 (auth guards, status, scan/rescan, batch, régression recherche IA) ; frontend 95% (stats correctes, dialog structuré). ✅
 - ⚠️ Prod `talentvortexagence.com` : redéploiement requis + lancer « Scanner tous les CV » pour peupler `cv_data`.
 
+## Implemented (2026-06, itération 47 — Nationalité & pays normalisés (combobox pays))
+- **Endpoint public `GET /api/countries`** (`backend/data/countries.py`, 193 pays) → `[{code ISO2, name (FR), nationality (adjectif féminin FR)}]` trié par nom. Source unique de vérité pour éliminer les saisies libres ambiguës (« algérien » / « Alger » / « algérienne »).
+- **Composant `CountrySelect`** (combobox recherchable shadcn Command + Popover, drapeaux emoji via code ISO) réutilisable en mode `nationality` ou `country`.
+- **Profil candidat** (`CandidateDashboard`) : le champ **Nationalité** (texte libre) devient un select normalisé (adjectif féminin, ex : « française »), et **Pays de résidence** un select de pays. Data standardisée → l'affichage « Répartition par nationalité » côté admin devient sans ambiguïté.
+- Vérifié : endpoint 193 pays OK ; combobox filtre/sélectionne correctement (screenshot : « algér » → 🇩🇿 Algérienne). Backend + frontend compilent proprement. ✅
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

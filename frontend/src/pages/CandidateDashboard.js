@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api, { fileUrl, formatApiError } from "@/lib/api";
+import { CountrySelect } from "@/components/CountrySelect";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -616,9 +617,9 @@ function ProfileForm({ profile, onSaved }) {
         <div className="grid sm:grid-cols-2 gap-4">
           <div><Label>Nom complet *</Label><Input className="mt-1.5" data-testid="profile-name" {...field("name")} required /></div>
           <div><Label>Téléphone *</Label><Input className="mt-1.5" data-testid="profile-phone" {...field("phone")} required /></div>
-          <div><Label>Nationalité *</Label><Input className="mt-1.5" data-testid="profile-nationality" placeholder="Ex : Française" {...field("nationality")} required /></div>
+          <div><Label>Nationalité *</Label><CountrySelect mode="nationality" value={form.nationality} onChange={(v) => setForm({ ...form, nationality: v })} testId="profile-nationality" placeholder="Sélectionnez une nationalité" /></div>
           <div><Label>Ville</Label><Input className="mt-1.5" data-testid="profile-city" {...field("city")} /></div>
-          <div><Label>Pays</Label><Input className="mt-1.5" data-testid="profile-country" {...field("country")} /></div>
+          <div><Label>Pays de résidence</Label><CountrySelect mode="country" value={form.country} onChange={(v) => setForm({ ...form, country: v })} testId="profile-country" placeholder="Sélectionnez un pays" /></div>
           <div><Label>Années d'expérience</Label><Input type="number" min="0" className="mt-1.5" data-testid="profile-years" {...field("years_experience")} /></div>
         </div>
       </div>
