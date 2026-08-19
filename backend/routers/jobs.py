@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Header, Background
 from pydantic import BaseModel
 
 from core import (
-    db, logger, EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    db, logger, EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
     require_admin, resolve_token, notify_user, notify_admins, send_email,
 )
 
@@ -127,7 +127,7 @@ async def notify_matching_candidates(job: dict):
 
 async def ai_rank_candidates(job: dict, candidates: list) -> dict:
     """Return {candidate_id: {"score": int, "reason": str}} ranked by AI."""
-    if not EMERGENT_LLM_KEY or not candidates:
+    if not GEMINI_API_KEY or not candidates:
         return {}
     cids = [c["user_id"] for c in candidates]
     cv_rows = await db.cv_data.find(
@@ -172,12 +172,7 @@ async def ai_rank_candidates(job: dict, candidates: list) -> dict:
         "Inclure uniquement les candidats avec un score >= 40, tries par score decroissant."
     )
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"suggest-{uuid.uuid4().hex[:8]}",
-            system_message=system,
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=prompt))
-        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        raw = await gemini_generate(system, prompt)
         raw = (raw or "").strip()
         arr = []
         try:
@@ -305,7 +300,7 @@ def _extract_json(raw: str) -> dict:
 
 @router.post("/jobs/ai-draft")
 async def ai_job_draft(body: JobDraftInput, admin: dict = Depends(require_admin)):
-    if not EMERGENT_LLM_KEY:
+    if not GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="Assistant IA indisponible")
     if not (body.brief or "").strip():
         raise HTTPException(status_code=400, detail="Veuillez fournir une fiche de poste ou une description.")
@@ -321,12 +316,7 @@ async def ai_job_draft(body: JobDraftInput, admin: dict = Depends(require_admin)
         "requirements (le profil recherché sous forme de puces avec des tirets)."
     )
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"jobdraft-{uuid.uuid4().hex[:8]}",
-            system_message=system,
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=f"Fiche de poste / brief:\n{body.brief}"))
-        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        raw = await gemini_generate(system, f"Fiche de poste / brief:\n{body.brief}")
     except Exception as e:
         logger.error(f"ai_job_draft: {e}")
         raise HTTPException(status_code=502, detail="La génération par l'IA a échoué. Réessayez.")

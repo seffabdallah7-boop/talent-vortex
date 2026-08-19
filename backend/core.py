@@ -23,6 +23,8 @@ from fastapi import HTTPException, Depends, Header, Query
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from google import genai as google_genai
+from google.genai import types as genai_types
 from emergentintegrations.llm.openai import OpenAISpeechToText
 
 # ---------------------------------------------------------------------------
@@ -38,6 +40,21 @@ db = client[os.environ["DB_NAME"]]
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGO = "HS256"
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_MODEL = "gemini-3.6-flash"
+_gemini_client = google_genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+
+async def gemini_generate(system: str, prompt: str, temperature: float = 0.3) -> str:
+    """Génération de texte via Gemini (clé utilisateur, gratuite)."""
+    if not _gemini_client:
+        raise RuntimeError("GEMINI_API_KEY manquant")
+    resp = await _gemini_client.aio.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=genai_types.GenerateContentConfig(system_instruction=system, temperature=temperature),
+    )
+    return (getattr(resp, "text", "") or "").strip()
 
 APP_NAME = "recruitai"
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -370,15 +387,20 @@ def extract_cv_text(data: bytes, filename: str = "") -> str:
 
 
 async def transcribe_audio(data: bytes, ext: str) -> str:
+    if not _gemini_client:
+        return ""
+    mime_map = {"webm": "audio/webm", "wav": "audio/wav", "mp3": "audio/mp3", "m4a": "audio/mp4",
+                "mp4": "audio/mp4", "ogg": "audio/ogg", "aac": "audio/aac", "flac": "audio/flac"}
+    mime = mime_map.get((ext or "").lower(), "audio/webm")
     try:
-        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
-            tmp.write(data)
-            tmp_path = tmp.name
-        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-        with open(tmp_path, "rb") as af:
-            resp = await stt.transcribe(file=af, model="whisper-1", response_format="json", language="fr")
-        os.unlink(tmp_path)
-        return getattr(resp, "text", "") or ""
+        resp = await _gemini_client.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                genai_types.Part.from_bytes(data=data, mime_type=mime),
+                "Transcris integralement cet audio en francais. Reponds uniquement par la transcription, sans commentaire.",
+            ],
+        )
+        return (getattr(resp, "text", "") or "").strip()
     except Exception as e:
         logger.error(f"Transcription echouee: {e}")
         return ""
@@ -419,45 +441,28 @@ def _cv_mime(filename: str, data: bytes) -> Optional[str]:
 
 async def parse_cv_structured(data: bytes, filename: str = "", content_type: str = "") -> dict:
     """Extract structured CV fields via Gemini (vision for PDF/images, text otherwise)."""
-    if not EMERGENT_LLM_KEY:
-        raise RuntimeError("EMERGENT_LLM_KEY manquant")
+    if not _gemini_client:
+        raise RuntimeError("GEMINI_API_KEY manquant")
     mime = _cv_mime(filename, data)
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY, session_id=f"cvparse-{uuid.uuid4().hex[:8]}",
-        system_message=CV_PARSE_SYSTEM,
-    ).with_model("gemini", "gemini-2.5-flash")
-    tmp_path = None
+    cfg = genai_types.GenerateContentConfig(system_instruction=CV_PARSE_SYSTEM, temperature=0)
+    if mime:
+        contents = [
+            genai_types.Part.from_bytes(data=data, mime_type=mime),
+            "Analyse ce CV et renvoie le JSON structure demande.",
+        ]
+    else:
+        txt = extract_cv_text(data, filename)
+        if not txt:
+            raise ValueError("Aucun texte exploitable dans le CV")
+        contents = "Analyse ce CV et renvoie le JSON structure demande.\n\nCONTENU DU CV:\n" + txt[:60000]
+    resp = await _gemini_client.aio.models.generate_content(model=GEMINI_MODEL, contents=contents, config=cfg)
+    raw = (getattr(resp, "text", "") or "").strip()
     try:
-        if mime:
-            from emergentintegrations.llm.chat import FileContentWithMimeType
-            ext = mime.split("/")[-1]
-            with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
-                tmp.write(data)
-                tmp_path = tmp.name
-            msg = UserMessage(
-                text="Analyse ce CV et renvoie le JSON structure demande.",
-                file_contents=[FileContentWithMimeType(file_path=tmp_path, mime_type=mime)],
-            )
-        else:
-            txt = extract_cv_text(data, filename)
-            if not txt:
-                raise ValueError("Aucun texte exploitable dans le CV")
-            msg = UserMessage(text="Analyse ce CV et renvoie le JSON structure demande.\n\nCONTENU DU CV:\n" + txt[:60000])
-        resp = await chat.send_message(msg)
-        raw = (resp if isinstance(resp, str) else getattr(resp, "text", str(resp))) or ""
-        raw = raw.strip()
-        try:
-            obj = json.loads(raw)
-        except Exception:
-            m = re.search(r"\{.*\}", raw, re.DOTALL)
-            obj = json.loads(m.group(0)) if m else {}
-        return obj if isinstance(obj, dict) else {}
-    finally:
-        if tmp_path:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        obj = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        obj = json.loads(m.group(0)) if m else {}
+    return obj if isinstance(obj, dict) else {}
 
 
 async def scan_user_cv(user_id: str, force: bool = False) -> dict:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFi
 from pydantic import BaseModel, EmailStr
 
 from core import (
-    db, logger, APP_NAME, EMERGENT_LLM_KEY, LlmChat, UserMessage, put_object,
+    db, logger, APP_NAME, EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage, put_object,
     hash_password, verify_password, create_jwt, public_user,
     get_current_user, send_email, validate_password, ensure_not_locked,
     register_failed, clear_attempts, verify_captcha, reset_email_html,
@@ -238,19 +238,15 @@ async def detect_profile_domains(profile: dict) -> List[str]:
         ", ".join(profile.get("domains") or []),
         ", ".join(profile.get("tools") or []),
     ]))
-    if not text.strip() or not EMERGENT_LLM_KEY:
+    if not text.strip() or not GEMINI_API_KEY:
         return []
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"domain-{uuid.uuid4().hex[:8]}",
-            system_message=(
-                "Tu classes un profil candidat. Reponds UNIQUEMENT par 1 a 3 domaines separes par des virgules, "
-                "choisis parmi: Tech, Data, Design, Marketing, Finance, Ressources Humaines, Commercial, "
-                "Juridique, Sante, Ingenierie, General. Aucune autre phrase."
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=f"Profil: {text}"))
-        raw = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        raw = await gemini_generate(
+            "Tu classes un profil candidat. Reponds UNIQUEMENT par 1 a 3 domaines separes par des virgules, "
+            "choisis parmi: Tech, Data, Design, Marketing, Finance, Ressources Humaines, Commercial, "
+            "Juridique, Sante, Ingenierie, General. Aucune autre phrase.",
+            f"Profil: {text}",
+        )
         return [t.strip() for t in raw.replace("\n", ",").split(",") if t.strip()][:3]
     except Exception as e:
         logger.error(f"detect_profile_domains: {e}")

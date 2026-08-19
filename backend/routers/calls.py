@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, B
 from pydantic import BaseModel
 
 from core import (
-    db, logger, APP_NAME, EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    db, logger, APP_NAME, EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
     get_current_user, require_admin, put_object, transcribe_audio, notify_user,
 )
 
@@ -74,18 +74,13 @@ async def set_call_status(call_id: str, body: CallStatusInput, user: dict = Depe
 
 async def summarize_transcript(transcript: str) -> str:
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"rec-{uuid.uuid4().hex[:8]}",
-            system_message=(
-                "Tu es un assistant RH. A partir de la transcription d'un entretien de recrutement, "
-                "redige en francais un compte-rendu structure et concis avec ces sections : "
-                "1) Resume (3-4 phrases), 2) Points forts du candidat, 3) Points d'attention, "
-                "4) Prochaines etapes recommandees. Reste factuel."
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=f"Transcription de l'entretien:\n{transcript[:12000]}"))
-        return resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        return await gemini_generate(
+            "Tu es un assistant RH. A partir de la transcription d'un entretien de recrutement, "
+            "redige en francais un compte-rendu structure et concis avec ces sections : "
+            "1) Resume (3-4 phrases), 2) Points forts du candidat, 3) Points d'attention, "
+            "4) Prochaines etapes recommandees. Reste factuel.",
+            f"Transcription de l'entretien:\n{transcript[:12000]}",
+        )
     except Exception as e:
         logger.error(f"summarize_transcript: {e}")
         return ""

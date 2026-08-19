@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from core import (
     db, logger, require_admin, require_super, get_current_user, public_user,
-    EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
 )
 
 router = APIRouter()
@@ -145,7 +145,7 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
     if not query:
         return {"results": []}
     cands = await db.users.find({"role": {"$ne": "admin"}}, {"_id": 0, "password_hash": 0}).to_list(200)
-    if not EMERGENT_LLM_KEY or not cands:
+    if not GEMINI_API_KEY or not cands:
         return {"answer": "", "results": []}
     # Données de CV pré-extraites (structurées) — priorité au profil, complément par le CV scanné
     cv_rows = await db.cv_data.find({"status": "scanned"}, {"_id": 0, "user_id": 1, "structured": 1, "raw_text": 1}).to_list(2000)
@@ -194,12 +194,7 @@ async def ai_search_users(body: AiSearchInput, admin: dict = Depends(require_adm
     answer = ""
     arr = []
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"aisearch-{uuid.uuid4().hex[:8]}",
-            system_message=system,
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=prompt))
-        raw = (resp if isinstance(resp, str) else getattr(resp, "text", str(resp))) or ""
+        raw = (await gemini_generate(system, prompt)) or ""
         raw = raw.strip()
         try:
             obj = json.loads(raw)

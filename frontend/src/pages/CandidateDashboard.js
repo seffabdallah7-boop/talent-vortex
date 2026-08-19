@@ -8,7 +8,6 @@ import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useDarkMode } from "@/context/DarkModeContext";
-import ChatWidget from "@/components/ChatWidget";
 import StatusBadge from "@/components/StatusBadge";
 import VideoCall from "@/components/VideoCall";
 import IncomingCall from "@/components/IncomingCall";
@@ -227,8 +226,7 @@ export default function CandidateDashboard() {
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
         </div>
       </main>
-      <ChatWidget />
-    </div>
+          </div>
   );
 }
 

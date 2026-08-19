@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, 
 from pydantic import BaseModel
 
 from core import (
-    db, logger, APP_NAME, EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    db, logger, APP_NAME, EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
     get_current_user, require_admin, put_object, get_object, transcribe_audio,
     notify_admins, send_email, admin_new_app_email_html, status_email_html,
     extract_cv_text,
@@ -41,16 +41,12 @@ SCREEN_DEFAULTS = [
 
 async def generate_screening_questions(job: dict) -> list:
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"screen-{uuid.uuid4().hex[:8]}",
-            system_message=(
-                "Tu es recruteur. Genere EXACTEMENT 4 questions courtes de pre-qualification en francais "
-                "permettant de verifier si un candidat correspond a l'offre. Reponds uniquement par les 4 "
-                "questions, une par ligne, sans numerotation ni autre texte."
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=f"Titre: {job.get('title','')}\nDescription: {job.get('description','')}\nExigences: {job.get('requirements','')}"))
-        text = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        text = await gemini_generate(
+            "Tu es recruteur. Genere EXACTEMENT 4 questions courtes de pre-qualification en francais "
+            "permettant de verifier si un candidat correspond a l'offre. Reponds uniquement par les 4 "
+            "questions, une par ligne, sans numerotation ni autre texte.",
+            f"Titre: {job.get('title','')}\nDescription: {job.get('description','')}\nExigences: {job.get('requirements','')}",
+        )
         qs = [l.strip(" -•\t.") for l in text.splitlines() if l.strip()]
         qs = [q for q in qs if len(q) > 5][:4]
         return qs if len(qs) >= 2 else SCREEN_DEFAULTS
@@ -62,17 +58,13 @@ async def generate_screening_questions(job: dict) -> list:
 async def assess_screening(job: dict, questions: list, answers: list):
     qa = "\n\n".join(f"Q{i+1}: {q}\nRéponse: {answers[i] if i < len(answers) else ''}" for i, q in enumerate(questions))
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=f"assess-{uuid.uuid4().hex[:8]}",
-            system_message=(
-                "Tu es recruteur senior. Evalue les reponses du candidat au regard de l'offre. "
-                'Reponds STRICTEMENT en JSON valide: {"score": <entier 0-100>, '
-                '"verdict": "Correspond" | "A verifier" | "Ne correspond pas", '
-                '"analyse": "3-4 phrases en francais"}.'
-            ),
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        resp = await chat.send_message(UserMessage(text=f"OFFRE\nTitre: {job.get('title','')}\nExigences: {job.get('requirements','')}\n\nREPONSES DU CANDIDAT\n{qa}"))
-        text = resp if isinstance(resp, str) else getattr(resp, "text", str(resp))
+        text = await gemini_generate(
+            "Tu es recruteur senior. Evalue les reponses du candidat au regard de l'offre. "
+            'Reponds STRICTEMENT en JSON valide: {"score": <entier 0-100>, '
+            '"verdict": "Correspond" | "A verifier" | "Ne correspond pas", '
+            '"analyse": "3-4 phrases en francais"}.',
+            f"OFFRE\nTitre: {job.get('title','')}\nExigences: {job.get('requirements','')}\n\nREPONSES DU CANDIDAT\n{qa}",
+        )
         m = re.search(r"\{.*\}", text, re.DOTALL)
         data = json.loads(m.group(0)) if m else {}
         try:

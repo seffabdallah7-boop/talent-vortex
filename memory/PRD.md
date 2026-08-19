@@ -287,6 +287,13 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Design profil** : la carte photo est déplacée **en bas du formulaire** (au-dessus du bouton Enregistrer) pour un rendu plus propre.
 - Vérifié : WhatsApp persiste (PUT/GET `+33612345678`), combobox rend bien (🇫🇷 +33), logo→landing reste sur `/`, migration OK, layout OK. ✅
 
+## Implemented (2026-06, itération 49 — Migration IA vers Gemini gratuit + retrait assistant candidat + logo/favicon)
+- **Toute l'IA migrée vers Gemini** (`gemini-3.6-flash`) avec la **clé Google AI Studio de l'utilisateur** (`GEMINI_API_KEY` dans backend/.env, gratuite) — fin de la consommation de crédits Emergent pour l'IA. Helper `core.gemini_generate(system, prompt)` (SDK officiel `google-genai`, async). Migrés : recherche conversationnelle candidats, suggestions IA, score matching candidatures, questions de pré-qualification, évaluation screening, détection domaines, brouillon d'offre IA, résumé d'entretien, assistant chat, **extraction/scan CV (vision PDF/images)** et **transcription audio des appels** (via Gemini audio). EMERGENT_LLM_KEY conservé uniquement pour l'init du stockage objet.
+- **Assistant IA retiré du côté candidat** : `ChatWidget` supprimé de la landing, JobDetail et CandidateDashboard.
+- **Logo en favicon + Open Graph** (`public/index.html`) : `<link rel="icon" href="/logo.png">`, apple-touch-icon, `og:image`/`twitter:image` → le logo s'affiche à gauche du titre dans Google et l'onglet.
+- Vérifié : job-draft (Tech), ai-search (réponse + 1 résultat), re-scan CV PDF (status scanned) — tous via Gemini. Backend + frontend compilent. ✅
+- ⚠️ Prod : redéploiement requis + la clé `GEMINI_API_KEY` doit être présente dans l'environnement de production.
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

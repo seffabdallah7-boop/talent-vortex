@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Response, Header, 
 from pydantic import BaseModel
 
 from core import (
-    db, logger, EMERGENT_LLM_KEY, LlmChat, UserMessage,
+    db, logger, EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
     get_current_user, require_admin, notify_user, send_email, interview_email_html,
 )
 
@@ -60,13 +60,7 @@ async def ai_chat(body: AiChatInput):
 
     reply = "Desole, je rencontre un souci technique. Reessayez dans un instant."
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=body.session_id,
-            system_message=AI_SYSTEM,
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        response = await chat.send_message(UserMessage(text=user_text))
-        reply = response if isinstance(response, str) else getattr(response, "text", str(response))
+        reply = await gemini_generate(AI_SYSTEM, user_text)
     except Exception as e:
         logger.error(f"AI chat error: {e}")
 
