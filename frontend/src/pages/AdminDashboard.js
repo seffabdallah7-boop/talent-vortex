@@ -931,9 +931,12 @@ function Suggestions({ onOpenProfile, initialJob }) {
           {jobs.map((job) => (
             <div key={job.id} className="rounded-2xl border border-border bg-card overflow-hidden" data-testid={`suggestion-job-${job.id}`}>
               <button onClick={() => toggle(job)} className="w-full flex items-center justify-between gap-4 p-5 text-left hover:bg-secondary/40 transition-colors" data-testid={`suggestion-toggle-${job.id}`}>
-                <div className="min-w-0">
-                  <h3 className="font-display text-lg font-semibold truncate">{job.title}</h3>
-                  <p className="text-xs text-muted-foreground">{job.company || "—"} • {job.location}{!job.is_active ? " • (masquée)" : ""}</p>
+                <div className="min-w-0 flex items-center gap-3">
+                  <span className="h-11 w-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Sparkles className="h-5 w-5" /></span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">{job.title}</h3>
+                    <p className="text-sm text-muted-foreground">{job.company || "—"} • {job.location}{!job.is_active ? " • (masquée)" : ""}</p>
+                  </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 text-sm text-primary font-medium shrink-0"><Sparkles className="h-4 w-4" /> {openJob === job.id ? "Masquer" : "Voir les profils"}</span>
               </button>
