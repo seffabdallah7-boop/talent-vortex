@@ -300,6 +300,14 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Suppression de compte candidat** : nouvel endpoint `DELETE /api/account` (self-delete, supprime user + candidatures + messages + cv_data) + « Zone de danger › Supprimer mon compte » dans le profil candidat, avec `AlertDialog` de confirmation puis déconnexion/redirection.
 - Vérifié : bulle « Messagerie recruteur » présente et ouverte côté candidat, zone de danger visible, dialog de confirmation promotion présent. Backend + frontend compilent. ✅
 
+## Implemented (2026-06, itération 51 — UX Messagerie candidat : position, appels retirés, vocal enrichi, plein écran mobile + bouton retour)
+- **Position desktop** : le panneau de messagerie est collé à ~1rem du bas (`sm:bottom-4`) ; la bulle flottante se masque quand le chat est ouvert.
+- **Appels retirés** : suppression des boutons Appel vidéo / Appel audio et du composant `VideoCall` dans la messagerie candidat.
+- **Vocal enrichi** : pendant l'enregistrement → boutons **Annuler** + **Stop** ; après arrêt → **prévisualisation** avec lecteur natif (lecture/pause/**avance/seek**) puis **Envoyer** ou **Supprimer** (plus d'envoi automatique).
+- **Mobile plein écran** : sur téléphone le chatbox occupe tout l'écran (`inset-0 w-full h-full`).
+- **Bouton retour téléphone** : `history.pushState` + écoute `popstate` → le retour **ferme seulement le chatbox** et revient au composant initial (ne quitte plus la page). Vérifié : retour → chat fermé, URL inchangée.
+- Frontend compile proprement. ✅
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).
