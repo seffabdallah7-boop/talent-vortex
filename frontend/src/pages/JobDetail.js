@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api, { formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
+import ChatWidget from "@/components/ChatWidget";
 import VoiceRecorder from "@/components/VoiceRecorder";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -169,6 +170,7 @@ export default function JobDetail() {
           )}
         </div>
       </div>
+      <ChatWidget />
           </div>
   );
 }

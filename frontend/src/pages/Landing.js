@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import api from "@/lib/api";
 import Navbar from "@/components/Navbar";
+import ChatWidget from "@/components/ChatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Briefcase, Search, ArrowRight, FileAudio, ShieldCheck, Bot, MoveUpRight, Star } from "lucide-react";
@@ -215,6 +216,7 @@ export default function Landing() {
           </a>
         </div>
       </footer>
+      <ChatWidget />
 
           </div>
   );

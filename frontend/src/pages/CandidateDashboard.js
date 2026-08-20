@@ -9,6 +9,11 @@ import { NotificationBell } from "@/components/Navbar";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useDarkMode } from "@/context/DarkModeContext";
 import StatusBadge from "@/components/StatusBadge";
+import ChatWidget from "@/components/ChatWidget";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import VideoCall from "@/components/VideoCall";
 import IncomingCall from "@/components/IncomingCall";
 import ScreeningQuiz from "@/components/ScreeningQuiz";
@@ -21,7 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   FileText, Plus, Briefcase, Clock, CheckCircle2, XCircle, CalendarDays, Video,
-  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle, Camera, LogOut, Sun, Moon,
+  ScrollText, User, Loader2, Sparkles, Home, MapPin, Search, ArrowRight, Star, Menu, MessageCircle, Camera, LogOut, Sun, Moon, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -226,6 +231,7 @@ export default function CandidateDashboard() {
           {section === "profile" && <ProfileForm profile={profile} onSaved={() => { loadAll(); checkAuth(); }} />}
         </div>
       </main>
+      <ChatWidget />
           </div>
   );
 }
@@ -512,6 +518,23 @@ function ProfileForm({ profile, onSaved }) {
   const photoRef = useRef(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [delAcc, setDelAcc] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await api.delete("/account");
+      toast.success("Votre compte a été supprimé.");
+      logout();
+      navigate("/", { replace: true });
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Échec de la suppression du compte");
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -676,11 +699,34 @@ function ProfileForm({ profile, onSaved }) {
         </div>
       )}
 
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6" data-testid="danger-zone">
+        <p className="font-medium text-destructive mb-1">Zone de danger</p>
+        <p className="text-sm text-muted-foreground mb-4">La suppression de votre compte est définitive : votre profil, votre CV, vos candidatures et vos messages seront supprimés et irrécupérables.</p>
+        <Button type="button" variant="outline" className="rounded-full border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => setDelAcc(true)} data-testid="delete-account-btn">
+          <Trash2 className="h-4 w-4 mr-2" /> Supprimer mon compte
+        </Button>
+      </div>
+
       <div className="sticky bottom-4 flex justify-end">
         <Button type="submit" disabled={saving} className="rounded-full h-12 px-8 shadow-lg shadow-primary/20" data-testid="save-profile-btn">
           {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Enregistrer mon profil
         </Button>
       </div>
+
+      <AlertDialog open={delAcc} onOpenChange={setDelAcc}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement votre compte ?</AlertDialogTitle>
+            <AlertDialogDescription>Cette action est irréversible. Votre profil, CV, candidatures et messages seront supprimés définitivement.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteAccount} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" data-testid="confirm-delete-account">
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Oui, supprimer mon compte
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

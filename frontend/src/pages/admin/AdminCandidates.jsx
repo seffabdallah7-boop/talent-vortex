@@ -32,6 +32,7 @@ export default function Candidates({ onOpenProfile }) {
   const { user: me } = useAuth();
   const [list, setList] = useState([]);
   const [del, setDel] = useState(null);
+  const [promote, setPromote] = useState(null);
   const [q, setQ] = useState("");
   const [minRating, setMinRating] = useState("all");
   const [nats, setNats] = useState([]);
@@ -173,6 +174,7 @@ export default function Candidates({ onOpenProfile }) {
       toast.success(role === "admin" ? `${u.name} est maintenant administrateur` : `${u.name} est de nouveau candidat`);
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setPromote(null); }
   };
   const toggleSuper = async (u) => {
     try {
@@ -342,7 +344,7 @@ export default function Candidates({ onOpenProfile }) {
                     <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{u.application_count}</span></TableCell>
                     <TableCell className="text-right">
                       {!isSelf && u.role === "candidate" && (
-                        <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => changeRole(u, "admin")} data-testid={`promote-${u.user_id}`}>Promouvoir admin</Button>
+                        <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => setPromote(u)} data-testid={`promote-${u.user_id}`}>Promouvoir admin</Button>
                       )}
                       {!isSelf && u.role === "admin" && (
                         <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => changeRole(u, "candidate")} data-testid={`demote-${u.user_id}`}>Rétrograder</Button>
@@ -379,6 +381,13 @@ export default function Candidates({ onOpenProfile }) {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Supprimer {del?.name} ?</AlertDialogTitle><AlertDialogDescription>L'utilisateur et toutes ses candidatures seront supprimés définitivement.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={remove} data-testid="confirm-delete-candidate">Supprimer</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!promote} onOpenChange={() => setPromote(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Nommer {promote?.name} administrateur ?</AlertDialogTitle><AlertDialogDescription>Cette personne aura un accès complet à l'espace administrateur (offres, candidatures, candidats, messagerie). Êtes-vous sûr ?</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => changeRole(promote, "admin")} data-testid="confirm-promote-admin">Oui, nommer administrateur</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

@@ -287,6 +287,16 @@ async def update_profile(body: ProfileInput, background: BackgroundTasks, user: 
     return public_user(fresh)
 
 
+@router.delete("/account")
+async def delete_my_account(user: dict = Depends(get_current_user)):
+    uid = user["user_id"]
+    await db.users.delete_one({"user_id": uid})
+    await db.applications.delete_many({"candidate_id": uid})
+    await db.messages.delete_many({"conversation_id": uid})
+    await db.cv_data.delete_many({"user_id": uid})
+    return {"ok": True}
+
+
 @router.post("/profile/cv")
 async def upload_profile_cv(background: BackgroundTasks, cv: UploadFile = File(...), user: dict = Depends(get_current_user)):
     data = await cv.read()

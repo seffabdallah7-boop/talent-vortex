@@ -294,6 +294,12 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - Vérifié : job-draft (Tech), ai-search (réponse + 1 résultat), re-scan CV PDF (status scanned) — tous via Gemini. Backend + frontend compilent. ✅
 - ⚠️ Prod : redéploiement requis + la clé `GEMINI_API_KEY` doit être présente dans l'environnement de production.
 
+## Implemented (2026-06, itération 50 — Restauration messagerie candidat + confirmation promotion admin + suppression de compte candidat)
+- **RÉGRESSION CORRIGÉE — Messagerie candidat↔admin restaurée** : le `ChatWidget` (retiré par erreur avec l'assistant IA) est réintégré sur les pages candidat (Landing, JobDetail, CandidateDashboard) **en mode messagerie uniquement** (onglet « Messagerie recruteur » par défaut, appels vidéo/audio, pièces jointes, vocal, accusés de lecture). L'assistant IA reste retiré (onglet AI non accessible).
+- **Confirmation avant nomination admin** (`AdminCandidates`) : le bouton « Promouvoir admin » ouvre une `AlertDialog` de confirmation (« Êtes-vous sûr de nommer cette personne administrateur ? ») avant d'appliquer le rôle.
+- **Suppression de compte candidat** : nouvel endpoint `DELETE /api/account` (self-delete, supprime user + candidatures + messages + cv_data) + « Zone de danger › Supprimer mon compte » dans le profil candidat, avec `AlertDialog` de confirmation puis déconnexion/redirection.
+- Vérifié : bulle « Messagerie recruteur » présente et ouverte côté candidat, zone de danger visible, dialog de confirmation promotion présent. Backend + frontend compilent. ✅
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

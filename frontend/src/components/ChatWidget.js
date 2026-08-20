@@ -32,7 +32,7 @@ function anonId() {
 export default function ChatWidget() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState("ai");
+  const [tab, setTab] = useState("support");
   const [aiMsgs, setAiMsgs] = useState([]);
   const [supMsgs, setSupMsgs] = useState([]);
   const [text, setText] = useState("");
@@ -189,7 +189,7 @@ export default function ChatWidget() {
         data-testid="chat-toggle-btn"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => { setOpen((o) => !o); setTab("ai"); }}
+        onClick={() => { setOpen((o) => !o); setTab("support"); }}
         className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl items-center justify-center ${open ? "hidden sm:flex" : "flex"}`}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
