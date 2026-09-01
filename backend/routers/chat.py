@@ -321,6 +321,9 @@ async def delete_message(msg_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Message introuvable")
     if msg.get("sender_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Vous ne pouvez supprimer que vos propres messages")
+    if msg.get("deleted"):
+        await db.messages.delete_one({"id": msg_id})
+        return {"ok": True, "removed": True}
     await db.messages.update_one({"id": msg_id}, {"$set": {"text": "", "attachment": None, "deleted": True}})
     return {"ok": True}
 

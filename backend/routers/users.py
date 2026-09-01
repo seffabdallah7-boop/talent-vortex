@@ -103,6 +103,15 @@ async def list_users(q: Optional[str] = Query(None), min_rating: Optional[int] =
             u["cv_snippet"] = _cv_snippet(u.get("cv_text", ""), q)
         u.pop("cv_text", None)
         u.pop("score", None)
+    iagg = await db.applications.find({"status": {"$in": ["interview_scheduled", "interview_done"]}}, {"_id": 0, "candidate_id": 1, "status": 1}).to_list(5000)
+    istatus = {}
+    for a in iagg:
+        if a["status"] == "interview_done" or istatus.get(a["candidate_id"]) != "interview_done":
+            istatus[a["candidate_id"]] = a["status"]
+    for u in users:
+        u["interview_status"] = istatus.get(u["user_id"])
+        u["cv_scanned"] = bool(u.get("cv_scanned"))
+        u["has_cv"] = bool(u.get("cv_file_id"))
     if min_rating:
         users = [u for u in users if (u.get("rating") or 0) >= min_rating]
     if not admin.get("is_super"):

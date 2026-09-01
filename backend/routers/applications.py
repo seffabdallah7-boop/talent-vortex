@@ -220,7 +220,7 @@ async def all_applications(status: Optional[str] = Query(None), job_id: Optional
 
 @router.put("/applications/{app_id}/status")
 async def update_status(app_id: str, body: StatusInput, admin: dict = Depends(require_admin)):
-    if body.status not in ("pending", "accepted", "rejected"):
+    if body.status not in ("pending", "accepted", "rejected", "interview_scheduled", "interview_done"):
         raise HTTPException(status_code=400, detail="Statut invalide")
     appdoc = await db.applications.find_one({"id": app_id}, {"_id": 0})
     if not appdoc:
@@ -229,8 +229,9 @@ async def update_status(app_id: str, body: StatusInput, admin: dict = Depends(re
         {"id": app_id},
         {"$set": {"status": body.status, "updated_at": datetime.now(timezone.utc).isoformat()}},
     )
-    labels = {"accepted": "Acceptee", "rejected": "Refusee", "pending": "En attente"}
-    if appdoc.get("candidate_email"):
+    labels = {"accepted": "Acceptée", "rejected": "Refusée", "pending": "En attente",
+              "interview_scheduled": "Entretien fixé", "interview_done": "Entretien déjà fait"}
+    if appdoc.get("candidate_email") and body.status in ("accepted", "rejected", "pending"):
         await send_email(appdoc["candidate_email"],
                          f"Mise a jour de votre candidature — {appdoc.get('job_title','')}",
                          status_email_html(appdoc, labels[body.status]))
@@ -241,6 +242,47 @@ async def update_status(app_id: str, body: StatusInput, admin: dict = Depends(re
         "read": False, "created_at": datetime.now(timezone.utc).isoformat(),
     })
     return await db.applications.find_one({"id": app_id}, {"_id": 0})
+
+
+@router.post("/applications/admin-create")
+async def admin_create_application(body: dict, admin: dict = Depends(require_admin)):
+    candidate_id = body.get("candidate_id"); job_id = body.get("job_id"); status = body.get("status", "pending")
+    if status not in ("pending", "accepted", "rejected", "interview_scheduled", "interview_done"):
+        raise HTTPException(status_code=400, detail="Statut invalide")
+    cand = await db.users.find_one({"user_id": candidate_id}, {"_id": 0})
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not cand or not job:
+        raise HTTPException(status_code=404, detail="Candidat ou offre introuvable")
+    now = datetime.now(timezone.utc).isoformat()
+    existing = await db.applications.find_one({"job_id": job_id, "candidate_id": candidate_id}, {"_id": 0})
+    if existing:
+        await db.applications.update_one({"id": existing["id"]}, {"$set": {"status": status, "updated_at": now}})
+        return await db.applications.find_one({"id": existing["id"]}, {"_id": 0})
+    doc = {"id": str(uuid.uuid4()), "job_id": job_id, "job_title": job.get("title", ""),
+           "candidate_id": candidate_id, "candidate_name": cand.get("name", ""),
+           "candidate_email": cand.get("email", ""), "status": status,
+           "cover_note": "", "created_at": now, "updated_at": now}
+    await db.applications.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@router.put("/applications/{app_id}/interview-note")
+async def set_interview_note(app_id: str, body: dict, admin: dict = Depends(require_admin)):
+    appdoc = await db.applications.find_one({"id": app_id}, {"_id": 0})
+    if not appdoc:
+        raise HTTPException(status_code=404, detail="Candidature introuvable")
+    if appdoc.get("status") != "interview_done":
+        raise HTTPException(status_code=400, detail="Note disponible uniquement pour un entretien déjà fait")
+    await db.applications.update_one({"id": app_id}, {"$set": {
+        "interview_note": body.get("note", ""), "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await db.applications.find_one({"id": app_id}, {"_id": 0})
+
+
+@router.get("/applications/interview-count")
+async def interview_count(admin: dict = Depends(require_admin)):
+    scheduled = await db.applications.count_documents({"status": "interview_scheduled"})
+    done = await db.applications.count_documents({"status": "interview_done"})
+    return {"scheduled": scheduled, "done": done}
 
 
 @router.put("/applications/{app_id}/review")

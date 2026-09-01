@@ -16,7 +16,12 @@ export default function ChatMessageBubble({ m, mine, editable, onEdit, onDelete 
       <div className="max-w-[80%]">
         <div className={`rounded-2xl px-3.5 py-2 text-sm ${bubbleCls}`} data-testid={`msg-${m.id}`}>
           {m.deleted ? (
-            <span className="italic opacity-70">Message supprimé</span>
+            <span className="italic opacity-70 inline-flex items-center gap-2">
+              Message supprimé
+              {editable && mine && (
+                <button onClick={() => onDelete(m)} data-testid={`purge-btn-${m.id}`} title="Retirer définitivement" className="opacity-60 hover:opacity-100"><Trash2 className="h-3 w-3" /></button>
+              )}
+            </span>
           ) : editing ? (
             <div className="flex items-center gap-1.5">
               <input

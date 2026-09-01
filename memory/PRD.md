@@ -308,6 +308,17 @@ Application web (React) de recrutement en ligne. Publier des offres ; les candid
 - **Bouton retour téléphone** : `history.pushState` + écoute `popstate` → le retour **ferme seulement le chatbox** et revient au composant initial (ne quitte plus la page). Vérifié : retour → chat fermé, URL inchangée.
 - Frontend compile proprement. ✅
 
+## Implemented (2026-06, itération 52 — Statuts entretien & note d'entretien) [LOT 1]
+- **5 statuts de candidature** : En attente, Acceptée, Refusée, **Entretien fixé** (`interview_scheduled`), **Entretien déjà fait** (`interview_done`). Badges dédiés (bleu/violet) dans `StatusBadge`. Filtre statut étendu.
+- **Backend** : `PUT /applications/{id}/status` accepte les 5 statuts (emails auto seulement pour pending/accepted/rejected) ; `POST /applications/admin-create` (créer/mettre à jour une candidature pour un candidat = jamais d'entretien sans candidature) ; `PUT /applications/{id}/interview-note` (note libre, uniquement si interview_done) ; `GET /applications/interview-count`. `/users` expose `cv_scanned`, `has_cv`, `interview_status`. Tous testés au curl. ✅
+- **UI Candidatures** : boutons « Entretien fixé » / « Entretien déjà fait » dans le détail + **section Note d'entretien** (textarea, visible uniquement si interview_done) enregistrée et affichée. Widget dashboard **« Entretiens fixés »** cliquable → liste filtrée.
+
+### RESTE À FAIRE [LOT 2] (backend prêt, UI à câbler)
+- Badges « Entretien fixé/déjà fait » + indicateur scan CV (bien/mal scanné) dans la **liste Utilisateurs** + 2 filtres (statut entretien / scan CV) + retrait du badge (repasser en pending).
+- **Page dédiée Entretiens** (nouvel onglet menu) : liste par défaut « fixés », sélecteur vers « déjà fait ».
+- **Profil candidat** : section Candidature cliquable, état vide + « Ajouter une candidature » (choisir offre + statut via `admin-create`), affichage statut entretien + scan CV + note.
+- Compteur exact du widget « Entretiens fixés » (ajouter `interviews_scheduled` aux stats du dashboard, ou utiliser `/applications/interview-count`).
+
 ## ⏳ Backlog / Futur
 - (P3) Refactors de complexité de la revue de code : découper `ChatWidget.js` (272 l.), `VideoCall.js`, `CandidateProfileDialog.jsx` en sous-composants/hooks ; simplifier `routers/jobs.py::ai_rank_candidates`, `applications.py::create_application`, `chat.py::send_attachment`.
 - (P2) App mobile React Native réutilisant le backend actuel (via l'agent mobile, une fois le web finalisé).

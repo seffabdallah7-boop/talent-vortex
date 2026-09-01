@@ -1,9 +1,11 @@
-import { Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, CalendarClock, CalendarCheck } from "lucide-react";
 
 const MAP = {
   pending: { label: "En attente", cls: "status-pending", Icon: Clock },
   accepted: { label: "Acceptée", cls: "status-accepted", Icon: CheckCircle2 },
   rejected: { label: "Refusée", cls: "status-rejected", Icon: XCircle },
+  interview_scheduled: { label: "Entretien fixé", cls: "bg-blue-500/15 text-blue-600", Icon: CalendarClock },
+  interview_done: { label: "Entretien déjà fait", cls: "bg-purple-500/15 text-purple-600", Icon: CalendarCheck },
 };
 
 export default function StatusBadge({ status, className = "" }) {

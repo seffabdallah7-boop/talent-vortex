@@ -280,6 +280,7 @@ function Overview({ onNavigate }) {
         <button onClick={() => onNavigate("applications", { appStatus: "pending" })} data-testid="stat-card-pending" className="text-left rounded-2xl border status-pending p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.pending}</p><p className="text-sm">En attente</p></button>
         <button onClick={() => onNavigate("applications", { appStatus: "accepted" })} data-testid="stat-card-accepted" className="text-left rounded-2xl border status-accepted p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.accepted}</p><p className="text-sm">Acceptées</p></button>
         <button onClick={() => onNavigate("applications", { appStatus: "rejected" })} data-testid="stat-card-rejected" className="text-left rounded-2xl border status-rejected p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold">{stats.rejected}</p><p className="text-sm">Refusées</p></button>
+        <button onClick={() => onNavigate("applications", { appStatus: "interview_scheduled" })} data-testid="stat-card-interviews-scheduled" className="text-left rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 hover:opacity-90 transition-opacity"><p className="font-display text-2xl font-semibold text-blue-600">{stats.interviews_scheduled ?? "—"}</p><p className="text-sm">Entretiens fixés</p></button>
       </div>
     </div>
   );
@@ -510,6 +511,15 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
     setDetail((d) => (d && d.id === id ? { ...d, status } : d));
     load();
   };
+  const [ivNote, setIvNote] = useState("");
+  useEffect(() => { setIvNote(detail?.interview_note || ""); }, [detail?.id, detail?.status, detail?.interview_note]);
+  const saveIvNote = async () => {
+    try {
+      await api.put(`/applications/${detail.id}/interview-note`, { note: ivNote });
+      toast.success("Note d'entretien enregistrée");
+      setDetail((d) => (d ? { ...d, interview_note: ivNote } : d));
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
   const remove = async () => { await api.delete(`/applications/${del.id}`); toast.success("Candidature supprimée"); setDel(null); setDetail(null); load(); };
   const saveReview = async () => {
     try {
@@ -555,6 +565,8 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
               <SelectItem value="pending">En attente</SelectItem>
               <SelectItem value="accepted">Acceptées</SelectItem>
               <SelectItem value="rejected">Refusées</SelectItem>
+              <SelectItem value="interview_scheduled">Entretien fixé</SelectItem>
+              <SelectItem value="interview_done">Entretien déjà fait</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -667,9 +679,18 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                     <Button size="sm" onClick={accept} className="rounded-full status-accepted border-0" data-testid="accept-btn">Accepter</Button>
                     <Button size="sm" onClick={() => setStatus(detail.id, "rejected")} className="rounded-full status-rejected border-0" data-testid="reject-btn">Refuser</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "pending")} className="rounded-full">En attente</Button>
+                    <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_scheduled")} className="rounded-full" data-testid="interview-scheduled-btn">Entretien fixé</Button>
+                    <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_done")} className="rounded-full" data-testid="interview-done-btn">Entretien déjà fait</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDel(detail)} className="rounded-full ml-auto text-destructive" data-testid="delete-app-btn"><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
+                {detail.status === "interview_done" && (
+                  <div className="border-t border-border pt-4" data-testid="interview-note-section">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Note d'entretien</p>
+                    <Textarea data-testid="interview-note-input" rows={4} value={ivNote} onChange={(e) => setIvNote(e.target.value)} placeholder="Notes sur l'entretien réalisé (vous pouvez coller le lien Fathom ici)..." />
+                    <Button size="sm" className="rounded-full mt-2" onClick={saveIvNote} data-testid="save-interview-note-btn">Enregistrer la note</Button>
+                  </div>
+                )}
               </div>
             </>
           )}
