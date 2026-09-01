@@ -13,7 +13,7 @@ from core import (
     hash_password, verify_password, create_jwt, public_user,
     get_current_user, send_email, validate_password, ensure_not_locked,
     register_failed, clear_attempts, verify_captcha, reset_email_html,
-    extract_cv_text, scan_user_cv,
+    extract_cv_text, scan_user_cv, purge_user_data,
 )
 
 router = APIRouter()
@@ -291,9 +291,7 @@ async def update_profile(body: ProfileInput, background: BackgroundTasks, user: 
 async def delete_my_account(user: dict = Depends(get_current_user)):
     uid = user["user_id"]
     await db.users.delete_one({"user_id": uid})
-    await db.applications.delete_many({"candidate_id": uid})
-    await db.messages.delete_many({"conversation_id": uid})
-    await db.cv_data.delete_many({"user_id": uid})
+    await purge_user_data(uid)
     return {"ok": True}
 
 
@@ -304,7 +302,12 @@ async def upload_profile_cv(background: BackgroundTasks, cv: UploadFile = File(.
         raise HTTPException(status_code=400, detail="Fichier vide")
     if len(data) > 15 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 15 Mo)")
-    ext = cv.filename.split(".")[-1] if cv.filename and "." in cv.filename else "pdf"
+    raw_ext = cv.filename.split(".")[-1].lower() if cv.filename and "." in cv.filename else "pdf"
+    ext = "".join(c for c in raw_ext if c.isalnum())[:8] or "pdf"
+    allowed_ct = {"application/pdf", "application/msword",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+    if ext not in {"pdf", "doc", "docx"} and (cv.content_type or "") not in allowed_ct:
+        raise HTTPException(status_code=400, detail="Format de CV non autorisé (PDF, DOC ou DOCX uniquement).")
     path = f"{APP_NAME}/cv/{user['user_id']}/{uuid.uuid4()}.{ext}"
     put_object(path, data, cv.content_type or "application/pdf")
     file_id = str(uuid.uuid4())
@@ -333,7 +336,8 @@ async def upload_profile_photo(photo: UploadFile = File(...), user: dict = Depen
     ct = photo.content_type or "image/jpeg"
     if not ct.startswith("image/"):
         raise HTTPException(status_code=400, detail="Veuillez sélectionner une image")
-    ext = photo.filename.split(".")[-1] if photo.filename and "." in photo.filename else "jpg"
+    raw_ext = photo.filename.split(".")[-1].lower() if photo.filename and "." in photo.filename else "jpg"
+    ext = "".join(c for c in raw_ext if c.isalnum())[:8] or "jpg"
     path = f"{APP_NAME}/photos/{user['user_id']}/{uuid.uuid4()}.{ext}"
     put_object(path, data, ct)
     file_id = str(uuid.uuid4())

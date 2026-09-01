@@ -9,7 +9,7 @@ import ImageLightbox from "@/components/ImageLightbox";
 import StatusBadge from "@/components/StatusBadge";
 import {
   Loader2, Mail, Phone, MapPin, Briefcase, Globe, Star, CalendarDays,
-  FileText, ScrollText, Sparkles, Clock, MessageSquare, Video,
+  FileText, ScrollText, Sparkles, Clock, MessageSquare, Video, Pencil, Save,
 } from "lucide-react";
 
 const fmtDate = (d) => {
@@ -39,6 +39,12 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
   const [njob, setNjob] = useState("");
   const [nstatus, setNstatus] = useState("interview_scheduled");
   const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [eStatus, setEStatus] = useState("pending");
+  const [eNote, setENote] = useState("");
+  const [eRating, setERating] = useState(0);
+  const [eIvNote, setEIvNote] = useState("");
+  const [savingApp, setSavingApp] = useState(false);
 
   const reload = () => api.get(`/users/${userId}`).then(({ data }) => setData(data)).catch(() => {});
   useEffect(() => {
@@ -60,6 +66,25 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
       reload();
     } catch (e) { toast.error("Échec de la création"); }
     finally { setAdding(false); }
+  };
+  const openEdit = (a) => {
+    setEditId(a.id);
+    setEStatus(a.status || "pending");
+    setENote(a.admin_note || "");
+    setERating(a.rating || 0);
+    setEIvNote(a.interview_note || "");
+  };
+  const saveEdit = async (a) => {
+    setSavingApp(true);
+    try {
+      if (eStatus !== a.status) await api.put(`/applications/${a.id}/status`, { status: eStatus });
+      await api.put(`/applications/${a.id}/review`, { admin_note: eNote, rating: eRating || null });
+      if (eStatus === "interview_done") await api.put(`/applications/${a.id}/interview-note`, { note: eIvNote });
+      toast.success("Candidature mise à jour");
+      setEditId(null);
+      reload();
+    } catch (e) { toast.error("Échec de la mise à jour"); }
+    finally { setSavingApp(false); }
   };
 
   const u = data?.user;
@@ -207,10 +232,50 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
                             </span>
                           )}
                           <StatusBadge status={a.status} />
+                          <Button size="sm" variant="ghost" className="rounded-full h-7 px-2" onClick={() => (editId === a.id ? setEditId(null) : openEdit(a))} data-testid={`edit-app-${a.id}`}><Pencil className="h-3.5 w-3.5 mr-1" /> Modifier</Button>
                         </div>
                       </div>
-                      {a.admin_note && <p className="text-xs text-muted-foreground italic mt-2">Note interne : {a.admin_note}</p>}
-                      {a.interview_note && <p className="text-xs text-purple-600 italic mt-2" data-testid={`app-iv-note-${a.id}`}>Note d'entretien : {a.interview_note}</p>}
+                      {a.admin_note && editId !== a.id && <p className="text-xs text-muted-foreground italic mt-2">Note interne : {a.admin_note}</p>}
+                      {a.interview_note && editId !== a.id && <p className="text-xs text-purple-600 italic mt-2" data-testid={`app-iv-note-${a.id}`}>Note d'entretien : {a.interview_note}</p>}
+                      {editId === a.id && (
+                        <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3" data-testid={`edit-app-form-${a.id}`}>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Statut</label>
+                            <select value={eStatus} onChange={(e) => setEStatus(e.target.value)} data-testid={`edit-app-status-${a.id}`} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                              <option value="pending">En attente</option>
+                              <option value="accepted">Acceptée</option>
+                              <option value="rejected">Refusée</option>
+                              <option value="interview_scheduled">Entretien fixé</option>
+                              <option value="interview_done">Entretien fait</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Appréciation</label>
+                            <select value={eRating} onChange={(e) => setERating(Number(e.target.value))} data-testid={`edit-app-rating-${a.id}`} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                              <option value={0}>Aucune</option>
+                              <option value={1}>1 ★</option>
+                              <option value={2}>2 ★</option>
+                              <option value={3}>3 ★</option>
+                              <option value={4}>4 ★</option>
+                              <option value={5}>5 ★</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Note interne</label>
+                            <textarea value={eNote} onChange={(e) => setENote(e.target.value)} rows={2} data-testid={`edit-app-note-${a.id}`} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Note interne sur le candidat..." />
+                          </div>
+                          {eStatus === "interview_done" && (
+                            <div>
+                              <label className="text-xs font-semibold text-purple-600">Note d'entretien</label>
+                              <textarea value={eIvNote} onChange={(e) => setEIvNote(e.target.value)} rows={2} data-testid={`edit-app-ivnote-${a.id}`} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" placeholder="Compte-rendu de l'entretien..." />
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button size="sm" className="rounded-full flex-1" onClick={() => saveEdit(a)} disabled={savingApp} data-testid={`edit-app-save-${a.id}`}><Save className="h-3.5 w-3.5 mr-1" /> {savingApp ? "Enregistrement…" : "Enregistrer"}</Button>
+                            <Button size="sm" variant="outline" className="rounded-full" onClick={() => setEditId(null)} data-testid={`edit-app-cancel-${a.id}`}>Annuler</Button>
+                          </div>
+                        </div>
+                      )}
                       <div className="flex gap-2 mt-2">
                         {a.cv_file_id && (
                           <a href={fileUrl(a.cv_file_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">

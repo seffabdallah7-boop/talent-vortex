@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 32 — validated (1) new inline application-edit feature in Admin > Users > candidate profile dialog, and (2) backend security hardening (file XSS defense, CV allowlist, RGPD purge). Backend: 17/17 pytest tests pass (test_iter32_security.py) covering admin auth matrix (401/403), PUT /applications/{id}/status transitions + invalid rejection, PUT /review persistence, PUT /interview-note guard (only when status=interview_done), public file inline + nosniff, private file 401 no-token / 403 non-owner / 200 owner+admin with nosniff+inline for PDF, DELETE /account RGPD purge, DELETE /users/{id} admin purge of application data, CV upload rejects .txt & .html with 400 and accepts a valid PDF. Frontend: Playwright end-to-end on candidate profile dialog — Edit button opens edit-app-form-{id}; status select exposes exactly the 5 required values; rating select 0..5; interview-note textarea only appears when status=interview_done and hides again when status is changed away; Save persists status/rating/admin_note/interview_note via the 3 documented PUTs and reloads profile so the badge (Entretien fait / 5/5), Internal note and Interview note become visible on the card; Cancel closes the panel without persisting.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/users/{id}", "issue": "Self-delete returns HTTP 400 'Vous ne pouvez pas supprimer votre propre compte' but a super-admin trying to delete themselves via /users/{id} still returns 400 (fine); however DELETE /candidates/{id} on a non-candidate user silently returns 200 without matching any doc — consider returning 404 when no doc deleted."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Candidate profile dialog", "issues": [
+        "Section header still reads 'Candidatures (1)' in English mode — the count breaks the FR->EN dictionary exact match (already flagged iter31, unchanged).",
+        "StatusBadge for interview statuses renders French ('Entretien fait', 'Entretien fixé') even when UI language = EN. Bind the label to i18n or extend uiDict.js.",
+        "Rating dropdown option labels use star + 'Aucune' (French) — should be 'None / 1 ★ / 2 ★ ...' when EN.",
+        "Toast messages inside CandidateProfileDialog.saveEdit are hardcoded French ('Candidature mise à jour', 'Échec de la mise à jour') — sonner toasts bypass the DOM-scan translator. Use t()/useTranslation.",
+        "openEdit initialises eStatus from the persisted status so the interview-note textarea auto-shows for apps already in interview_done state — good UX, but 'Note d'entretien' label + placeholder ('Compte-rendu de l\\'entretien...') remain in French in EN mode.",
+        "Section labels inside edit form ('Statut', 'Appréciation', 'Note interne', 'Note d\\'entretien', 'Enregistrer', 'Annuler') are hardcoded French.",
+        "fmtDate still hardcodes fr-FR ('Postulé le 1 septembre 2026') — carried over from iter31."
+      ]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter32_security.py",
+    "/app/test_reports/pytest/iter32_results.xml"
+  ],
+  "action_items": [
+    "i18n polish only: translate CandidateProfileDialog edit-form labels, toasts, StatusBadge tokens (Entretien fixé/fait), rating 'Aucune', and 'Candidatures (n)' via t() instead of DOM scan; format dates using i18n.language."
+  ],
+  "critical_code_review_comments": [
+    "CandidateProfileDialog.saveEdit fires up to 3 PUTs sequentially without transactional guarantees; if the /interview-note call fails after /status has already flipped to interview_done, the DB ends up in a partial state. Consider a single admin endpoint that accepts (status, rating, admin_note, interview_note) atomically.",
+    "The /applications/{id}/interview-note endpoint hard-rejects (400) when status!=interview_done, but the frontend guards this by calling it only when eStatus==='interview_done' — save() sends status BEFORE the interview-note PUT which is correct; however if only the interview-note changed (status already interview_done) the code still works, good. Doc-comment the ordering.",
+    "applications.py::review_application silently ignores rating=None but does not allow clearing an existing rating back to null (uses $set only when body.rating is not None). If a recruiter wants to clear a rating, they cannot — consider explicit unset when rating is null.",
+    "purge_user_data does NOT delete db.jobs authored by the user (n/a for candidates) nor db.calls / db.recordings / db.conversations — audit RGPD coverage against all collections; today it covers applications/messages/cv_data/files/interviews/contracts/notifications/user_sessions.",
+    "core._safe_file_response falls back to _INLINE_SAFE by lowered content-type without also whitelisting the extension — a stored record with content_type='image/svg+xml' would be treated as unsafe (good) but 'image/PNG ' (with trailing space) would still be safe because of .strip(). Fine, just noting.",
+    "auth.py::upload_profile_cv extension check is bypassable: if content_type is in allowlist even a .exe filename passes; hardening: require BOTH extension AND content_type to be in allowlist, or sniff the magic bytes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter32_security.py (extended with CV-allowlist and admin-delete-purge tests)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (edit flow + cancel)"},
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! ; captcha 'a + b' via GET /api/auth/captcha (see /app/memory/test_credentials.md).",
+  "seed_data_creation": "Created two throwaway candidates (TEST_iter32_* / TEST_iter32b_*) via /api/auth/register in pytest module scope for file-access matrix; created two throwaway candidates for DELETE /account and DELETE /users/{id} purge tests (both purged inside the test). One admin-created application was left in DB against candidate 'Iter32 Candidate' (status: interview_done, rating 5, notes populated) as a side-effect of the frontend E2E — safe to keep or clean up.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend regressions with: `python -m pytest /app/backend/tests/test_iter32_security.py /app/backend/tests/test_lot2_features.py -v -o 'addopts='`. Captcha is arithmetic 'a + b'; solve via regex + eval. Frontend admin nav item Users has NO data-testid 'nav-users' (previous iter31 report claimed it does — actually there is only the text 'Users' on an <a>). Use `page.locator('text=Users').first.click()` to navigate. New testids exercised: edit-app-<id>, edit-app-form-<id>, edit-app-status-<id>, edit-app-rating-<id>, edit-app-note-<id>, edit-app-ivnote-<id>, edit-app-save-<id>, edit-app-cancel-<id>, app-iv-note-<id>. Language default is English (i18n.fallbackLng='en'); several strings in the new edit-form + StatusBadge remain FR-only.",
+  "rca of the issue": "No functional bug found. All iter32 acceptance criteria met. Remaining items are cosmetic i18n gaps and low-risk code-review suggestions (atomic save, RGPD collection audit, magic-byte sniffing for CV upload)."
+}

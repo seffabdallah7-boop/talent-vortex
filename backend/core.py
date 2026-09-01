@@ -26,6 +26,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 from google import genai as google_genai
 from google.genai import types as genai_types
 from emergentintegrations.llm.openai import OpenAISpeechToText
+from openai import AsyncOpenAI
 
 # ---------------------------------------------------------------------------
 # Config & clients
@@ -44,17 +45,112 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-3.6-flash"
 _gemini_client = google_genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+# ---------------------------------------------------------------------------
+# Fallback IA multi-fournisseurs (texte) : Gemini -> DeepSeek -> Mistral -> OpenAI
+# Gemini reste le fournisseur principal (clé gratuite). Les fournisseurs sans clé
+# configurée sont ignorés. Bascule SÉQUENTIELLE (jamais en parallèle) sur
+# quota/429/timeout/erreur transitoire. Clés uniquement côté serveur (.env).
+# ---------------------------------------------------------------------------
+LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT_SECONDS", "40"))
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-large-latest")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+OPENAI_VISION_MODEL = os.environ.get("OPENAI_VISION_MODEL", "gpt-4o")
+OPENAI_STT_MODEL = os.environ.get("OPENAI_STT_MODEL", "whisper-1")
 
-async def gemini_generate(system: str, prompt: str, temperature: float = 0.3) -> str:
-    """Génération de texte via Gemini (clé utilisateur, gratuite)."""
+
+def _oai_client(key, base_url):
+    return AsyncOpenAI(api_key=key, base_url=base_url, timeout=LLM_TIMEOUT, max_retries=0) if key else None
+
+
+_deepseek_client = _oai_client(DEEPSEEK_API_KEY, "https://api.deepseek.com")
+_mistral_client = _oai_client(MISTRAL_API_KEY, "https://api.mistral.ai/v1")
+_openai_client = _oai_client(OPENAI_API_KEY, "https://api.openai.com/v1")
+
+
+def _err_status(exc):
+    for attr in ("status_code", "status", "code"):
+        v = getattr(exc, attr, None)
+        if isinstance(v, int):
+            return v
+        if isinstance(v, str) and v.isdigit():
+            return int(v)
+    return None
+
+
+def _is_fallbackable(exc) -> bool:
+    """Erreur transitoire (quota/429/timeout/5xx/réponse vide) => tenter le suivant."""
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError, ValueError)):
+        return True
+    try:
+        from openai import APITimeoutError, APIConnectionError
+        if isinstance(exc, (APITimeoutError, APIConnectionError)):
+            return True
+    except Exception:
+        pass
+    if _err_status(exc) in (408, 409, 429, 500, 502, 503, 504):
+        return True
+    msg = str(exc).lower()
+    return any(k in msg for k in ("quota", "rate limit", "rate_limit", "resource_exhausted",
+                                  "429", "overloaded", "unavailable", "exhausted", "timeout"))
+
+
+async def _gemini_text(system: str, prompt: str, temperature: float) -> str:
     if not _gemini_client:
         raise RuntimeError("GEMINI_API_KEY manquant")
     resp = await _gemini_client.aio.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt,
+        model=GEMINI_MODEL, contents=prompt,
         config=genai_types.GenerateContentConfig(system_instruction=system, temperature=temperature),
     )
-    return (getattr(resp, "text", "") or "").strip()
+    txt = (getattr(resp, "text", "") or "").strip()
+    if not txt:
+        raise ValueError("Réponse Gemini vide")
+    return txt
+
+
+async def _oai_text(client, model, system, prompt, temperature) -> str:
+    resp = await client.chat.completions.create(
+        model=model,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        temperature=temperature, stream=False,
+    )
+    txt = (resp.choices[0].message.content or "").strip()
+    if not txt:
+        raise ValueError(f"Réponse {model} vide")
+    return txt
+
+
+async def gemini_generate(system: str, prompt: str, temperature: float = 0.3) -> str:
+    """Génération de texte avec fallback séquentiel transparent :
+    Gemini (principal) -> DeepSeek -> Mistral -> OpenAI. Nom conservé pour compatibilité.
+    Une seule IA à la fois ; on renvoie la première réponse valide."""
+    providers = [("gemini", lambda: _gemini_text(system, prompt, temperature))]
+    if _deepseek_client:
+        providers.append(("deepseek", lambda: _oai_text(_deepseek_client, DEEPSEEK_MODEL, system, prompt, temperature)))
+    if _mistral_client:
+        providers.append(("mistral", lambda: _oai_text(_mistral_client, MISTRAL_MODEL, system, prompt, temperature)))
+    if _openai_client:
+        providers.append(("openai", lambda: _oai_text(_openai_client, OPENAI_MODEL, system, prompt, temperature)))
+    failures = []
+    last_exc = None
+    for i, (name, call) in enumerate(providers):
+        is_last = i == len(providers) - 1
+        try:
+            return await call()
+        except Exception as exc:
+            last_exc = exc
+            failures.append(f"{name}:{type(exc).__name__}")
+            if not is_last and not _is_fallbackable(exc):
+                logger.error(f"LLM '{name}' erreur non transitoire, arrêt: {exc}")
+                raise
+            logger.warning(f"LLM '{name}' indisponible ({exc}); bascule vers le fournisseur suivant"
+                           if not is_last else f"LLM '{name}' a échoué; aucun fournisseur restant")
+    if isinstance(last_exc, ValueError):
+        return ""
+    raise RuntimeError("Tous les fournisseurs IA ont échoué: " + ", ".join(failures)) from last_exc
 
 APP_NAME = "recruitai"
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -262,6 +358,18 @@ async def clear_attempts(email: str):
     await db.login_attempts.delete_one({"identifier": email})
 
 
+async def purge_user_data(uid: str):
+    """Suppression RGPD complète des données d'un utilisateur (au-delà du doc user)."""
+    await db.applications.delete_many({"candidate_id": uid})
+    await db.messages.delete_many({"conversation_id": uid})
+    await db.cv_data.delete_many({"user_id": uid})
+    await db.files.delete_many({"owner_id": uid})
+    await db.interviews.delete_many({"candidate_id": uid})
+    await db.contracts.delete_many({"candidate_id": uid})
+    await db.notifications.delete_many({"user_id": uid})
+    await db.user_sessions.delete_many({"user_id": uid})
+
+
 async def verify_captcha(captcha_id: str, answer: str):
     if not captcha_id:
         raise HTTPException(status_code=400, detail="Verification anti-robot requise")
@@ -387,23 +495,33 @@ def extract_cv_text(data: bytes, filename: str = "") -> str:
 
 
 async def transcribe_audio(data: bytes, ext: str) -> str:
-    if not _gemini_client:
-        return ""
     mime_map = {"webm": "audio/webm", "wav": "audio/wav", "mp3": "audio/mp3", "m4a": "audio/mp4",
                 "mp4": "audio/mp4", "ogg": "audio/ogg", "aac": "audio/aac", "flac": "audio/flac"}
     mime = mime_map.get((ext or "").lower(), "audio/webm")
-    try:
-        resp = await _gemini_client.aio.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[
-                genai_types.Part.from_bytes(data=data, mime_type=mime),
-                "Transcris integralement cet audio en francais. Reponds uniquement par la transcription, sans commentaire.",
-            ],
-        )
-        return (getattr(resp, "text", "") or "").strip()
-    except Exception as e:
-        logger.error(f"Transcription echouee: {e}")
-        return ""
+    if _gemini_client:
+        try:
+            resp = await _gemini_client.aio.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[
+                    genai_types.Part.from_bytes(data=data, mime_type=mime),
+                    "Transcris integralement cet audio en francais. Reponds uniquement par la transcription, sans commentaire.",
+                ],
+            )
+            txt = (getattr(resp, "text", "") or "").strip()
+            if txt:
+                return txt
+        except Exception as e:
+            logger.warning(f"Transcription Gemini echouee, fallback OpenAI: {e}")
+    if _openai_client:
+        try:
+            import io
+            f = io.BytesIO(data)
+            f.name = f"audio.{(ext or 'webm').lower()}"
+            r = await _openai_client.audio.transcriptions.create(model=OPENAI_STT_MODEL, file=f)
+            return (getattr(r, "text", "") or "").strip()
+        except Exception as e:
+            logger.error(f"Transcription OpenAI echouee: {e}")
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -439,11 +557,16 @@ def _cv_mime(filename: str, data: bytes) -> Optional[str]:
     return None
 
 
-async def parse_cv_structured(data: bytes, filename: str = "", content_type: str = "") -> dict:
-    """Extract structured CV fields via Gemini (vision for PDF/images, text otherwise)."""
-    if not _gemini_client:
-        raise RuntimeError("GEMINI_API_KEY manquant")
-    mime = _cv_mime(filename, data)
+def _parse_cv_json(raw: str) -> dict:
+    try:
+        obj = json.loads(raw)
+    except Exception:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        obj = json.loads(m.group(0)) if m else {}
+    return obj if isinstance(obj, dict) else {}
+
+
+async def _gemini_parse_cv(data: bytes, filename: str, mime: Optional[str]) -> dict:
     cfg = genai_types.GenerateContentConfig(system_instruction=CV_PARSE_SYSTEM, temperature=0)
     if mime:
         contents = [
@@ -456,13 +579,49 @@ async def parse_cv_structured(data: bytes, filename: str = "", content_type: str
             raise ValueError("Aucun texte exploitable dans le CV")
         contents = "Analyse ce CV et renvoie le JSON structure demande.\n\nCONTENU DU CV:\n" + txt[:60000]
     resp = await _gemini_client.aio.models.generate_content(model=GEMINI_MODEL, contents=contents, config=cfg)
-    raw = (getattr(resp, "text", "") or "").strip()
-    try:
-        obj = json.loads(raw)
-    except Exception:
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        obj = json.loads(m.group(0)) if m else {}
-    return obj if isinstance(obj, dict) else {}
+    return _parse_cv_json((getattr(resp, "text", "") or "").strip())
+
+
+async def _openai_parse_cv(data: bytes, filename: str, mime: Optional[str]) -> dict:
+    import base64
+    if mime and mime.startswith("image/"):
+        b64 = base64.b64encode(data).decode()
+        user_content = [
+            {"type": "text", "text": "Analyse ce CV et renvoie le JSON structuré demandé."},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]
+    else:
+        txt = extract_cv_text(data, filename)
+        if not txt:
+            raise ValueError("Aucun texte exploitable dans le CV")
+        user_content = "Analyse ce CV et renvoie le JSON structuré demandé.\n\nCONTENU DU CV:\n" + txt[:60000]
+    resp = await _openai_client.chat.completions.create(
+        model=OPENAI_VISION_MODEL,
+        messages=[{"role": "system", "content": CV_PARSE_SYSTEM}, {"role": "user", "content": user_content}],
+        temperature=0, response_format={"type": "json_object"},
+    )
+    return _parse_cv_json((resp.choices[0].message.content or "").strip())
+
+
+async def parse_cv_structured(data: bytes, filename: str = "", content_type: str = "") -> dict:
+    """Extraction structurée du CV : Gemini (vision) principal, fallback OpenAI."""
+    mime = _cv_mime(filename, data)
+    last = None
+    if _gemini_client:
+        try:
+            return await _gemini_parse_cv(data, filename, mime)
+        except Exception as e:
+            last = e
+            logger.warning(f"parse_cv Gemini echoue, fallback OpenAI: {e}")
+    if _openai_client:
+        try:
+            return await _openai_parse_cv(data, filename, mime)
+        except Exception as e:
+            last = e
+            logger.error(f"parse_cv OpenAI echoue: {e}")
+    if not _gemini_client and not _openai_client:
+        raise RuntimeError("Aucun fournisseur IA configuré pour l'analyse de CV")
+    raise (last or RuntimeError("Analyse CV impossible"))
 
 
 async def scan_user_cv(user_id: str, force: bool = False) -> dict:

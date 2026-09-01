@@ -390,6 +390,15 @@ export const FR_EN = {
   "Candidature créée": "Application created",
   "Choisissez une offre": "Choose an offer",
   "Échec de la création": "Creation failed",
+  "Modifier": "Edit",
+  "Note interne": "Internal note",
+  "Note d'entretien": "Interview note",
+  "Aucune": "None",
+  "Enregistrer": "Save",
+  "Enregistrement…": "Saving…",
+  "Compte-rendu de l'entretien...": "Interview report...",
+  "Candidature mise à jour": "Application updated",
+  "Échec de la mise à jour": "Update failed",
 };
 
 export default FR_EN;

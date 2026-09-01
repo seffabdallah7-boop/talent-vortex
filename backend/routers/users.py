@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from core import (
     db, logger, require_admin, require_super, get_current_user, public_user,
-    EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage,
+    EMERGENT_LLM_KEY, gemini_generate, GEMINI_API_KEY, LlmChat, UserMessage, purge_user_data,
 )
 
 router = APIRouter()
@@ -272,8 +272,7 @@ async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     if target and target.get("is_super"):
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     await db.users.delete_one({"user_id": user_id})
-    await db.applications.delete_many({"candidate_id": user_id})
-    await db.messages.delete_many({"conversation_id": user_id})
+    await purge_user_data(user_id)
     return {"ok": True}
 
 
@@ -283,6 +282,5 @@ async def delete_candidate(user_id: str, admin: dict = Depends(require_admin)):
     if target and target.get("is_super"):
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     await db.users.delete_one({"user_id": user_id, "role": "candidate"})
-    await db.applications.delete_many({"candidate_id": user_id})
-    await db.messages.delete_many({"conversation_id": user_id})
+    await purge_user_data(user_id)
     return {"ok": True}

@@ -302,13 +302,30 @@ async def delete_application(app_id: str, admin: dict = Depends(require_admin)):
     return {"ok": True}
 
 
+_INLINE_SAFE = {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "application/pdf"}
+
+
+def _safe_file_response(record: dict, data: bytes, fallback_ct: str) -> Response:
+    """Sert un fichier uploadé sans risque de XSS stocké : seuls des types sûrs
+    (images bitmap, PDF) sont rendus inline ; tout le reste (HTML, SVG, etc.) est
+    forcé en téléchargement et servi en octet-stream avec nosniff."""
+    ct = (record.get("content_type") or fallback_ct or "application/octet-stream").split(";")[0].strip().lower()
+    fname = re.sub(r'[\r\n"]', "", record.get("original_filename") or "fichier")[:200]
+    if ct in _INLINE_SAFE:
+        media, disp = ct, f'inline; filename="{fname}"'
+    else:
+        media, disp = "application/octet-stream", f'attachment; filename="{fname}"'
+    return Response(content=data, media_type=media,
+                    headers={"Content-Disposition": disp, "X-Content-Type-Options": "nosniff"})
+
+
 @router.get("/files/public/{file_id}")
 async def download_public_file(file_id: str):
     record = await db.files.find_one({"id": file_id, "is_deleted": False, "public": True}, {"_id": 0})
     if not record:
         raise HTTPException(status_code=404, detail="Fichier introuvable")
     data, content_type = get_object(record["storage_path"])
-    return Response(content=data, media_type=record.get("content_type", content_type))
+    return _safe_file_response(record, data, content_type)
 
 
 @router.get("/files/{file_id}")
@@ -319,4 +336,4 @@ async def download_file(file_id: str, user: dict = Depends(get_current_user)):
     if user.get("role") != "admin" and record["owner_id"] != user["user_id"] and record.get("conversation_id") != user["user_id"]:
         raise HTTPException(status_code=403, detail="Acces refuse")
     data, content_type = get_object(record["storage_path"])
-    return Response(content=data, media_type=record.get("content_type", content_type))
+    return _safe_file_response(record, data, content_type)
