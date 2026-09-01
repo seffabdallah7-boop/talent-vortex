@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api, { fileUrl } from "@/lib/api";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/Avatar";
@@ -33,18 +34,33 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [njob, setNjob] = useState("");
+  const [nstatus, setNstatus] = useState("interview_scheduled");
+  const [adding, setAdding] = useState(false);
 
+  const reload = () => api.get(`/users/${userId}`).then(({ data }) => setData(data)).catch(() => {});
   useEffect(() => {
     if (open && userId) {
       setLoading(true);
       setData(null);
       setError(false);
-      api.get(`/users/${userId}`)
-        .then(({ data }) => setData(data))
-        .catch(() => setError(true))
-        .finally(() => setLoading(false));
+      api.get(`/users/${userId}`).then(({ data }) => setData(data)).catch(() => setError(true)).finally(() => setLoading(false));
+      api.get("/jobs/all").then(({ data }) => setJobs(data || [])).catch(() => {});
     }
   }, [open, userId]);
+  const addApplication = async () => {
+    if (!njob) { toast.error("Choisissez une offre"); return; }
+    setAdding(true);
+    try {
+      await api.post("/applications/admin-create", { candidate_id: userId, job_id: njob, status: nstatus });
+      toast.success("Candidature créée");
+      setAddOpen(false); setNjob("");
+      reload();
+    } catch (e) { toast.error("Échec de la création"); }
+    finally { setAdding(false); }
+  };
 
   const u = data?.user;
   const apps = data?.applications || [];
@@ -153,7 +169,26 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
 
             {/* Applications */}
             <div className="rounded-2xl border border-border bg-card p-5">
-              <p className="font-medium mb-3">Candidatures ({apps.length})</p>
+              <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <p className="font-medium">Candidatures ({apps.length})</p>
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setAddOpen((o) => !o)} data-testid="add-application-btn">+ Ajouter une candidature</Button>
+              </div>
+              {addOpen && (
+                <div className="rounded-xl border border-border p-3 mb-3 space-y-2" data-testid="add-application-form">
+                  <select value={njob} onChange={(e) => setNjob(e.target.value)} data-testid="add-app-job" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <option value="">— Choisir une offre —</option>
+                    {jobs.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
+                  </select>
+                  <select value={nstatus} onChange={(e) => setNstatus(e.target.value)} data-testid="add-app-status" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <option value="interview_scheduled">Entretien fixé</option>
+                    <option value="interview_done">Entretien fait</option>
+                    <option value="pending">En attente</option>
+                    <option value="accepted">Acceptée</option>
+                    <option value="rejected">Refusée</option>
+                  </select>
+                  <Button size="sm" className="rounded-full w-full" onClick={addApplication} disabled={adding} data-testid="add-app-submit">{adding ? "Création…" : "Créer la candidature"}</Button>
+                </div>
+              )}
               {apps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Aucune candidature.</p>
               ) : (
@@ -175,6 +210,7 @@ export default function CandidateProfileDialog({ userId, open, onClose, onChat, 
                         </div>
                       </div>
                       {a.admin_note && <p className="text-xs text-muted-foreground italic mt-2">Note interne : {a.admin_note}</p>}
+                      {a.interview_note && <p className="text-xs text-purple-600 italic mt-2" data-testid={`app-iv-note-${a.id}`}>Note d'entretien : {a.interview_note}</p>}
                       <div className="flex gap-2 mt-2">
                         {a.cv_file_id && (
                           <a href={fileUrl(a.cv_file_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">

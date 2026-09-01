@@ -5,7 +5,7 @@ const MAP = {
   accepted: { label: "Acceptée", cls: "status-accepted", Icon: CheckCircle2 },
   rejected: { label: "Refusée", cls: "status-rejected", Icon: XCircle },
   interview_scheduled: { label: "Entretien fixé", cls: "bg-blue-500/15 text-blue-600", Icon: CalendarClock },
-  interview_done: { label: "Entretien déjà fait", cls: "bg-purple-500/15 text-purple-600", Icon: CalendarCheck },
+  interview_done: { label: "Entretien fait", cls: "bg-purple-500/15 text-purple-600", Icon: CalendarCheck },
 };
 
 export default function StatusBadge({ status, className = "" }) {

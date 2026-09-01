@@ -1,0 +1,38 @@
+{
+  "summary": "Full E2E validation of Lot 2 (interview badges + CV scan badge/filters) and admin '+ Add application' from the candidate profile, plus English-by-default check. Backend pytest suite (6/6) covers: /api/users returns interview_status/has_cv/cv_scanned, GET /api/jobs/all, POST /api/applications/admin-create (success + status persists + surfaces in GET /users/{id}), 400 on invalid status, 404 on unknown ids, 401/403 without auth. Frontend: landing loads in English (contains 'See jobs' and 'at the heart of', French 'au cœur du' absent). Admin login (email+password+captcha 'a+b=?' math) succeeds and lands on /admin with all nav labels in English (Dashboard, Job offers, Applications, Contracts, Interview agenda, Users, Messages, Meeting room, Recordings, Suggestions IA, Appearance, Log out). Users page renders 13 candidate rows with data-testid='candidate-row-*'; both filters render (filter-interview, filter-cvscan) and actually filter: CV=scanned reduces to 6 rows (all with green 'CV' pills badge-cv-scanned-*, 0 unscanned badges visible); CV=unscanned reduces to 1 row (red 'CV' pill badge-cv-unscanned-*); Interview=scheduled reduces to 2 rows with 2 badge-interview-scheduled-* pills. Interview badges observed: 2 scheduled, 1 done. Opened profile dialog (candidate-profile-dialog) for Cand Test, clicked add-application-btn -> add-application-form appears with add-app-job (5 job options loaded via /api/jobs/all) and add-app-status select; submitted with job 'Dessinateur(trice) électrique' + status 'interview_scheduled' -> 'Application created' toast, new profile-app-* row rendered with 'Interview scheduled' status badge (0->1 applications).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "Candidate profile dialog (EN)", "issues": ["Section header still reads 'Candidatures (1)' instead of 'Applications (1)' because the FR->EN dictionary only matches whole trimmed text nodes; the appended count breaks the exact match. Consider a dedicated i18n key or splitting the count into a sibling node."] },
+      { "screen": "Users page (EN)", "issues": ["'Sélectionner' bulk-select button is not present in uiDict.js so it remains French while everything else is translated. Add 'Sélectionner' -> 'Select' (and any 'Annuler' fallbacks that still appear next to it)."] },
+      { "screen": "Admin nav (EN)", "issues": ["'Suggestions IA' item keeps the French 'IA'; consider 'AI Suggestions'."] },
+      { "screen": "Profile dialog", "issues": ["Application posted-date is formatted with fr-FR locale ('Postulé le 1 septembre 2026'); pick locale from i18n.language."] }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_lot2_features.py",
+    "/app/test_reports/pytest/lot2_results.xml"
+  ],
+  "action_items": [
+    "Optional i18n polish: translate 'Sélectionner' button and 'Suggestions IA' nav entry; render Candidatures/Applications count outside the translatable text; format dates using i18n.language."
+  ],
+  "critical_code_review_comments": [
+    "CandidateProfileDialog.jsx addApplication toasts hardcode French ('Choisissez une offre', 'Candidature créée', 'Échec de la création') — these strings are in uiDict.js but sonner toasts bypass the DOM-scan translator (uiDict is applied to rendered text, not to toast payloads). Use useTranslation() / t() for toasts.",
+    "applications.py::admin_create_application accepts a raw dict body — introduce a Pydantic model (candidate_id/job_id/status) for validation and OpenAPI documentation; currently missing candidate_id/job_id silently 404 instead of returning 422.",
+    "users.py::list_users computes interview_status from a full scan of applications with status in {scheduled,done} on every request; add an index on applications.status and consider $lookup, or cache per short TTL to avoid a full to_list(5000) for each list load.",
+    "AdminCandidates.jsx: interview badges + CV pill labels ('Entretien fixé', 'Entretien fait', 'CV') are hardcoded French/short-labels; the CV pill uses title='CV scanned'/'CV not scanned' (English) but the visible label is only 'CV' — fine, but the interview badges won't switch with the FR/EN toggle unless the tokens are added to uiDict or bound to i18n keys.",
+    "CandidateProfileDialog.jsx fmtDate is hardcoded to fr-FR — should honour selected language."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_lot2_features.py (new)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "test_credentials": "Admin seffabdallah7@gmail.com / Admin@2026! ; captcha via GET /api/auth/captcha (simple arithmetic). No candidate account was needed for these flows.",
+  "seed_data_creation": "Test created one application via POST /api/applications/admin-create for candidate 'Cand Test' (user_d58128841b71) on job 'Dessinateur(trice) électrique' with status interview_scheduled. Also asserted a second (idempotent update path) from pytest. These are harmless test artefacts; the admin-create endpoint updates the existing row on collision so no duplicates.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run backend tests with: `python -m pytest backend/tests/test_lot2_features.py -v -o 'addopts='`. Captcha is a simple math prompt 'a + b = ?'; scrape it from GET /api/auth/captcha and eval. Frontend testids exercised: nav-users, candidate-row-*, filter-interview, filter-cvscan, badge-cv-scanned-*, badge-cv-unscanned-*, badge-interview-scheduled-*, badge-interview-done-*, open-profile-*, candidate-profile-dialog, add-application-btn, add-application-form, add-app-job, add-app-status, add-app-submit, profile-app-*. Language default = English (i18n fallbackLng='en', detection order=['localStorage']); to test FR keep the FR/EN toggle in the header.",
+  "rca of the issue": "N/A — feature works as specified. Remaining items are i18n polish (see design_issues)."
+}

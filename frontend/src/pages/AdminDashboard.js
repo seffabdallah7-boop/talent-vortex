@@ -566,7 +566,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
               <SelectItem value="accepted">Acceptées</SelectItem>
               <SelectItem value="rejected">Refusées</SelectItem>
               <SelectItem value="interview_scheduled">Entretien fixé</SelectItem>
-              <SelectItem value="interview_done">Entretien déjà fait</SelectItem>
+              <SelectItem value="interview_done">Entretien fait</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -680,7 +680,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                     <Button size="sm" onClick={() => setStatus(detail.id, "rejected")} className="rounded-full status-rejected border-0" data-testid="reject-btn">Refuser</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "pending")} className="rounded-full">En attente</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_scheduled")} className="rounded-full" data-testid="interview-scheduled-btn">Entretien fixé</Button>
-                    <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_done")} className="rounded-full" data-testid="interview-done-btn">Entretien déjà fait</Button>
+                    <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_done")} className="rounded-full" data-testid="interview-done-btn">Entretien fait</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDel(detail)} className="rounded-full ml-auto text-destructive" data-testid="delete-app-btn"><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>

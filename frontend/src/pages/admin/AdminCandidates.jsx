@@ -37,6 +37,8 @@ export default function Candidates({ onOpenProfile }) {
   const [minRating, setMinRating] = useState("all");
   const [nats, setNats] = useState([]);
   const [natFilter, setNatFilter] = useState("");
+  const [ivFilter, setIvFilter] = useState("all");
+  const [cvFilter, setCvFilter] = useState("all");
   const [natOpen, setNatOpen] = useState(false);
   const [cvView, setCvView] = useState(null);
   const [aiQuery, setAiQuery] = useState("");
@@ -143,7 +145,14 @@ export default function Candidates({ onOpenProfile }) {
     } catch (e) { toast.error("Impossible d'ouvrir le CV original"); }
   };
   const visibleList = list.filter((u) => !me || u.user_id !== me.user_id);
-  const filteredList = natFilter ? visibleList.filter((u) => (u.nationality || "") === natFilter) : visibleList;
+  const filteredList = (natFilter ? visibleList.filter((u) => (u.nationality || "") === natFilter) : visibleList)
+    .filter((u) => ivFilter === "all" ? true : u.interview_status === ivFilter)
+    .filter((u) => {
+      if (cvFilter === "all") return true;
+      if (cvFilter === "scanned") return u.cv_scanned;
+      if (cvFilter === "unscanned") return u.has_cv && !u.cv_scanned;
+      return true;
+    });
   const lc = useListControls(filteredList, { pageSize: 15, selectId: (u) => u.user_id });
   const bulkDelete = async () => {
     const ids = lc.selectedIds();
@@ -278,6 +287,22 @@ export default function Candidates({ onOpenProfile }) {
           <Button onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} className="rounded-full shrink-0" data-testid="ai-search-btn">{aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}<span className="hidden sm:inline ml-2">Envoyer</span></Button>
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-3 mb-4" data-testid="user-filters">
+        <label className="text-xs text-muted-foreground">Entretien
+          <select value={ivFilter} onChange={(e) => setIvFilter(e.target.value)} data-testid="filter-interview" className="ml-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm">
+            <option value="all">Tous</option>
+            <option value="interview_scheduled">Entretien fixé</option>
+            <option value="interview_done">Entretien fait</option>
+          </select>
+        </label>
+        <label className="text-xs text-muted-foreground">Scan CV
+          <select value={cvFilter} onChange={(e) => setCvFilter(e.target.value)} data-testid="filter-cvscan" className="ml-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm">
+            <option value="all">Tous</option>
+            <option value="scanned">CV bien scanné</option>
+            <option value="unscanned">CV non scanné</option>
+          </select>
+        </label>
+      </div>
       {nats.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-4 mb-6" data-testid="nationalities-panel">
           <button type="button" onClick={() => setNatOpen((o) => !o)} data-testid="toggle-nationalities" className="flex items-center gap-2 w-full text-left">
@@ -321,7 +346,16 @@ export default function Candidates({ onOpenProfile }) {
                     <TableCell className="font-medium">
                       <button className="flex items-center gap-3 hover:opacity-80 text-left" onClick={() => onOpenProfile(u.user_id)} data-testid={`open-profile-${u.user_id}`}>
                         <Avatar name={u.name} src={u.picture} size={36} />
-                        <span>{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</span>
+                        <span className="flex flex-col gap-1">
+                          <span>{u.name} {isSelf && <span className="text-xs text-muted-foreground">(vous)</span>}</span>
+                          <span className="flex items-center gap-1.5 flex-wrap">
+                            {u.interview_status === "interview_scheduled" && <span className="rounded-full bg-blue-500/15 text-blue-600 px-2 py-0.5 text-[10px] font-semibold" data-testid={`badge-interview-scheduled-${u.user_id}`}>Entretien fixé</span>}
+                            {u.interview_status === "interview_done" && <span className="rounded-full bg-purple-500/15 text-purple-600 px-2 py-0.5 text-[10px] font-semibold" data-testid={`badge-interview-done-${u.user_id}`}>Entretien fait</span>}
+                            {u.role === "candidate" && u.has_cv && (u.cv_scanned
+                              ? <span title="CV scanned" className="rounded-full bg-emerald-500/15 text-emerald-600 px-2 py-0.5 text-[10px] font-bold" data-testid={`badge-cv-scanned-${u.user_id}`}>CV</span>
+                              : <span title="CV not scanned" className="rounded-full bg-destructive/15 text-destructive px-2 py-0.5 text-[10px] font-bold" data-testid={`badge-cv-unscanned-${u.user_id}`}>CV</span>)}
+                          </span>
+                        </span>
                       </button>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>

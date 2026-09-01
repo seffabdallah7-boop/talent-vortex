@@ -94,10 +94,10 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: "fr",
+    fallbackLng: "en",
     supportedLngs: ["fr", "en"],
     interpolation: { escapeValue: false },
-    detection: { order: ["localStorage", "navigator"], caches: ["localStorage"], lookupLocalStorage: "lang" },
+    detection: { order: ["localStorage"], caches: ["localStorage"], lookupLocalStorage: "lang" },
   });
 
 export default i18n;

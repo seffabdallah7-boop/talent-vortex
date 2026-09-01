@@ -164,7 +164,7 @@ async def forgot_password(body: ForgotInput):
                       "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(), "used": False}},
             upsert=True,
         )
-        logger.info(f"RESET {email} = {code}")
+        logger.info(f"Password reset requested for {email}")
         await send_email(email, "Reinitialisation de votre mot de passe Talent Vortex", reset_email_html(code, user.get("name", "")))
     return {"ok": True}
 

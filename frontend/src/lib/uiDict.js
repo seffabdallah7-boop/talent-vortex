@@ -317,6 +317,79 @@ export const FR_EN = {
   "Impossible de démarrer l'enregistrement (partage d'écran refusé ?)": "Unable to start recording (screen sharing refused?)",
   "Merci de répondre à toutes les questions.": "Please answer all questions.",
   "Veuillez joindre votre CV.": "Please attach your resume.",
+
+  // --- Interview statuses (Lot 1 & 2) ---
+  "Entretien fixé": "Interview scheduled",
+  "Entretien fait": "Interview done",
+  "Entretiens fixés": "Interviews scheduled",
+  "Note d'entretien :": "Interview note:",
+  "Note interne :": "Internal note:",
+
+  // --- Users list: filters, badges, panels ---
+  "Rechercher (nom, email, domaine, contenu du CV...)": "Search (name, email, domain, CV content...)",
+  "Scan CV": "CV scan",
+  "CV bien scanné": "CV scanned",
+  "CV non scanné": "CV not scanned",
+
+  // --- CV scanning panel ---
+  "Scanning IA des CV — extraction structurée (compétences, expériences, formations…)": "AI CV scanning — structured extraction (skills, experience, education…)",
+  "Scanner les CV non scannés": "Scan unscanned CVs",
+  "Scan en cours…": "Scanning…",
+  "Tout re-scanner": "Re-scan all",
+  "CV total :": "Total CVs:",
+  "Scannés :": "Scanned:",
+  "À scanner :": "To scan:",
+  "Erreurs :": "Errors:",
+  "Scan des CV lancé en arrière-plan.": "CV scan started in the background.",
+  "Un scan est déjà en cours.": "A scan is already running.",
+  "Impossible de lancer le scan.": "Unable to start the scan.",
+
+  // --- Conversational AI agent ---
+  "Agent IA conversationnel — analyse des profils & du contenu des CV": "Conversational AI agent — analyses profiles & CV content",
+  "Nouvelle conversation": "New conversation",
+  "L'agent analyse les CV…": "The agent is analysing the CVs…",
+  "Envoyer": "Send",
+  "Voir le profil": "View profile",
+  "Parlez maintenant…": "Speak now…",
+  "Ex : qui a de l'expérience React et connaît Docker ?": "e.g. who has React experience and knows Docker?",
+  "Arrêter la dictée": "Stop dictation",
+  "Dicter la requête": "Dictate the query",
+  "La saisie vocale n'est pas supportée par ce navigateur (utilisez Chrome ou Edge).": "Voice input is not supported by this browser (use Chrome or Edge).",
+  "Recherche IA indisponible": "AI search unavailable",
+  "Désolé, la recherche IA est momentanément indisponible.": "Sorry, the AI search is temporarily unavailable.",
+
+  // --- CV preview dialog (structured extraction) ---
+  "Chargement…": "Loading…",
+  "Données extraites par l'IA": "Data extracted by AI",
+  "Poste :": "Position:",
+  "Expérience :": "Experience:",
+  "Email :": "Email:",
+  "Téléphone :": "Phone:",
+  "Compétences": "Skills",
+  "Expériences": "Experience",
+  "Formations": "Education",
+  "Langues :": "Languages:",
+  "Échec du scan de ce CV. Cliquez « Re-scanner » pour réessayer.": "This CV scan failed. Click \u201cRe-scan\u201d to try again.",
+  "Ce CV n'a pas encore été scanné. Cliquez « Re-scanner » pour extraire les données.": "This CV has not been scanned yet. Click \u201cRe-scan\u201d to extract the data.",
+  "Texte brut du CV": "Raw CV text",
+  "Aucun texte brut exploitable dans ce CV.": "No usable raw text in this CV.",
+  "CV original": "Original CV",
+  "Re-scanner": "Re-scan",
+  "Re-scan du CV en cours…": "Re-scanning CV…",
+  "CV re-scanné": "CV re-scanned",
+  "Échec du re-scan": "Re-scan failed",
+  "Impossible de charger le CV": "Unable to load the CV",
+  "Impossible d'ouvrir le CV original": "Unable to open the original CV",
+  "Suppression effectuée": "Deletion done",
+
+  // --- Candidate profile dialog: add application ---
+  "+ Ajouter une candidature": "+ Add application",
+  "— Choisir une offre —": "— Choose an offer —",
+  "Créer la candidature": "Create application",
+  "Création…": "Creating…",
+  "Candidature créée": "Application created",
+  "Choisissez une offre": "Choose an offer",
+  "Échec de la création": "Creation failed",
 };
 
 export default FR_EN;
