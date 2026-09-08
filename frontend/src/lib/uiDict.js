@@ -399,6 +399,7 @@ export const FR_EN = {
   "Compte-rendu de l'entretien...": "Interview report...",
   "Candidature mise à jour": "Application updated",
   "Échec de la mise à jour": "Update failed",
+  "Inscription": "Registered",
 };
 
 export default FR_EN;

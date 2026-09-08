@@ -586,7 +586,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
         <ListToolbar lc={lc} onBulkDelete={bulkDelete} testId="apps" />
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead>}<TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Statut</TableHead>{activeJobId && <TableHead>Match IA</TableHead>}<TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-apps" /></TableHead>}<TableHead>Candidat</TableHead><TableHead>Poste</TableHead><TableHead>Date</TableHead><TableHead>Statut</TableHead>{activeJobId && <TableHead>Match IA</TableHead>}<TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((a) => (
                 <TableRow key={a.id} className="cursor-pointer" onClick={() => setDetail(a)} data-testid={`app-row-${a.id}`}>
@@ -607,6 +607,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                     </div>
                   </TableCell>
                   <TableCell>{a.job_title}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap" data-testid={`app-date-${a.id}`}>{a.created_at ? new Date(a.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
                   <TableCell><StatusBadge status={a.status} /></TableCell>
                   {activeJobId && <TableCell data-testid={`app-match-${a.id}`}>{scoresLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : scores[a.candidate_id] ? <MatchBadge score={scores[a.candidate_id].score} reason={scores[a.candidate_id].reason} /> : <span className="text-muted-foreground text-sm">—</span>}</TableCell>}
                   <TableCell className="text-right">

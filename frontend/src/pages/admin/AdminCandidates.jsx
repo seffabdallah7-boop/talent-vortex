@@ -335,7 +335,7 @@ export default function Candidates({ onOpenProfile }) {
         </div>
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <Table>
-            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-users" /></TableHead>}<TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow>{lc.selectMode && <TableHead className="w-10"><Checkbox checked={lc.allPageSelected} onCheckedChange={lc.toggleAllPage} data-testid="select-all-users" /></TableHead>}<TableHead>Nom</TableHead><TableHead>Email</TableHead><TableHead>Nationalité</TableHead><TableHead>Poste</TableHead><TableHead>Appréciation</TableHead><TableHead>Rôle</TableHead><TableHead>Cand.</TableHead><TableHead>Inscription</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {lc.pageItems.map((u) => {
                 const isSelf = me && u.user_id === me.user_id;
@@ -376,6 +376,7 @@ export default function Candidates({ onOpenProfile }) {
                       {me?.is_super && u.is_super && <span className="ml-1 rounded-full bg-amber-500/15 text-amber-600 px-2 py-0.5 text-[10px] font-semibold" data-testid={`super-badge-${u.user_id}`}>Super</span>}
                     </TableCell>
                     <TableCell><span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium">{u.application_count}</span></TableCell>
+                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap" data-testid={`user-created-${u.user_id}`}>{u.created_at ? new Date(u.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}</TableCell>
                     <TableCell className="text-right">
                       {!isSelf && u.role === "candidate" && (
                         <Button variant="outline" size="sm" className="rounded-full mr-2" onClick={() => setPromote(u)} data-testid={`promote-${u.user_id}`}>Promouvoir admin</Button>
@@ -393,7 +394,7 @@ export default function Candidates({ onOpenProfile }) {
                   </TableRow>
                   {u.cv_snippet && (
                     <TableRow data-testid={`cv-snippet-row-${u.user_id}`} className="bg-secondary/30 hover:bg-secondary/30">
-                      <TableCell colSpan={9} className="py-2 text-xs text-muted-foreground">
+                      <TableCell colSpan={10} className="py-2 text-xs text-muted-foreground">
                         <button type="button" onClick={() => openCv(u)} className="text-left hover:opacity-80" data-testid={`cv-snippet-${u.user_id}`}>
                           <span className="font-semibold text-foreground/70 mr-1">CV :</span>
                           <Highlight text={u.cv_snippet} q={q} />

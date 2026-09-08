@@ -119,6 +119,8 @@ async def admin_stats(admin: dict = Depends(require_admin)):
         "contracts_closed": await db.contracts.count_documents({"status": "boucle"}),
         "contracts_terminated": await db.contracts.count_documents({"status": "resilie"}),
         "upcoming_interviews": await db.interviews.count_documents({"date": {"$gte": today}}),
+        "interviews_scheduled": await db.applications.count_documents({"status": "interview_scheduled"}),
+        "interviews_done": await db.applications.count_documents({"status": "interview_done"}),
     }
 
 
