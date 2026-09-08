@@ -484,9 +484,9 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
   const [itwForm, setItwForm] = useState({ title: "", date: "", time: "", location: "", notes: "" });
   const [scheduling, setScheduling] = useState(false);
 
-  const accept = async () => {
-    await setStatus(detail.id, "accepted");
+  const scheduleInterview = async () => {
     const app = detail;
+    await setStatus(app.id, "interview_scheduled");
     setDetail(null);
     setItwForm({ title: `Entretien — ${app.job_title}`, date: "", time: "", location: "", notes: "" });
     setSchedule({ candidate_id: app.candidate_id, candidate_name: app.candidate_name, application_id: app.id });
@@ -677,10 +677,10 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Décision</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={accept} className="rounded-full status-accepted border-0" data-testid="accept-btn">Accepter</Button>
+                    <Button size="sm" onClick={() => setStatus(detail.id, "accepted")} className="rounded-full status-accepted border-0" data-testid="accept-btn">Accepter</Button>
                     <Button size="sm" onClick={() => setStatus(detail.id, "rejected")} className="rounded-full status-rejected border-0" data-testid="reject-btn">Refuser</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "pending")} className="rounded-full">En attente</Button>
-                    <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_scheduled")} className="rounded-full" data-testid="interview-scheduled-btn">Entretien fixé</Button>
+                    <Button size="sm" variant="outline" onClick={scheduleInterview} className="rounded-full" data-testid="interview-scheduled-btn">Entretien fixé</Button>
                     <Button size="sm" variant="outline" onClick={() => setStatus(detail.id, "interview_done")} className="rounded-full" data-testid="interview-done-btn">Entretien fait</Button>
                     <Button size="sm" variant="ghost" onClick={() => setDel(detail)} className="rounded-full ml-auto text-destructive" data-testid="delete-app-btn"><Trash2 className="h-4 w-4" /></Button>
                   </div>
@@ -731,7 +731,7 @@ function Applications({ jobFilter, onClearJobFilter, onOpenProfile, initialStatu
           <DialogHeader><DialogTitle>Planifier l'entretien</DialogTitle></DialogHeader>
           {schedule && (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Candidat accepté : <b>{schedule.candidate_name}</b>. Fixez la date de l'entretien — il apparaîtra dans son espace et il sera notifié.</p>
+              <p className="text-sm text-muted-foreground">Rendez-vous pour <b>{schedule.candidate_name}</b>. Fixez la date et l'heure — il apparaîtra dans son espace et il sera notifié.</p>
               <div><Label>Intitulé</Label><Input data-testid="schedule-title-input" value={itwForm.title} onChange={(e) => setItwForm({ ...itwForm, title: e.target.value })} className="mt-1" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Date</Label><Input type="date" data-testid="schedule-date-input" value={itwForm.date} onChange={(e) => setItwForm({ ...itwForm, date: e.target.value })} className="mt-1" /></div>

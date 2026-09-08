@@ -400,6 +400,9 @@ export const FR_EN = {
   "Candidature mise à jour": "Application updated",
   "Échec de la mise à jour": "Update failed",
   "Inscription": "Registered",
+  "Rendez-vous pour": "Appointment for",
+  ". Fixez la date et l'heure — il apparaîtra dans son espace et il sera notifié.": ". Set the date and time — it will appear in their space and they will be notified.",
+  "Planifier l'entretien": "Schedule the interview",
 };
 
 export default FR_EN;
